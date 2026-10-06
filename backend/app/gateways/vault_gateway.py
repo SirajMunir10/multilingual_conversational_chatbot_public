@@ -1,0 +1,69 @@
+from typing import Optional, Dict, Any, List
+from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+from app.core.audit import AuditService
+
+class VaultMortgageLeadPayload(BaseModel):
+    applicant_name: str
+    applicant_phone: Optional[str] = None
+    applicant_email: Optional[str] = None
+    monthly_income: float
+    existing_debt: float
+    calculated_affordability_max: Optional[float] = None
+    estimated_emi: Optional[float] = None
+    nationality_status: Optional[str] = None  # uae_national, expat
+    consent_given: bool = True  # Mandatory explicit consent check
+    notes: Optional[str] = None
+
+class VaultMortgageLeadResponse(BaseModel):
+    application_id: str
+    crm: str = "Vault"
+    status: str = "submitted"
+    created_at: str
+
+class VaultGateway:
+    """
+    Vault — In-house Mortgage CRM Gateway.
+    Accessed strictly through this scoped API gateway.
+    No direct database connection from LLM/bot layer (Rule 4 / PRD Sec 6.1).
+    All writes are strictly logged.
+    """
+    _applications_store: List[Dict[str, Any]] = []
+
+    @classmethod
+    def create_lead(
+        cls,
+        payload: VaultMortgageLeadPayload,
+        session_id: Optional[str] = None,
+        user_id: Optional[str] = None
+    ) -> VaultMortgageLeadResponse:
+        app_id = f"vault_app_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        record = {
+            "application_id": app_id,
+            "crm": "Vault",
+            "payload": payload.model_dump(),
+            "session_id": session_id,
+            "user_id": user_id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        cls._applications_store.append(record)
+
+        # Mandatory audit logging for business write action
+        AuditService.log_event(
+            event_type="business_write",
+            action="create_lead_vault",
+            resource="vault_crm",
+            session_id=session_id,
+            user_id=user_id,
+            details={
+                "application_id": app_id,
+                "calculated_affordability_max": payload.calculated_affordability_max,
+                "consent_given": payload.consent_given
+            }
+        )
+
+        return VaultMortgageLeadResponse(
+            application_id=app_id,
+            status="submitted",
+            created_at=record["created_at"]
+        )
