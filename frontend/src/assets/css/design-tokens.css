@@ -1,0 +1,138 @@
+:root, [data-theme="light"] {
+  /* =========================================================================
+     XO Official Brand Color Palette (HEX, RGB, CMYK Aligned)
+     =========================================================================
+     1. Primary Purple:        #5C039B (RGB: 92, 3, 155   | CMYK: 80, 100, 0, 1)
+     2. Obsidian Black:        #020202 (RGB: 2, 2, 2      | CMYK: 75, 68, 67, 89)
+     3. Pure White:            #FFFFFF (RGB: 255, 255, 255| CMYK: 0, 0, 0, 0)
+     4. Electric Lime Green:   #64EF0A (RGB: 100, 239, 10 | CMYK: 56, 0, 100, 0)
+     5. Electric Cyan / Azure: #03A4F4 (RGB: 3, 164, 244  | CMYK: 70, 24, 0, 0)
+     ========================================================================= */
+
+  /* Brand Core Colors */
+  --brand-purple: #5C039B;
+  --brand-purple-light: #7B1FA2;
+  --brand-purple-vibrant: #8A2BE2;
+  --brand-purple-soft: #A855F7;
+  --brand-purple-dark: #420170;
+  --brand-purple-deep: #2A0148;
+  --brand-purple-glow: rgba(92, 3, 155, 0.22);
+
+  --brand-black: #020202;
+  --brand-white: #FFFFFF;
+
+  --brand-lime: #16A34A; /* Accessible green for text on light */
+  --brand-lime-vivid: #64EF0A; /* Signature brand lime for dots & badges */
+  --brand-lime-light: #86EF3C;
+  --brand-lime-dark: #15803D;
+  --brand-lime-glow: rgba(100, 239, 10, 0.35);
+
+  --brand-cyan: #0284C7; /* Accessible cyan-azure for text on light */
+  --brand-cyan-vivid: #03A4F4; /* Signature brand cyan */
+  --brand-cyan-light: #38BDF8;
+  --brand-cyan-dark: #0369A1;
+  --brand-cyan-glow: rgba(3, 164, 244, 0.3);
+
+  /* Semantic UI Tokens: LIGHT MODE (DEFAULT) */
+  --bg-primary: #F8F9FD;
+  --bg-secondary: #FFFFFF;
+  --bg-surface: #FFFFFF;
+  --bg-surface-elevated: #F1F4F9;
+  --bg-surface-hover: #E8EDF5;
+  --bg-glass: rgba(255, 255, 255, 0.94);
+  --bg-glass-card: rgba(255, 255, 255, 0.88);
+  --bg-feed: #F4F6FB;
+  --bg-card: #FFFFFF;
+  --bg-footer: #FFFFFF;
+
+  /* Borders & Dividers (Light Mode) */
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-prominent: rgba(15, 23, 42, 0.14);
+  --border-purple: rgba(92, 3, 155, 0.20);
+  --border-purple-bright: rgba(92, 3, 155, 0.40);
+  --border-lime: rgba(22, 163, 74, 0.30);
+  --border-cyan: rgba(2, 132, 199, 0.30);
+
+  /* Typography Colors: LIGHT MODE (WCAG 2.1 AA Compliant) */
+  --text-primary: #0F172A;
+  --text-secondary: #334155;
+  --text-muted: #64748B;
+  --text-purple: #5C039B;
+  --text-purple-light: #7B1FA2;
+  --text-lime: #15803D;
+  --text-cyan: #0284C7;
+
+  /* Typography Families */
+  --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-arabic: 'Cairo', 'Tajawal', Tahoma, sans-serif;
+
+  /* Elevation & Shadows (Light Mode: Soft, Human-Designed Layering) */
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08), 0 2px 4px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 12px 36px rgba(15, 23, 42, 0.12), 0 4px 10px rgba(15, 23, 42, 0.05);
+  --shadow-glow-purple: 0 4px 20px rgba(92, 3, 155, 0.16);
+  --shadow-glow-lime: 0 4px 16px rgba(22, 163, 74, 0.18);
+  --shadow-glow-cyan: 0 4px 16px rgba(2, 132, 199, 0.18);
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 350ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* =========================================================================
+   DARK MODE OVERRIDES
+   ========================================================================= */
+[data-theme="dark"] {
+  /* Brand Core Overrides */
+  --brand-purple-glow: rgba(92, 3, 155, 0.45);
+  --brand-lime: #64EF0A;
+  --brand-lime-vivid: #64EF0A;
+  --brand-cyan: #38BDF8;
+  --brand-cyan-vivid: #03A4F4;
+
+  /* Background Palette (Obsidian Luxury Dark) */
+  --bg-primary: #020202;
+  --bg-secondary: #0A0814;
+  --bg-surface: #120F24;
+  --bg-surface-elevated: #1B1634;
+  --bg-surface-hover: #261F48;
+  --bg-glass: rgba(10, 8, 20, 0.90);
+  --bg-glass-card: rgba(18, 15, 36, 0.80);
+  --bg-feed: #07070A;
+  --bg-card: #120F24;
+  --bg-footer: #0A0814;
+
+  /* Borders & Dividers (Dark Mode) */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-prominent: rgba(255, 255, 255, 0.16);
+  --border-purple: rgba(92, 3, 155, 0.50);
+  --border-purple-bright: rgba(168, 85, 247, 0.60);
+  --border-lime: rgba(100, 239, 10, 0.45);
+  --border-cyan: rgba(3, 164, 244, 0.45);
+
+  /* Typography Colors: DARK MODE */
+  --text-primary: #FFFFFF;
+  --text-secondary: #E2E8F0;
+  --text-muted: #94A3B8;
+  --text-purple: #C084FC;
+  --text-purple-light: #E9D5FF;
+  --text-lime: #64EF0A;
+  --text-cyan: #38BDF8;
+
+  /* Shadows (Dark Mode) */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.75);
+  --shadow-glow-purple: 0 0 24px rgba(92, 3, 155, 0.35);
+  --shadow-glow-lime: 0 0 20px rgba(100, 239, 10, 0.35);
+  --shadow-glow-cyan: 0 0 20px rgba(3, 164, 244, 0.35);
+}
