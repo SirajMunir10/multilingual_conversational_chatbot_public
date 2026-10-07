@@ -64,7 +64,7 @@
     <!-- Embedded Floating Widget Shell -->
     <div class="embedded-widget-shell" :class="{ 'open': isWidgetOpen, 'expanded': isExpanded }">
       <ChatWidget 
-        v-if="isWidgetOpen" 
+        v-show="isWidgetOpen" 
         :current-language="currentLanguage"
         :current-theme="currentTheme"
         :is-expanded="isExpanded"
@@ -75,7 +75,7 @@
       />
       <!-- Floating Launcher Button with 3D XO Mascot -->
       <button 
-        v-else 
+        v-show="!isWidgetOpen" 
         class="floating-launcher-btn animate-pulse-glow" 
         @click="isWidgetOpen = true"
         aria-label="Open XO Assistant"

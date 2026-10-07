@@ -54,13 +54,22 @@ class ConversationOrchestrator:
         session = SessionStore.get_or_create_session(session_id, user_id=user_id)
 
         # 4. Multilingual Detection & Override (FR-1)
-        if manual_language and manual_language in settings.LAUNCH_LANGUAGES:
+        explicit_switch = LanguageDetector.check_explicit_language_switch(sanitized_input)
+        if explicit_switch:
+            session.language = explicit_switch
+            session.language_manually_overridden = True
+            logger.info(f"Explicit language switch detected for session {session.session_id}: {explicit_switch}")
+        elif manual_language and manual_language in settings.LAUNCH_LANGUAGES:
             session.language = manual_language
             session.language_manually_overridden = True
-        elif not session.language_manually_overridden and len(session.messages) == 0:
+        elif not session.language_manually_overridden:
             detected_lang, confidence = LanguageDetector.detect_language(sanitized_input)
-            session.language = detected_lang
-            logger.info(f"Auto-detected language for session {session.session_id}: {detected_lang} (confidence {confidence:.2f})")
+            if detected_lang != "en" and confidence >= 0.80:
+                session.language = detected_lang
+                logger.info(f"Script-based language switch detected for session {session.session_id}: {detected_lang}")
+            elif len(session.messages) == 0:
+                session.language = detected_lang
+                logger.info(f"Auto-detected language for session {session.session_id}: {detected_lang} (confidence {confidence:.2f})")
 
         # Record User Message
         SessionStore.add_message(
@@ -124,8 +133,17 @@ class ConversationOrchestrator:
         """
         lowered = text.lower()
 
-        # Account intent keywords
-        account_kw = ["my application", "my status", "saved properties", "shortlist", "my favorites", "my inquiries", "حسابي", "طلباتي", "मेरा स्टेटस"]
+        # Explicit language switch or language preference is general conversational intent
+        if LanguageDetector.check_explicit_language_switch(text):
+            return "general"
+
+        # Account intent keywords (strictly scoped to user profile/vault access)
+        account_kw = [
+            "my application", "my status", "saved properties", "my shortlist",
+            "view shortlist", "view my shortlist", "show shortlist", "show my shortlist",
+            "saved shortlist", "my favorites", "my inquiries", "حسابي", "طلباتي",
+            "قائمتي المحفوظة", "मेरा स्टेटस"
+        ]
         if any(kw in lowered for kw in account_kw):
             return "account"
 
@@ -262,6 +280,28 @@ class ConversationOrchestrator:
                 session.slots.property_city = canon
                 break
 
+        # Extract amenity / proximity preferences
+        has_amenity_kw = any(w in lowered for w in ["metro", "مترو", "मेट्रो", "pool", "مسبح", "gym", "جيم", "balcony", "شرفة"])
+        is_fresh_property_search = any(w in lowered for w in [
+            "show me", "find me", "provide me", "give me", "look for", "search",
+            "ابحث", "اريد", "أريد", "دیکھو"
+        ]) or any(w in lowered for w in ["1 bhk", "2 bhk", "3 bhk", "1br", "2br", "3br", "1 bedroom", "2 bedroom", "3 bedroom", "all apartments", "all properties"])
+        if is_fresh_property_search and not has_amenity_kw:
+            session.slots.property_amenities = []
+
+        if any(w in lowered for w in ["metro", "مترو", "मेट्रो"]):
+            if "Near Metro Station" not in session.slots.property_amenities:
+                session.slots.property_amenities.append("Near Metro Station")
+        elif "pool" in lowered or "مسبح" in lowered:
+            if "Pool" not in session.slots.property_amenities:
+                session.slots.property_amenities.append("Pool")
+        elif "gym" in lowered or "جيم" in lowered:
+            if "Gym" not in session.slots.property_amenities:
+                session.slots.property_amenities.append("Gym")
+        elif "balcony" in lowered or "شرفة" in lowered:
+            if "Balcony" not in session.slots.property_amenities:
+                session.slots.property_amenities.append("Balcony")
+
     @classmethod
     async def _generate_reply(cls, session: SessionContext, user_text: str) -> Dict[str, Any]:
         """
@@ -298,14 +338,46 @@ class ConversationOrchestrator:
                     messages.append({"role": "system", "content": comp_context})
                 elif session.active_intent == "mortgage" and session.slots.mortgage_income:
                     tool_choice = {"type": "function", "function": {"name": "calc_affordability"}}
-                elif session.active_intent == "property" and (session.slots.property_beds or session.slots.property_budget_max):
+                elif session.active_intent == "property" and (session.slots.property_beds or session.slots.property_budget_max or session.slots.property_city):
                     is_exploratory = any(w in user_text.lower() for w in [
                         "where to invest", "best place", "best places", "places to invest", 
                         "best area", "best areas", "top areas", "top places", "names of the places",
-                        "where can i invest", "where should i invest", "good place to invest"
+                        "where can i invest", "where should i invest", "good place to invest", "options to invest"
                     ])
-                    if not is_exploratory:
+                    is_analytical = any(w in user_text.lower() for w in [
+                        "average price", "average cost", "average size", "average pricing", "what is the average", "whats the average",
+                        "how much on average", "price range", "متوسط سعر", "متوسط السعر", "औसत कीमत", "اوسط قیمت"
+                    ])
+                    is_search_request = any(w in user_text.lower() for w in [
+                        "show", "find", "get", "need", "want", "search", "looking for", "provide", "give me", "list",
+                        "ابحث", "اريد", "أريد", "دیکھو", "चाहिए", "दिखाइए"
+                    ]) or (bool(session.slots.property_beds) and any(w in user_text.lower() for w in ["bhk", "bedroom", "br", "apartment", "villa", "townhouse"]))
+
+                    if is_search_request and not is_analytical and not is_exploratory:
                         tool_choice = {"type": "function", "function": {"name": "search_properties"}}
+
+                # If user already searched and has active inventory in session, inject metrics context for analytical questions
+                if session.last_recommended_properties:
+                    props = session.last_recommended_properties
+                    total_count = len(props)
+                    prices = [p.get("price", 0) for p in props if p.get("price")]
+                    areas = [p.get("sq_ft") or p.get("sqft") or 0 for p in props if (p.get("sq_ft") or p.get("sqft"))]
+                    avg_p = round(sum(prices) / len(prices)) if prices else 0
+                    min_p = min(prices) if prices else 0
+                    max_p = max(prices) if prices else 0
+                    avg_a = round(sum(areas) / len(areas)) if areas else 0
+                    inv_summary = (
+                        f"ACTIVE DISPLAYED INVENTORY SUMMARY IN USER'S CURRENT SESSION:\n"
+                        f"- Total active listings: {total_count}\n"
+                        f"- Average price: AED {avg_p:,}\n"
+                        f"- Price range: AED {min_p:,} to AED {max_p:,}\n"
+                        f"- Average area: {avg_a} sq.ft\n"
+                        f"CRITICAL INSTRUCTIONS:\n"
+                        f"- If the user asks analytical questions about these active listings (e.g., 'what is the average price', 'average size', 'price range', 'what do you recommend among these'), "
+                        f"answer directly and enthusiastically using these exact precalculated figures in {lang}!\n"
+                        f"- Do NOT trigger a redundant search_properties tool call when answering analytical questions about these active listings."
+                    )
+                    messages.append({"role": "system", "content": inv_summary})
 
                 response = await client.chat.completions.create(
                     model=settings.LLM_MODEL,
@@ -317,12 +389,54 @@ class ConversationOrchestrator:
                 choice = response.choices[0]
                 reply_message = choice.message
 
-                # Handle function calling if requested by model
+                # Handle 2-step function calling loop
                 if reply_message.tool_calls:
                     tool_call = reply_message.tool_calls[0]
                     fn_name = tool_call.function.name
                     fn_args = json.loads(tool_call.function.arguments)
-                    return await cls._execute_tool_and_narrate(fn_name, fn_args, session)
+
+                    tool_exec = await cls._execute_tool_raw(fn_name, fn_args, session)
+
+                    # Build tool call message and tool response message
+                    messages.append({
+                        "role": "assistant",
+                        "content": reply_message.content or "",
+                        "tool_calls": [
+                            {
+                                "id": tool_call.id,
+                                "type": "function",
+                                "function": {
+                                    "name": fn_name,
+                                    "arguments": tool_call.function.arguments
+                                }
+                            }
+                        ]
+                    })
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": json.dumps(tool_exec.get("tool_result_for_llm", {}))
+                    })
+
+                    try:
+                        second_response = await client.chat.completions.create(
+                            model=settings.LLM_MODEL,
+                            messages=messages
+                        )
+                        final_text = second_response.choices[0].message.content or ""
+                    except Exception as e2:
+                        logger.warning(f"Error in second LLM completion after tool call: {e2}")
+                        narrative = await cls._execute_tool_and_narrate(fn_name, fn_args, session)
+                        final_text = narrative.get("text", "")
+
+                    return {
+                        "text": final_text,
+                        "property_results": tool_exec.get("property_results", []),
+                        "mortgage_result": tool_exec.get("mortgage_result"),
+                        "shortlist_status": tool_exec.get("shortlist_status"),
+                        "tool_calls": [{"function": fn_name, "args": fn_args}],
+                        "metadata": tool_exec.get("metadata", {})
+                    }
 
                 if session.active_intent == "property_comparison":
                     return {
@@ -339,20 +453,88 @@ class ConversationOrchestrator:
         return await cls._deterministic_engine(session, user_text)
 
     @classmethod
-    async def _execute_tool_and_narrate(
+    async def _execute_tool_raw(
         cls,
         fn_name: str,
         fn_args: Dict[str, Any],
         session: SessionContext
     ) -> Dict[str, Any]:
         """
-        Executes scoped API gateway or deterministic calculation tools
-        and narrates the result strictly conforming to Rule 5, Rule 4, and Rule 10.
+        Executes gateway or calculation tool and returns structured data for both the UI
+        and the LLM 2-step completion loop.
         """
-        lang = session.language
+        if fn_name == "search_properties":
+            latest_msg = session.messages[-1].content.lower() if session.messages else ""
+            is_broaden = any(w in latest_msg for w in ["other property", "other properties", "other options", "something else", "different property", "عقارات أخرى", "خيارات أخرى", "अन्य प्रॉपर्टी", "دوسری پراپرٹی"])
 
-        # 1. Deterministic Affordability Calculation (Rule 5, FR-12a, FR-13a)
-        if fn_name == "calc_affordability":
+            raw_city = "Dubai" if is_broaden else fn_args.get("city", session.slots.property_city)
+            if raw_city and raw_city.upper() in ["UAE", "ALL UAE", "ANYWHERE"]:
+                city_filter = None
+                location_name = "the UAE"
+            else:
+                city_filter = raw_city
+                location_name = raw_city or "Dubai"
+
+            b_max = None if is_broaden else fn_args.get("budget_max", session.slots.property_budget_max)
+            req_amenities = fn_args.get("amenities") or (session.slots.property_amenities if session.slots.property_amenities else None)
+            req_limit = fn_args.get("limit")
+
+            filters = PropertySearchFilter(
+                city=city_filter,
+                type=fn_args.get("type", session.slots.property_type),
+                budget_min=fn_args.get("budget_min", session.slots.property_budget_min),
+                budget_max=b_max,
+                beds=fn_args.get("beds", session.slots.property_beds),
+                purpose=fn_args.get("purpose", session.slots.property_purpose),
+                status=fn_args.get("status"),
+                amenities=req_amenities,
+                limit=req_limit
+            )
+
+            listings = PropertyDiscoveryService.search_and_rank(
+                filters=filters,
+                session_id=session.session_id
+            )
+            session.last_recommended_properties = listings
+
+            count = len(listings)
+            prices = [p.get("price", 0) for p in listings if p.get("price")]
+            areas = [p.get("sq_ft") or p.get("sqft") or 0 for p in listings if (p.get("sq_ft") or p.get("sqft"))]
+            avg_p = round(sum(prices) / len(prices)) if prices else 0
+            min_p = min(prices) if prices else 0
+            max_p = max(prices) if prices else 0
+            avg_a = round(sum(areas) / len(areas)) if areas else 0
+
+            tool_summary = {
+                "status": "success",
+                "location": location_name,
+                "total_matching_properties": count,
+                "average_price_aed": avg_p,
+                "min_price_aed": min_p,
+                "max_price_aed": max_p,
+                "average_area_sqft": avg_a,
+                "properties_sample": [
+                    {
+                        "id": p["id"],
+                        "title": p.get("title", ""),
+                        "price_aed": p.get("price", 0),
+                        "beds": p.get("beds", 0),
+                        "sqft": p.get("sq_ft") or p.get("sqft") or 0,
+                        "location": p.get("location") or p.get("community", ""),
+                        "amenities": p.get("amenities", [])
+                    }
+                    for p in listings[:6]
+                ]
+            }
+
+            return {
+                "property_results": listings,
+                "location_name": location_name,
+                "filters": filters,
+                "tool_result_for_llm": tool_summary
+            }
+
+        elif fn_name == "calc_affordability":
             income = float(fn_args.get("income", session.slots.mortgage_income or 25000.0))
             debt = float(fn_args.get("existing_debt", session.slots.mortgage_existing_debt or 0.0))
             down_payment = float(fn_args.get("down_payment", session.slots.mortgage_down_payment or 0.0))
@@ -372,22 +554,12 @@ class ConversationOrchestrator:
                 user_id=session.user_id
             )
             session.last_mortgage_result = afford_res
-            summary = afford_res["affordability_summary"]
-
-            narratives = {
-                "ar": f"بناءً على ضوابط مصرف الإمارات المركزي (سقف 50% لعبء الدين)، بدخل شهري {income:,.0f} درهم، فإن القسط الشهري الأقصى التقديري هو {summary['max_allowable_monthly_emi_aed']:,.0f} درهم، مما يتيح لك تمويلاً أقصى يصل إلى {summary['max_borrowing_capacity_aed']:,.0f} درهم وميزانية شراء حتى {summary['max_property_price_aed']:,.0f} درهم ({afford_res['disclaimer']}).",
-                "hi": f"यूएई सेंट्रल बैंक के 50% डीबीआर कैप के अनुसार, {income:,.0f} AED मासिक आय पर आपकी अधिकतम मासिक ईएमआई {summary['max_allowable_monthly_emi_aed']:,.0f} AED बनती है, जिससे {summary['max_borrowing_capacity_aed']:,.0f} AED का अधिकतम लोन और {summary['max_property_price_aed']:,.0f} AED तक की प्रॉपर्टी खरीदी जा सकती है ({afford_res['disclaimer']})।",
-                "ur": f"یو اے ای سنٹرل بینک کے 50% DBR ضابطے کے تحت، {income:,.0f} درہم ماہانہ آمدنی پر آپ کی زیادہ سے زیادہ متوقع ماہانہ قسط {summary['max_allowable_monthly_emi_aed']:,.0f} درہم ہے، جس سے آپ کو {summary['max_borrowing_capacity_aed']:,.0f} درہم تک کا قرض اور {summary['max_property_price_aed']:,.0f} درہم تک کی پراپرٹی بجٹ حاصل ہو سکتی ہے ({afford_res['disclaimer']})۔",
-                "en": f"Based on UAE Central Bank rules (50% DBR cap), for a monthly income of AED {income:,.0f}, your maximum estimated monthly installment is AED {summary['max_allowable_monthly_emi_aed']:,.0f}, giving an estimated borrowing capacity of AED {summary['max_borrowing_capacity_aed']:,.0f} and an affordable property purchase price of up to AED {summary['max_property_price_aed']:,.0f} ({afford_res['disclaimer']})."
-            }
-
             return {
-                "text": narratives.get(lang, narratives["en"]),
                 "mortgage_result": afford_res,
-                "tool_calls": [{"function": fn_name, "args": fn_args}]
+                "income": income,
+                "tool_result_for_llm": afford_res
             }
 
-        # 2. Deterministic EMI Calculation (Rule 5, FR-12c, FR-13a)
         elif fn_name == "calc_emi":
             loan = float(fn_args.get("loan_amount", 1000000.0))
             rate = float(fn_args.get("interest_rate", 4.49))
@@ -405,50 +577,132 @@ class ConversationOrchestrator:
                 user_id=session.user_id
             )
             session.last_mortgage_result = emi_res
+            return {
+                "mortgage_result": emi_res,
+                "loan": loan,
+                "rate": rate,
+                "tenure": tenure,
+                "tool_result_for_llm": emi_res
+            }
 
+        elif fn_name == "refine_property_search":
+            refinement = PropertyDiscoveryService.refine_search(
+                session_id=session.session_id,
+                refinement_text=fn_args.get("refinement_text", ""),
+                nationality="expat"
+            )
+            listings = refinement.get("properties", [])
+            session.last_recommended_properties = listings
+            return {
+                "property_results": listings,
+                "refinement": refinement,
+                "tool_result_for_llm": refinement
+            }
+
+        elif fn_name == "shortlist_property":
+            raw_pid = fn_args.get("property_id", "")
+            target_pid = raw_pid
+            ord_match = re.search(r'#?(\d+)', str(raw_pid))
+            if ord_match and session.last_recommended_properties:
+                idx = int(ord_match.group(1)) - 1
+                if 0 <= idx < len(session.last_recommended_properties):
+                    target_pid = session.last_recommended_properties[idx]["id"]
+
+            shortlist_res = PropertyDiscoveryService.shortlist_property(
+                session_id=session.session_id,
+                property_id=target_pid,
+                user_id=session.user_id
+            )
+            return {
+                "shortlist_status": shortlist_res,
+                "property_id": target_pid,
+                "tool_result_for_llm": shortlist_res
+            }
+
+        elif fn_name == "compare_properties":
+            comp = PropertyDiscoveryService.compare_displayed_properties(session.last_recommended_properties)
+            return {
+                "property_results": session.last_recommended_properties,
+                "metadata": {"comparison": comp},
+                "tool_result_for_llm": comp
+            }
+
+        elif fn_name == "get_mortgage_products":
+            prods = MortgageRulesGateway.get_mortgage_products(
+                bank=fn_args.get("bank"),
+                rate_type=fn_args.get("rate_type"),
+                salary=fn_args.get("salary"),
+                nationality=fn_args.get("nationality"),
+                finance_type=fn_args.get("finance_type"),
+                session_id=session.session_id
+            )
+            return {
+                "mortgage_products": prods,
+                "tool_result_for_llm": {"count": len(prods), "products": prods[:5]}
+            }
+
+        elif fn_name in ["get_my_saved_properties", "get_my_application_status"]:
+            if not session.user_id:
+                return {
+                    "tool_result_for_llm": {"status": "auth_required", "message": "Sign in required to view account data"}
+                }
+            return {
+                "tool_result_for_llm": {"status": "authenticated", "user_id": session.user_id, "saved_count": 2, "active_applications": 1}
+            }
+
+        return {"tool_result_for_llm": {"status": "executed"}}
+
+    @classmethod
+    async def _execute_tool_and_narrate(
+        cls,
+        fn_name: str,
+        fn_args: Dict[str, Any],
+        session: SessionContext
+    ) -> Dict[str, Any]:
+        """
+        Executes scoped API gateway or deterministic calculation tools
+        and narrates the result strictly conforming to Rule 5, Rule 4, and Rule 10.
+        """
+        lang = session.language
+        raw_res = await cls._execute_tool_raw(fn_name, fn_args, session)
+
+        if fn_name == "calc_affordability":
+            afford_res = raw_res["mortgage_result"]
+            income = raw_res["income"]
+            summary = afford_res["affordability_summary"]
+            narratives = {
+                "ar": f"بناءً على ضوابط مصرف الإمارات المركزي (سقف 50% لعبء الدين)، بدخل شهري {income:,.0f} درهم، فإن القسط الشهري الأقصى التقديري هو {summary['max_allowable_monthly_emi_aed']:,.0f} درهم، مما يتيح لك تمويلاً أقصى يصل إلى {summary['max_borrowing_capacity_aed']:,.0f} درهم وميزانية شراء حتى {summary['max_property_price_aed']:,.0f} درهم ({afford_res['disclaimer']}).",
+                "hi": f"यूएई सेंट्रल बैंक के 50% डीबीआर कैप के अनुसार, {income:,.0f} AED मासिक आय पर आपकी अधिकतम मासिक ईएमआई {summary['max_allowable_monthly_emi_aed']:,.0f} AED बनती है, जिससे {summary['max_borrowing_capacity_aed']:,.0f} AED का अधिकतम लोन और {summary['max_property_price_aed']:,.0f} AED तक की प्रॉपर्टी खरीदी जा सकती है ({afford_res['disclaimer']})।",
+                "ur": f"یو اے ای سنٹرل بینک کے 50% DBR ضابطے کے تحت، {income:,.0f} درہم ماہانہ آمدنی پر آپ کی زیادہ سے زیادہ متوقع ماہانہ قسط {summary['max_allowable_monthly_emi_aed']:,.0f} درہم ہے، جس سے آپ کو {summary['max_borrowing_capacity_aed']:,.0f} درہم تک کا قرض اور {summary['max_property_price_aed']:,.0f} درہم تک کی پراپرٹی بجٹ حاصل ہو سکتی ہے ({afford_res['disclaimer']})۔",
+                "en": f"Based on UAE Central Bank rules (50% DBR cap), for a monthly income of AED {income:,.0f}, your maximum estimated monthly installment is AED {summary['max_allowable_monthly_emi_aed']:,.0f}, giving an estimated borrowing capacity of AED {summary['max_borrowing_capacity_aed']:,.0f} and an affordable property purchase price of up to AED {summary['max_property_price_aed']:,.0f} ({afford_res['disclaimer']})."
+            }
+            return {
+                "text": narratives.get(lang, narratives["en"]),
+                "mortgage_result": afford_res,
+                "tool_calls": [{"function": fn_name, "args": fn_args}]
+            }
+
+        elif fn_name == "calc_emi":
+            emi_res = raw_res["mortgage_result"]
+            loan = raw_res["loan"]
+            rate = raw_res["rate"]
+            tenure = raw_res["tenure"]
             narratives = {
                 "ar": f"لقرض تمويلي قدره {loan:,.0f} درهم بفائدة {rate}% على مدار {tenure} سنة، فإن القسط الشهري التقديري هو {emi_res['periodic_installment_aed']:,.0f} درهم ({emi_res['disclaimer']}). إجمالي الفائدة المستحقة طوال الفترة هو {emi_res['total_interest_payable_aed']:,.0f} درهم.",
                 "hi": f"{loan:,.0f} AED लोन राशि पर {rate}% ब्याज दर और {tenure} साल की अवधि के लिए आपकी अनुमानित मासिक ईएमआई {emi_res['periodic_installment_aed']:,.0f} AED होगी ({emi_res['disclaimer']})। कुल देय ब्याज {emi_res['total_interest_payable_aed']:,.0f} AED है।",
                 "ur": f"{loan:,.0f} درہم کے قرض پر {rate}% سود اور {tenure} سال کی مدت کے لیے، متوقع ماہانہ قسط {emi_res['periodic_installment_aed']:,.0f} درہم ہوگی ({emi_res['disclaimer']})۔ کل قابلِ ادائیگی سود {emi_res['total_interest_payable_aed']:,.0f} درہم ہے۔",
                 "en": f"For a loan amount of AED {loan:,.0f} at {rate}% annual interest over {tenure} years, your estimated monthly payment is AED {emi_res['periodic_installment_aed']:,.0f} ({emi_res['disclaimer']}). Total interest payable over the term is AED {emi_res['total_interest_payable_aed']:,.0f}."
             }
-
             return {
                 "text": narratives.get(lang, narratives["en"]),
                 "mortgage_result": emi_res,
                 "tool_calls": [{"function": fn_name, "args": fn_args}]
             }
 
-        # 3. Property Discovery & Inventory (Rule 4, FR-8, FR-11)
         elif fn_name == "search_properties":
-            latest_msg = session.messages[-1].content.lower() if session.messages else ""
-            is_broaden = any(w in latest_msg for w in ["other property", "other properties", "other options", "something else", "different property", "عقارات أخرى", "خيارات أخرى", "अन्य प्रॉपर्टी", "دوسری پراپرٹی"])
-
-            raw_city = "Dubai" if is_broaden else fn_args.get("city", session.slots.property_city)
-            if raw_city and raw_city.upper() in ["UAE", "ALL UAE", "ANYWHERE"]:
-                city_filter = None
-                location_name = "the UAE"
-            else:
-                city_filter = raw_city
-                location_name = raw_city or "Dubai"
-
-            b_max = None if is_broaden else fn_args.get("budget_max", session.slots.property_budget_max)
-
-            filters = PropertySearchFilter(
-                city=city_filter,
-                type=fn_args.get("type", session.slots.property_type),
-                budget_min=fn_args.get("budget_min", session.slots.property_budget_min),
-                budget_max=b_max,
-                beds=fn_args.get("beds", session.slots.property_beds),
-                purpose=fn_args.get("purpose", session.slots.property_purpose),
-                status=fn_args.get("status")
-            )
-
-            listings = PropertyDiscoveryService.search_and_rank(
-                filters=filters,
-                session_id=session.session_id
-            )
-
+            listings = raw_res.get("property_results", [])
+            location_name = raw_res.get("location_name", "Dubai")
+            filters = raw_res.get("filters")
             if len(listings) > 0:
                 narratives = {
                     "ar": f"لقد وجدت {len(listings)} عقارات تناسب بحثك في {location_name}. يمكنك التحقق من قسط الرهن العقاري التقديري أو حفظها في قائمتك المفضلة.",
@@ -467,14 +721,9 @@ class ConversationOrchestrator:
                 "tool_calls": [{"function": fn_name, "args": fn_args}]
             }
 
-        # 3b. Conversational Refinement (FR-9)
         elif fn_name == "refine_property_search":
-            refinement = PropertyDiscoveryService.refine_search(
-                session_id=session.session_id,
-                refinement_text=fn_args.get("refinement_text", ""),
-                nationality="expat"
-            )
-            listings = refinement.get("properties", [])
+            listings = raw_res.get("property_results", [])
+            refinement = raw_res.get("refinement", {})
             narratives = {
                 "ar": f"تم تحديث البحث حسب تفضيلك. إليك {len(listings)} خيارات معدلة تناسب طلبك:",
                 "hi": f"आपकी प्राथमिकता के आधार पर सर्च को रिफाइन कर दिया गया है। यहाँ {len(listings)} अपडेटेड विकल्प हैं:",
@@ -487,23 +736,9 @@ class ConversationOrchestrator:
                 "tool_calls": [{"function": fn_name, "args": fn_args}]
             }
 
-        # 3c. Shortlisting Properties (FR-10)
         elif fn_name == "shortlist_property":
-            raw_pid = fn_args.get("property_id", "")
-            target_pid = raw_pid
-            # Resolve ordinal numbers e.g. #1, #2
-            ord_match = re.search(r'#?(\d+)', str(raw_pid))
-            if ord_match and session.last_recommended_properties:
-                idx = int(ord_match.group(1)) - 1
-                if 0 <= idx < len(session.last_recommended_properties):
-                    target_pid = session.last_recommended_properties[idx]["id"]
-
-            shortlist_res = PropertyDiscoveryService.shortlist_property(
-                session_id=session.session_id,
-                property_id=target_pid,
-                user_id=session.user_id
-            )
-
+            shortlist_res = raw_res.get("shortlist_status", {})
+            target_pid = raw_res.get("property_id", "")
             if shortlist_res.get("success"):
                 title = shortlist_res.get("property_title", target_pid)
                 status_word = "saved to" if shortlist_res.get("status") == "saved" else "removed from"
@@ -519,9 +754,8 @@ class ConversationOrchestrator:
                 "tool_calls": [{"function": fn_name, "args": fn_args}]
             }
 
-        # 3d. Property Comparison & Advisory Evaluation (FR-9)
         elif fn_name == "compare_properties":
-            comp = PropertyDiscoveryService.compare_displayed_properties(session.last_recommended_properties)
+            comp = raw_res.get("metadata", {}).get("comparison", {})
             reply = cls._format_comparison_narrative(comp, lang)
             return {
                 "text": reply,
@@ -530,22 +764,13 @@ class ConversationOrchestrator:
                 "tool_calls": [{"function": fn_name, "args": fn_args}]
             }
 
-        # 4. Mortgage Rules Gateway (FR-13c)
         elif fn_name == "get_mortgage_products":
-            prods = MortgageRulesGateway.get_mortgage_products(
-                bank=fn_args.get("bank"),
-                rate_type=fn_args.get("rate_type"),
-                salary=fn_args.get("salary"),
-                nationality=fn_args.get("nationality"),
-                finance_type=fn_args.get("finance_type"),
-                session_id=session.session_id
-            )
+            prods = raw_res.get("mortgage_products", [])
             return {
                 "text": f"Found {len(prods)} mortgage products matching your criteria from UAE partner banks.",
                 "tool_calls": [{"function": fn_name, "args": fn_args}]
             }
 
-        # 5. Account Gateways (Scoped to authenticated user, Rule 9)
         elif fn_name in ["get_my_saved_properties", "get_my_application_status"]:
             if not session.user_id:
                 return {
@@ -557,7 +782,6 @@ class ConversationOrchestrator:
                 "tool_calls": [{"function": fn_name, "args": fn_args}]
             }
 
-        # Fallback
         return {
             "text": "Your request has been processed.",
             "tool_calls": [{"function": fn_name, "args": fn_args}]
@@ -576,6 +800,48 @@ class ConversationOrchestrator:
         lang = session.language
         intent = session.active_intent
 
+        # Explicit language switch requests
+        if LanguageDetector.check_explicit_language_switch(user_text):
+            greetings = {
+                "ar": "أهلاً بك! بكل سرور، يسعدني جداً التحدث معك باللغة العربية! 🎉 كيف يمكنني مساعدتك اليوم بخصوص عقارات دبي أو حساب التمويل العقاري؟",
+                "hi": "नमस्ते! मुझे आपके साथ हिंदी में बातचीत करने में बहुत खुशी होगी! 🎉 आज मैं आपकी क्या सहायता कर सकता हूँ?",
+                "ur": "خوش آمدید! مجھے آپ سے اردو میں بات چیت کر کے بہت خوشی ہو رہی ہے! 🎉 آج میں دبئی میں پراپرٹیز یا مارگیج کے حوالے سے آپ کی کیا مدد کر سکتا ہوں؟",
+                "en": "Welcome! I'm thrilled to chat with you in English! 🎉 How can I assist you today with premier UAE properties or mortgage financing?"
+            }
+            return {
+                "text": greetings.get(lang, greetings["en"]),
+                "property_results": []
+            }
+
+        # Check for average price or size statistical inquiry
+        avg_inquiry = any(w in user_text.lower() for w in ["average price", "average pricing", "average cost", "average size", "متوسط سعر", "متوسط السعر", "औसत कीमत", "اوسط قیمت"])
+        if avg_inquiry:
+            props = session.last_recommended_properties
+            if not props and session.slots.property_beds:
+                filters = PropertySearchFilter(
+                    city=session.slots.property_city or "Dubai Marina",
+                    beds=session.slots.property_beds,
+                    type=session.slots.property_type or "apartment"
+                )
+                props = PropertyDiscoveryService.search_and_rank(filters, session.session_id)
+            if props:
+                prices = [p.get("price", 0) for p in props if p.get("price")]
+                areas = [p.get("sq_ft") or p.get("sqft") or 0 for p in props if (p.get("sq_ft") or p.get("sqft"))]
+                avg_p = round(sum(prices) / len(prices)) if prices else 0
+                min_p = min(prices) if prices else 0
+                max_p = max(prices) if prices else 0
+                avg_a = round(sum(areas) / len(areas)) if areas else 0
+                narratives = {
+                    "ar": f"متوسط سعر الشقق المكونة من {session.slots.property_beds or 1} غرف في {session.slots.property_city or 'دبي مارينا'} هو {avg_p:,.0f} درهم إماراتي (تتراوح الأسعار بين {min_p:,.0f} و {max_p:,.0f} درهم بمتوسط مساحة {avg_a} قدم مربع). 🎉",
+                    "hi": f"{session.slots.property_city or 'दुबई मरीना'} में {session.slots.property_beds or 1} बीएचके अपार्टमेंट्स की औसत कीमत {avg_p:,.0f} AED है (कीमतें {min_p:,.0f} से {max_p:,.0f} AED के बीच हैं)। 🎉",
+                    "ur": f"{session.slots.property_city or 'دبئی مرینا'} میں {session.slots.property_beds or 1} بی ایچ کے اپارٹمنٹس کی اوسط قیمت {avg_p:,.0f} درہم ہے (قیمتیں {min_p:,.0f} سے {max_p:,.0f} درہم کے درمیان ہیں)۔ 🎉",
+                    "en": f"The average price for {session.slots.property_beds or 1} BHK apartments in {session.slots.property_city or 'Dubai Marina'} is AED {avg_p:,.0f} (ranging from AED {min_p:,.0f} to AED {max_p:,.0f} with an average size of {avg_a} sq.ft)! 🎉"
+                }
+                return {
+                    "text": narratives.get(lang, narratives["en"]),
+                    "property_results": []
+                }
+
         # 0. PROPERTY COMPARISON & EVALUATION INTENT (FR-9)
         if intent == "property_comparison":
             comp = PropertyDiscoveryService.compare_displayed_properties(session.last_recommended_properties)
@@ -589,8 +855,9 @@ class ConversationOrchestrator:
 
         # 1. PROPERTY DISCOVERY INTENT
         if intent == "property":
-            # Check for shortlisting request: "save #1", "shortlist", "احفظ", "شورت ليست"
-            if any(w in user_text.lower() for w in ["shortlist", "save", "احفظ", "पसंदीदा", "محفوظ"]):
+            # Check for shortlisting request: "save #1", "shortlist #2", "save property"
+            is_filter_shortlist = any(w in user_text.lower() for w in ["shortlist those", "shortlist only", "shortlist the ones", "only shortlist"])
+            if not is_filter_shortlist and any(w in user_text.lower() for w in ["shortlist #", "save #", "save property", "shortlist this", "احفظ", "पसंदीदा", "محفوظ"]):
                 raw_pid = None
                 ord_match = re.search(r'#?(\d+)', user_text)
                 if ord_match and session.last_recommended_properties:
@@ -615,8 +882,8 @@ class ConversationOrchestrator:
                         "tool_calls": [{"function": "shortlist_property", "args": {"property_id": raw_pid}}]
                     }
 
-            # Check for refinement: "cheaper", "more bedrooms", "like #2", "closer to"
-            if session.last_recommended_properties and any(w in user_text.lower() for w in ["cheaper", "more bedroom", "fewer bedroom", "luxury", "like #", "similar to", "close to"]):
+            # Check for refinement: "cheaper", "more bedrooms", "like #2", "closer to", "near", "metro", "only shortlist those"
+            if session.last_recommended_properties and any(w in user_text.lower() for w in ["cheaper", "more bedroom", "fewer bedroom", "luxury", "like #", "similar to", "close to", "near", "metro", "مترو", "only those", "with metro", "only shortlist", "shortlist those"]):
                 refinement = PropertyDiscoveryService.refine_search(
                     session_id=session.session_id,
                     refinement_text=user_text,
@@ -721,7 +988,8 @@ class ConversationOrchestrator:
                 type=ptype,
                 budget_max=budget,
                 beds=beds,
-                purpose=purpose
+                purpose=purpose,
+                amenities=session.slots.property_amenities or None
             )
             listings = PropertyDiscoveryService.search_and_rank(
                 filters=filters,

@@ -18,6 +18,8 @@ class PropertySearchFilter(BaseModel):
     purpose: Optional[str] = None  # buy, rent, invest
     status: Optional[str] = None  # ready, off-plan
     developer: Optional[str] = None
+    amenities: Optional[Union[str, List[str]]] = None
+    limit: Optional[int] = None
 
 class PropertyMortgageCrossSell(BaseModel):
     property_id: str
@@ -129,6 +131,8 @@ class PropertyDiscoveryService:
             purpose=filters.purpose,
             status=filters.status,
             developer=filters.developer,
+            amenities=filters.amenities,
+            limit=filters.limit,
             session_id=session_id
         )
 
@@ -143,6 +147,8 @@ class PropertyDiscoveryService:
                 purpose=filters.purpose,
                 status=filters.status,
                 developer=filters.developer,
+                amenities=filters.amenities,
+                limit=filters.limit,
                 session_id=session_id
             )
 
@@ -157,6 +163,8 @@ class PropertyDiscoveryService:
                 purpose=filters.purpose,
                 status=filters.status,
                 developer=filters.developer,
+                amenities=filters.amenities,
+                limit=filters.limit,
                 session_id=session_id
             )
 
@@ -235,6 +243,9 @@ class PropertyDiscoveryService:
                 filt.location = "Palm Jumeirah"
                 filt.city = "Palm Jumeirah"
 
+            if any(w in text_lower for w in ["metro", "مترو", "मेट्रो"]):
+                filt.amenities = "metro"
+
             return filt
 
         # Branch 2: Session-based refinement (for router and orchestrator)
@@ -297,6 +308,23 @@ class PropertyDiscoveryService:
                 refinement_action = f"location_shifted_to_{comm}"
                 break
 
+        # 6. Check for amenity requirements (metro, pool, gym, balcony, beach)
+        if any(w in text_lower for w in ["metro", "مترو", "मेट्रो"]):
+            sess.slots.property_amenities = ["Near Metro Station"]
+            refinement_action = "filtered_by_metro"
+        elif "pool" in text_lower or "مسبح" in text_lower:
+            sess.slots.property_amenities = ["Pool"]
+            refinement_action = "filtered_by_pool"
+        elif "gym" in text_lower or "جيم" in text_lower:
+            sess.slots.property_amenities = ["Gym"]
+            refinement_action = "filtered_by_gym"
+        elif "balcony" in text_lower or "شرفة" in text_lower:
+            sess.slots.property_amenities = ["Balcony"]
+            refinement_action = "filtered_by_balcony"
+        elif any(w in text_lower for w in ["beach", "sea view"]):
+            sess.slots.property_amenities = ["Beach Access"]
+            refinement_action = "filtered_by_beach"
+
         # Re-execute search with updated slots
         filters = PropertySearchFilter(
             city=sess.slots.property_city,
@@ -304,7 +332,8 @@ class PropertyDiscoveryService:
             budget_min=sess.slots.property_budget_min,
             budget_max=sess.slots.property_budget_max,
             beds=sess.slots.property_beds,
-            purpose=sess.slots.property_purpose
+            purpose=sess.slots.property_purpose,
+            amenities=sess.slots.property_amenities or None
         )
         updated_results = cls.search_and_rank(filters, nationality=nationality, session_id=session_id)
 

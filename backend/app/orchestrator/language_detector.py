@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 class LanguageDetector:
     """
@@ -74,6 +74,51 @@ class LanguageDetector:
         # 3. Check Latin Script for English
         # (Could also detect Roman Urdu/Hindi if needed, but PRD standard launch is English for Latin script)
         return "en", 0.95
+
+    @classmethod
+    def check_explicit_language_switch(cls, text: str) -> Optional[str]:
+        """
+        Detects if the user is explicitly requesting to switch conversation language.
+        Examples:
+        - 'switch to arabic', 'speak in arabic', 'speak arabic', 'in arabic', 'بالعربي', 'تحدث بالعربية'
+        - 'switch to english', 'speak english', 'in english'
+        - 'switch to urdu', 'urdu please', 'اردو میں بات کریں'
+        - 'switch to hindi', 'hindi me baat karo', 'हिंदी में'
+        """
+        if not text:
+            return None
+        lowered = text.lower().strip()
+
+        # Arabic switch patterns
+        if any(p in lowered for p in [
+            "switch to arabic", "speak in arabic", "speak arabic", "in arabic", "talk in arabic",
+            "switch in speaking in arabic", "speaking in arabic", "change language to arabic",
+            "بالعربي", "عربي", "تكلم عربي", "تحدث بالعربية", "باللغة العربية"
+        ]):
+            return "ar"
+
+        # English switch patterns
+        if any(p in lowered for p in [
+            "switch to english", "speak in english", "speak english", "in english", "talk in english",
+            "change language to english", "انجليزي", "بالانجليزي", "अंग्रेजी में"
+        ]):
+            return "en"
+
+        # Urdu switch patterns
+        if any(p in lowered for p in [
+            "switch to urdu", "speak in urdu", "speak urdu", "in urdu", "talk in urdu",
+            "change language to urdu", "اردو میں", "اردو", "اردو بولیں"
+        ]):
+            return "ur"
+
+        # Hindi switch patterns
+        if any(p in lowered for p in [
+            "switch to hindi", "speak in hindi", "speak hindi", "in hindi", "talk in hindi",
+            "change language to hindi", "हिंदी में", "हिंदी", "हिंदी बोलो"
+        ]):
+            return "hi"
+
+        return None
 
     @classmethod
     def get_supported_locales(cls) -> Dict[str, Dict[str, str]]:

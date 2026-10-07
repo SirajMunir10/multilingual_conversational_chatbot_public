@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 from pydantic import BaseModel, Field
 from app.core.audit import AuditService
 
@@ -67,7 +67,7 @@ class PropertyInventoryGateway:
         ),
         ScopedPropertyListing(
             id="prop-dxb-003",
-            title="Contemporary 1BR Apartment near Metro",
+            title="Contemporary 1BR Apartment",
             city="Dubai",
             community="Dubai Marina",
             type="apartment",
@@ -80,7 +80,7 @@ class PropertyInventoryGateway:
             status="ready",
             image_url="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
             listing_url="https://xoto.ae/properties/prop-dxb-003",
-            amenities=["Marina Walk Access", "Infinity Pool", "Fitness Club"]
+            amenities=["Near Metro Station", "Marina Walk Access", "Infinity Pool", "Fitness Club"]
         ),
         ScopedPropertyListing(
             id="prop-dxb-004",
@@ -336,6 +336,176 @@ class PropertyInventoryGateway:
             image_url="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80",
             listing_url="https://xoto.ae/properties/prop-dxb-018",
             amenities=["Full Marina View", "Marina Promenade Direct Access", "Infinity Pool", "Squash Courts"]
+        ),
+        ScopedPropertyListing(
+            id="prop-dxb-019",
+            title="Cozy 1BR Apartment",
+            city="Dubai",
+            community="Dubai Marina",
+            type="apartment",
+            beds=1,
+            baths=1,
+            sq_ft=800,
+            price=1250000.0,
+            purpose="buy",
+            developer="Emaar",
+            status="ready",
+            image_url="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
+            listing_url="https://xoto.ae/properties/prop-dxb-019",
+            amenities=["Near Metro Station", "Gym", "Covered Parking"]
+        ),
+        ScopedPropertyListing(
+            id="prop-dxb-020",
+            title="Spacious Luxury 1BR with Full Marina View",
+            city="Dubai",
+            community="Dubai Marina",
+            type="apartment",
+            beds=1,
+            baths=2,
+            sq_ft=1050,
+            price=1600000.0,
+            purpose="buy",
+            developer="Select Group",
+            status="ready",
+            image_url="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80",
+            listing_url="https://xoto.ae/properties/prop-dxb-020",
+            amenities=["Marina View", "Balcony", "Shared Pool", "Premium Finishing"]
+        ),
+        ScopedPropertyListing(
+            id="prop-dxb-021",
+            title="Compact 1BR Ideal for Investment",
+            city="Dubai",
+            community="Dubai Marina",
+            type="apartment",
+            beds=1,
+            baths=1,
+            sq_ft=720,
+            price=1150000.0,
+            purpose="buy",
+            developer="Damac",
+            status="ready",
+            image_url="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
+            listing_url="https://xoto.ae/properties/prop-dxb-021",
+            amenities=["Near Metro Station", "High ROI", "Security"]
+        ),
+        ScopedPropertyListing(
+            id="prop-dxb-022",
+            title="Bright 1BR Apartment with Balcony",
+            city="Dubai",
+            community="Dubai Marina",
+            type="apartment",
+            beds=1,
+            baths=2,
+            sq_ft=850,
+            price=1300000.0,
+            purpose="buy",
+            developer="Emaar",
+            status="ready",
+            image_url="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80",
+            listing_url="https://xoto.ae/properties/prop-dxb-022",
+            amenities=["Balcony", "Covered Parking", "Gym"]
+        ),
+        ScopedPropertyListing(
+            id="prop-dxb-023",
+            title="Large 1BR Apartment",
+            city="Dubai",
+            community="Dubai Marina",
+            type="apartment",
+            beds=1,
+            baths=2,
+            sq_ft=950,
+            price=1450000.0,
+            purpose="buy",
+            developer="Select Group",
+            status="ready",
+            image_url="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80",
+            listing_url="https://xoto.ae/properties/prop-dxb-023",
+            amenities=["Near Metro Station", "Marina View", "Swimming Pool"]
+        ),
+        ScopedPropertyListing(
+            id="prop-dxb-024",
+            title="Premium Large 1BR Residence",
+            city="Dubai",
+            community="Dubai Marina",
+            type="apartment",
+            beds=1,
+            baths=2,
+            sq_ft=1100,
+            price=1700000.0,
+            purpose="buy",
+            developer="Emaar",
+            status="ready",
+            image_url="https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=80",
+            listing_url="https://xoto.ae/properties/prop-dxb-024",
+            amenities=["Full Marina View", "Private Jacuzzi", "Concierge Service"]
+        ),
+        ScopedPropertyListing(
+            id="prop-dxb-025",
+            title="Affordable 1BR in Marina",
+            city="Dubai",
+            community="Dubai Marina",
+            type="apartment",
+            beds=1,
+            baths=1,
+            sq_ft=750,
+            price=1100000.0,
+            purpose="buy",
+            developer="Damac",
+            status="ready",
+            image_url="https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=80",
+            listing_url="https://xoto.ae/properties/prop-dxb-025",
+            amenities=["Gym", "Security", "Kids Play Area"]
+        ),
+        ScopedPropertyListing(
+            id="prop-dxb-026",
+            title="Mid-size 1BR Perfect for Commuters",
+            city="Dubai",
+            community="Dubai Marina",
+            type="apartment",
+            beds=1,
+            baths=1,
+            sq_ft=820,
+            price=1280000.0,
+            purpose="buy",
+            developer="Select Group",
+            status="ready",
+            image_url="https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=80",
+            listing_url="https://xoto.ae/properties/prop-dxb-026",
+            amenities=["Near Metro Station", "Supermarket in Building", "Shared Pool"]
+        ),
+        ScopedPropertyListing(
+            id="prop-dxb-027",
+            title="Upgraded 1BR with Modern Finish",
+            city="Dubai",
+            community="Dubai Marina",
+            type="apartment",
+            beds=1,
+            baths=2,
+            sq_ft=880,
+            price=1350000.0,
+            purpose="buy",
+            developer="Emaar",
+            status="ready",
+            image_url="https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80",
+            listing_url="https://xoto.ae/properties/prop-dxb-027",
+            amenities=["Upgraded Interior", "Balcony", "Gym"]
+        ),
+        ScopedPropertyListing(
+            id="prop-dxb-028",
+            title="High Floor 1BR with Excellent Views",
+            city="Dubai",
+            community="Dubai Marina",
+            type="apartment",
+            beds=1,
+            baths=2,
+            sq_ft=920,
+            price=1400000.0,
+            purpose="buy",
+            developer="Damac",
+            status="ready",
+            image_url="https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80",
+            listing_url="https://xoto.ae/properties/prop-dxb-028",
+            amenities=["High Floor", "Near Metro Station", "Balcony"]
         )
     ]
 
@@ -350,11 +520,12 @@ class PropertyInventoryGateway:
         purpose: Optional[str] = None,
         status: Optional[str] = None,
         developer: Optional[str] = None,
-        limit: Optional[int] = 5,
+        amenities: Optional[Union[str, List[str]]] = None,
+        limit: Optional[int] = None,
         session_id: Optional[str] = None
     ) -> List[ScopedPropertyListing]:
         """
-        PRD Architecture Function: search_properties(city, type, budget_min, budget_max, beds)
+        PRD Architecture Function: search_properties(city, type, budget_min, budget_max, beds, amenities, limit)
         """
         results = cls._inventory
 
@@ -387,6 +558,17 @@ class PropertyInventoryGateway:
             results = [p for p in results if status.lower() in p.status.lower()]
         if developer:
             results = [p for p in results if developer.lower() in p.developer.lower()]
+        if amenities:
+            if isinstance(amenities, str):
+                amenity_list = [amenities]
+            else:
+                amenity_list = list(amenities)
+            for am in amenity_list:
+                am_low = am.lower().strip()
+                if "metro" in am_low:
+                    results = [p for p in results if any("metro" in a.lower() for a in p.amenities)]
+                else:
+                    results = [p for p in results if any(am_low in a.lower() for a in p.amenities)]
 
         # Audit log the property search query
         AuditService.log_event(
@@ -403,6 +585,7 @@ class PropertyInventoryGateway:
                 "purpose": purpose,
                 "status": status,
                 "developer": developer,
+                "amenities": amenities,
                 "results_count": len(results)
             }
         )

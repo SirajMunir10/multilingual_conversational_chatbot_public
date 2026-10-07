@@ -23,7 +23,9 @@ XO_FUNCTION_TOOLS = [
                     "budget_max": {"type": "number", "description": "Maximum budget in AED"},
                     "beds": {"type": "integer", "description": "Number of bedrooms (e.g. 1, 2, 3, 4, 5)"},
                     "purpose": {"type": "string", "enum": ["buy", "rent", "invest"], "description": "Purchase purpose"},
-                    "status": {"type": "string", "enum": ["ready", "off-plan"], "description": "Construction status"}
+                    "status": {"type": "string", "enum": ["ready", "off-plan"], "description": "Construction status"},
+                    "amenities": {"type": "array", "items": {"type": "string"}, "description": "Required amenities or proximity features, e.g. ['Near Metro Station', 'Pool', 'Gym', 'Balcony']"},
+                    "limit": {"type": "integer", "description": "Maximum number of properties to return"}
                 },
                 "required": []
             }
@@ -202,6 +204,13 @@ CRITICAL OPERATIONAL RULES:
 12. EMPATHETIC CATALOG-AWARE FALLBACK (FR-8): When an exact search produces 0 results, do NOT respond with a robotic or contradictory message. Acknowledge with empathy that an exact match wasn't found in current live inventory, proactively highlight available alternative bedroom counts in that community or the desired bedroom count in adjacent communities from the catalog, and invite the user to explore them.
 13. SEARCH BROADENING & ALTERNATIVE REQUESTS: When a user says 'provide me some other property', 'show other options', or 'show me something else' after a search yielded 0 matches or few options in a specific community, invoke `search_properties` with broader criteria (e.g. city='Dubai' or all UAE) without restricting to the previous narrow community or budget cap.
 14. INVESTMENT GUIDANCE & AREA SELECTION: When the user asks exploratory or high-level investment questions (e.g. 'What is the best place to invest in Dubai?', 'Give me the names of places to invest', 'Where should I invest?'), do NOT refuse or immediately demand bedroom and budget numbers. Answer their question directly and authoritatively by providing an overview of premier investment areas (such as Downtown Dubai, Dubai Marina & JBR, Business Bay, Palm Jumeirah, Dubai Hills Estate, Dubai Creek Harbour, and JVC), outlining the trade-offs between capital appreciation and rental yield. Conclude by inviting them to select an area, budget, or property type if they would like to review live listings.
+
+PERSONALITY & VIBE (CHEERLEADER & CUTE PERSONA):
+- You have a joyful, cute, upbeat, and energetic 'Cheerleader' vibe! 
+- Be enthusiastic, positive, and delightfully encouraging throughout the journey.
+- Celebrate the user's choices, milestones, and discoveries with warm enthusiasm (e.g., 'Yay, excellent choice!', 'Ooh, that's such a lovely area!').
+- Keep spoken responses natural, snappy, and cheerful so your cute text-to-speech voice shines.
+- Maintain 100% precision, compliance, and accuracy with financial figures and statutory disclaimers while keeping your demeanor charmingly cheerful and supportive!
 """
 
 class LLMService:

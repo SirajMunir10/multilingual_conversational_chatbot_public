@@ -29,14 +29,12 @@ class TestPhase4IntelligenceEnhancements(unittest.TestCase):
         SessionStore.get_or_create_session(session_id)
 
         # Turn 1: Search for 2 BHK in Dubai Hills
-        turn1 = ConversationOrchestrator.process_user_turn(
-            user_message="Marhaba, I need a 2 BHK apartment in Dubai Hills.",
-            session_id=session_id
-        )
-        # Handle async coroutine if returned
-        import asyncio
-        if asyncio.iscoroutine(turn1):
-            turn1 = asyncio.run(turn1)
+        res1 = self.client.post("/api/chat/message", json={
+            "session_id": session_id,
+            "message": "Marhaba, I need a 2 BHK apartment in Dubai Hills."
+        })
+        self.assertEqual(res1.status_code, 200)
+        turn1 = res1.json()
 
         self.assertEqual(turn1["intent"], "property")
         self.assertGreaterEqual(len(turn1["property_results"]), 2)
@@ -49,12 +47,12 @@ class TestPhase4IntelligenceEnhancements(unittest.TestCase):
             "what would be the most beneficial for me? Like I am thinking of it as an investment. "
             "So what do you suggest? Which one should I be buying?"
         )
-        turn2 = ConversationOrchestrator.process_user_turn(
-            user_message=user_query,
-            session_id=session_id
-        )
-        if asyncio.iscoroutine(turn2):
-            turn2 = asyncio.run(turn2)
+        res2 = self.client.post("/api/chat/message", json={
+            "session_id": session_id,
+            "message": user_query
+        })
+        self.assertEqual(res2.status_code, 200)
+        turn2 = res2.json()
 
         self.assertEqual(turn2["intent"], "property_comparison")
         # Ensure property cards are STILL displayed on screen
@@ -77,15 +75,12 @@ class TestPhase4IntelligenceEnhancements(unittest.TestCase):
         'I found 0 properties', but proactively and empathetically suggests specific alternatives.
         """
         session_id = "test_fallback_sess_102"
-        SessionStore.get_or_create_session(session_id)
-
-        turn = ConversationOrchestrator.process_user_turn(
-            user_message="Hi, can I get a 2 BHK apartment in Palm Jumeirah with budget around 3 million AED?",
-            session_id=session_id
-        )
-        import asyncio
-        if asyncio.iscoroutine(turn):
-            turn = asyncio.run(turn)
+        res = self.client.post("/api/chat/message", json={
+            "session_id": session_id,
+            "message": "Hi, can I get a 2 BHK apartment in Palm Jumeirah with budget around 3 million AED?"
+        })
+        self.assertEqual(res.status_code, 200)
+        turn = res.json()
 
         self.assertEqual(turn["intent"], "property")
         text = turn["text"]
@@ -102,24 +97,21 @@ class TestPhase4IntelligenceEnhancements(unittest.TestCase):
         broadens the scope to all Dubai and returns live inventory instead of remaining stuck at 0.
         """
         session_id = "test_other_prop_sess_103"
-        SessionStore.get_or_create_session(session_id)
 
-        import asyncio
         # Step 1: Turn searching Palm Jumeirah 2BR
-        t1 = ConversationOrchestrator.process_user_turn(
-            user_message="Find 2 BHK in Palm Jumeirah under 4 million",
-            session_id=session_id
-        )
-        if asyncio.iscoroutine(t1):
-            t1 = asyncio.run(t1)
+        res1 = self.client.post("/api/chat/message", json={
+            "session_id": session_id,
+            "message": "Find 2 BHK in Palm Jumeirah under 4 million"
+        })
+        self.assertEqual(res1.status_code, 200)
 
         # Step 2: User says 'provide me some other property'
-        t2 = ConversationOrchestrator.process_user_turn(
-            user_message="provide me some other property",
-            session_id=session_id
-        )
-        if asyncio.iscoroutine(t2):
-            t2 = asyncio.run(t2)
+        res2 = self.client.post("/api/chat/message", json={
+            "session_id": session_id,
+            "message": "provide me some other property"
+        })
+        self.assertEqual(res2.status_code, 200)
+        t2 = res2.json()
 
         self.assertEqual(t2["intent"], "property")
         self.assertGreater(len(t2["property_results"]), 0)
@@ -131,15 +123,12 @@ class TestPhase4IntelligenceEnhancements(unittest.TestCase):
         instead of repeating generic slot-filling clarifying questions.
         """
         session_id = "test_invest_places_first_attempt"
-        SessionStore.get_or_create_session(session_id)
-
-        import asyncio
-        turn = ConversationOrchestrator.process_user_turn(
-            user_message="I just want to know the places where I can invest. Just give me the names of the places.",
-            session_id=session_id
-        )
-        if asyncio.iscoroutine(turn):
-            turn = asyncio.run(turn)
+        res = self.client.post("/api/chat/message", json={
+            "session_id": session_id,
+            "message": "I just want to know the places where I can invest. Just give me the names of the places."
+        })
+        self.assertEqual(res.status_code, 200)
+        turn = res.json()
 
         text = turn["text"]
         # Must NOT be the robotic generic slot-filling loop

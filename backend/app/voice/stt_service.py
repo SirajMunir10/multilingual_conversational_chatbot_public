@@ -33,11 +33,19 @@ class STTService:
 
                 # Call OpenAI transcription endpoint with whisper-1 fallback for live transcribe
                 model_to_use = "whisper-1" if settings.STT_MODEL == "gpt-live-transcribe" else settings.STT_MODEL
+                domain_prompts = {
+                    "ar": "XOTO, عقارات، تمويل عقاري، نخلة جميرا، دبي هيلز استيت، داون تاون دبي، درهم، قرض، الإمارات",
+                    "hi": "XOTO, प्रॉपर्टी, होम लोन, पाम जुमेराह, दुबई हिल्स, ईएमआई, यूएई",
+                    "ur": "XOTO, پراپرٹی, مارگیج، پام جمیرا، دبئی ہلز، ای ایم آئی، متحدہ عرب امارات",
+                    "en": "XOTO, mortgage, Palm Jumeirah, Dubai Hills Estate, Downtown Dubai, Business Bay, AED, EMI, affordability, UAE."
+                }
+                selected_prompt = domain_prompts.get(language_hint, domain_prompts["en"])
                 response = await async_client.audio.transcriptions.create(
                     model=model_to_use,
                     file=audio_file,
                     language=language_hint if language_hint in ["en", "ar", "hi", "ur"] else None,
-                    timeout=8.0
+                    prompt=selected_prompt,
+                    timeout=15.0
                 )
                 transcribed_text = response.text.strip()
                 if transcribed_text:

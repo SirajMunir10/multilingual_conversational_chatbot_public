@@ -67,6 +67,18 @@
           <span>🎧 Advisor</span>
         </button>
 
+        <!-- Clear Chat Button -->
+        <button 
+          class="icon-btn clear-chat-btn" 
+          @click="clearChat" 
+          title="Clear Chat & Restart"
+          aria-label="Clear Chat"
+          data-tooltip="Clear Chat"
+          data-tooltip-pos="bottom"
+        >
+          🗑️
+        </button>
+
         <!-- Close Chatbot Button (✕) -->
         <button 
           class="icon-btn close-widget-btn" 
@@ -202,7 +214,7 @@
       <!-- Voice Visualizer during Recording or Playing -->
       <VoiceVisualizer 
         :is-active="isRecording" 
-        label="Listening (Speak in English, Arabic, Hindi, or Urdu)..." 
+        :label="liveSpokenText ? 'Transcribing: ' + liveSpokenText : 'Listening (Speak in English, Arabic, Hindi, or Urdu)...'" 
       />
       <VoiceVisualizer 
         :is-active="isPlayingVoice" 
@@ -211,6 +223,17 @@
         style="cursor: pointer;"
         title="Click to interrupt voice playback"
       />
+    </div>
+
+    <!-- Live Speech Transcription Dock (Shows progressive user speech on screen) -->
+    <div v-if="isVoiceActive && (liveSpokenText || isRecording)" class="live-speech-dock">
+      <div class="live-speech-header">
+        <span class="live-rec-dot"></span>
+        <span class="live-rec-label">{{ isRecording ? 'Listening live...' : 'Voice Input Staged' }}</span>
+      </div>
+      <p class="live-speech-transcript" v-if="liveSpokenText">
+        “{{ liveSpokenText }}”
+      </p>
     </div>
 
     <!-- Advisor Standby Notification Bar -->
@@ -242,43 +265,76 @@
           ref="inputRef"
           v-model="inputQuery" 
           type="text" 
-          :placeholder="inputPlaceholder" 
+          :placeholder="isRecording ? 'Listening... Spoken words will appear here' : inputPlaceholder" 
           class="chat-input-field"
-          :disabled="isTyping || isRecording"
+          :class="{ 'voice-listening-active': isRecording }"
+          :disabled="isTyping"
           autocomplete="off"
         />
 
-        <!-- Microphone Button (Composed V2V Voice Interaction) -->
-        <button 
-          type="button" 
-          class="mic-btn" 
-          :class="{ 'recording': isRecording, 'speaking': isPlayingVoice }"
-          @click="toggleVoiceRecording"
-          :title="isRecording ? 'Stop Recording' : (isPlayingVoice ? 'Interrupt XO & Speak' : 'Hold/Tap to Speak (Voice STT in EN, AR, HI, UR)')"
-          aria-label="Microphone Voice Input"
-          :data-tooltip="isRecording ? 'Click to Stop Recording' : (isPlayingVoice ? 'Click to Interrupt & Speak' : 'Voice Input: Tap to Speak')"
-          data-tooltip-pos="left"
-        >
-          <svg v-if="!isRecording" class="mic-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-            <line x1="12" y1="19" x2="12" y2="22"></line>
-          </svg>
-          <span v-else class="rec-stop-box">■</span>
-        </button>
+        <!-- Voice Confirmation & Cancellation Controls when Voice Input is active -->
+        <template v-if="isVoiceActive">
+          <!-- Cancel / X Button (Discards current voice input, preserves session context, does not close widget) -->
+          <button 
+            type="button" 
+            class="voice-btn voice-cancel-btn" 
+            @click="cancelVoiceInput"
+            title="Cancel & discard voice input (✕)"
+            aria-label="Cancel Voice Input"
+            data-tooltip="Cancel voice input (✕)"
+            data-tooltip-pos="left"
+          >
+            ✕
+          </button>
 
-        <!-- Send Button: Purple circle with upward arrow -->
-        <button 
-          type="submit" 
-          class="send-btn" 
-          :disabled="!inputQuery.trim() || isTyping || isRecording"
-          title="Send message (Enter)"
-          aria-label="Send Message"
-          data-tooltip="Send message (Enter)"
-          data-tooltip-pos="left"
-        >
-          <span class="send-arrow">↑</span>
-        </button>
+          <!-- Confirm / ✓ Button (Confirms & sends captured speech through pipeline) -->
+          <button 
+            type="button" 
+            class="voice-btn voice-confirm-btn" 
+            :disabled="!liveSpokenText.trim() && !inputQuery.trim() && audioChunks.length === 0"
+            @click="confirmVoiceInput"
+            title="Confirm & send speech (✓)"
+            aria-label="Confirm Voice Input"
+            data-tooltip="Confirm & send (✓)"
+            data-tooltip-pos="left"
+          >
+            ✓
+          </button>
+        </template>
+
+        <!-- Standard Controls when Voice Input is NOT active -->
+        <template v-else>
+          <!-- Microphone Button (Composed V2V Voice Interaction) -->
+          <button 
+            type="button" 
+            class="mic-btn" 
+            :class="{ 'recording': isRecording, 'speaking': isPlayingVoice }"
+            @click="toggleVoiceRecording"
+            :title="isPlayingVoice ? 'Interrupt XO & Speak' : 'Tap to Speak (Voice STT in EN, AR, HI, UR)'"
+            aria-label="Microphone Voice Input"
+            :data-tooltip="isPlayingVoice ? 'Click to Interrupt & Speak' : 'Voice Input: Tap to Speak'"
+            data-tooltip-pos="left"
+          >
+            <svg class="mic-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="22"></line>
+            </svg>
+          </button>
+
+          <!-- Send Button: Purple circle with upward arrow -->
+          <button 
+            type="submit" 
+            class="send-btn" 
+            :disabled="!inputQuery.trim() || isTyping"
+            title="Send message (Enter)"
+            aria-label="Send Message"
+            data-tooltip="Send message (Enter)"
+            data-tooltip-pos="left"
+          >
+            <span class="send-arrow">↑</span>
+          </button>
+        </template>
       </form>
     </div>
 
@@ -360,7 +416,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick, toRefs } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, toRefs } from 'vue'
 import MessageItem from './MessageItem.vue'
 import OnboardingTooltips from './OnboardingTooltips.vue'
 import VoiceVisualizer from './VoiceVisualizer.vue'
@@ -384,13 +440,37 @@ const { isExpanded } = toRefs(props)
 
 const emit = defineEmits(['close', 'language-changed', 'update:currentTheme', 'toggle-expand'])
 
+const SESSION_STORAGE_KEY_ID = 'xo_session_id'
+const SESSION_STORAGE_KEY_MESSAGES = 'xo_chat_messages'
+
+// Initialize or restore session ID across widget close/reopen and page loads
+const getInitialSessionId = () => {
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    const saved = window.sessionStorage.getItem(SESSION_STORAGE_KEY_ID)
+    if (saved) return saved
+    const newId = `sess_${Math.random().toString(36).substring(2, 10)}`
+    window.sessionStorage.setItem(SESSION_STORAGE_KEY_ID, newId)
+    return newId
+  }
+  return `sess_${Math.random().toString(36).substring(2, 10)}`
+}
+
 const messages = ref([])
 const inputQuery = ref('')
 const isTyping = ref(false)
 const isRecording = ref(false)
 const isPlayingVoice = ref(false)
 const showTips = ref(false)
-const sessionId = ref(`sess_${Math.random().toString(36).substring(2, 10)}`)
+const sessionId = ref(getInitialSessionId())
+
+// Voice UX Refinement State
+const hasVoiceSessionGreeted = ref(false)
+const isVoiceActive = ref(false)
+const isVoiceInFlight = ref(false)
+const recordedAudioBlob = ref(null)
+const liveSpokenText = ref('')
+let speechRecognition = null
+let voiceAbortController = null
 
 const feedRef = ref(null)
 const inputRef = ref(null)
@@ -432,6 +512,67 @@ const initializeWelcomeMessage = () => {
     timestamp: new Date().toISOString(),
     language: props.currentLanguage
   })
+}
+
+// Restore previous messages from sessionStorage or initialize fresh welcome message
+const initializeChatSession = () => {
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    const saved = window.sessionStorage.getItem(SESSION_STORAGE_KEY_MESSAGES)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          messages.value = parsed
+          return
+        }
+      } catch (e) {
+        console.warn('Could not parse saved chat messages:', e)
+      }
+    }
+  }
+  initializeWelcomeMessage()
+}
+
+// Watch and persist messages to sessionStorage so state is never lost on widget close
+watch(messages, (newMsgs) => {
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      window.sessionStorage.setItem(SESSION_STORAGE_KEY_MESSAGES, JSON.stringify(newMsgs))
+    } catch (e) {
+      console.warn('Could not persist messages to sessionStorage:', e)
+    }
+  }
+}, { deep: true })
+
+// Reset voice greeting status when user switches language so XO greets in the new language
+watch(() => props.currentLanguage, () => {
+  hasVoiceSessionGreeted.value = false
+  if (isVoiceActive.value || isRecording.value) {
+    cancelVoiceInput()
+  }
+})
+
+const clearChat = () => {
+  messages.value = []
+  
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    window.sessionStorage.removeItem(SESSION_STORAGE_KEY_MESSAGES)
+    
+    // Generate a fresh session ID for the backend
+    const newId = `sess_${Math.random().toString(36).substring(2, 10)}`
+    window.sessionStorage.setItem(SESSION_STORAGE_KEY_ID, newId)
+    sessionId.value = newId
+  }
+
+  // Stop active processes
+  if (isPlayingVoice.value) stopVoicePlayback()
+  if (isVoiceActive.value || isRecording.value) {
+    if (typeof cancelVoiceInput === 'function') cancelVoiceInput()
+  }
+  isTyping.value = false
+
+  // Re-initialize the welcome message
+  initializeWelcomeMessage()
 }
 
 const scrollToBottom = async () => {
@@ -533,12 +674,115 @@ const stopVoicePlayback = () => {
   isPlayingVoice.value = false
 }
 
+// 1. Voice Session Greeting (Requirement 1)
+const playVoiceGreeting = async () => {
+  const welcomeTexts = {
+    ar: 'أهلاً بك في XO! أنا مساعدك الذكي للعقارات والتمويل العقاري في الإمارات. كيف يمكنني مساعدتك اليوم؟',
+    hi: 'नमस्ते! मैं XO हूँ, यूएई में प्रॉपर्टी और होम लोन के लिए आपका एआई सहायक। आज मैं आपकी क्या सहायता कर सकता हूँ?',
+    ur: 'خوش آمدید! میں XO ہوں، متحدہ عرب امارات میں پراپرٹی اور مارگیج کے لیے آپ کا AI اسسٹنٹ۔ میں آپ کی کیا مدد کر سکتا ہوں؟',
+    en: 'Welcome to XO! I am your AI assistant for premier properties, mortgage affordability, and instant guidance across the UAE. How can I help you today?'
+  }
+  const text = welcomeTexts[props.currentLanguage] || welcomeTexts.en
+
+  // Ensure greeting text is present in the feed if empty
+  if (messages.value.length === 0) {
+    messages.value.push({
+      id: 'welcome-msg',
+      role: 'assistant',
+      content: text,
+      timestamp: new Date().toISOString(),
+      language: props.currentLanguage
+    })
+  }
+
+  try {
+    const res = await fetch('/api/voice/synthesize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, language: props.currentLanguage })
+    })
+
+    if (res.ok && audioPlayerRef.value) {
+      const blob = await res.blob()
+      const audioUrl = URL.createObjectURL(blob)
+      stopVoicePlayback()
+      isPlayingVoice.value = true
+      audioPlayerRef.value.src = audioUrl
+
+      audioPlayerRef.value.onended = () => {
+        stopVoicePlayback()
+        startVoiceRecording()
+      }
+
+      await audioPlayerRef.value.play().catch((err) => {
+        console.warn('Greeting playback auto-play error:', err)
+        isPlayingVoice.value = false
+        startVoiceRecording()
+      })
+      return
+    }
+  } catch (err) {
+    console.warn('Voice greeting error:', err)
+  }
+
+  // Fallback if audio playback fails: smoothly proceed to recording
+  startVoiceRecording()
+}
+
+// 2. Start Voice Recording & Live Speech Recognition (Requirement 2)
 const startVoiceRecording = async () => {
   if (isPlayingVoice.value) {
     stopVoicePlayback()
   }
 
   audioChunks.value = []
+  recordedAudioBlob.value = null
+  liveSpokenText.value = ''
+  inputQuery.value = ''
+  isVoiceActive.value = true
+  isRecording.value = true
+
+  // Initialize SpeechRecognition for live progressive text display on screen
+  const SpeechRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null
+  if (SpeechRecognition) {
+    try {
+      if (speechRecognition) {
+        speechRecognition.onresult = null
+        speechRecognition.onerror = null
+        speechRecognition.stop()
+      }
+      speechRecognition = new SpeechRecognition()
+      speechRecognition.continuous = true
+      speechRecognition.interimResults = true
+      const langMap = { en: 'en-US', ar: 'ar-AE', hi: 'hi-IN', ur: 'ur-PK' }
+      speechRecognition.lang = langMap[props.currentLanguage] || 'en-US'
+
+      speechRecognition.onresult = (event) => {
+        let interim = ''
+        let final = ''
+        for (let i = 0; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            final += event.results[i][0].transcript
+          } else {
+            interim += event.results[i][0].transcript
+          }
+        }
+        const transcript = (final + ' ' + interim).trim()
+        if (transcript) {
+          liveSpokenText.value = transcript
+          inputQuery.value = transcript
+        }
+      }
+      speechRecognition.onerror = (e) => {
+        console.warn('SpeechRecognition notice:', e)
+      }
+      speechRecognition.start()
+    } catch (err) {
+      console.warn('SpeechRecognition init error:', err)
+    }
+  }
+
+  // Initialize MediaRecorder for audio recording
   if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -552,50 +796,161 @@ const startVoiceRecording = async () => {
         }
       }
 
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks.value, { type: mimeType })
-        stream.getTracks().forEach(t => t.stop())
-        await executeVoicePipeline(audioBlob)
+      recorder.onstop = () => {
+        if (audioChunks.value.length > 0) {
+          recordedAudioBlob.value = new Blob(audioChunks.value, { type: mimeType })
+        }
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop())
+        }
       }
 
       recorder.start()
-      isRecording.value = true
     } catch (err) {
       console.warn('Microphone permission or hardware unavailable:', err)
-      isRecording.value = true
     }
-  } else {
-    isRecording.value = true
   }
 }
 
-const stopVoiceRecording = async () => {
+const stopVoiceRecording = () => {
   isRecording.value = false
-  if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
-    mediaRecorder.value.stop()
-  } else {
-    await executeVoicePipeline(null)
+  if (speechRecognition) {
+    try {
+      speechRecognition.stop()
+    } catch (e) {
+      // ignore
+    }
   }
+  if (mediaRecorder.value && mediaRecorder.value.state === 'recording') {
+    try {
+      mediaRecorder.value.requestData()
+    } catch (e) {
+      // ignore
+    }
+  }
+  // isVoiceActive remains true so Confirm (✓) and Cancel (✕) buttons stay accessible
 }
 
 const toggleVoiceRecording = async () => {
-  // If XO is currently speaking, clicking the voice button immediately interrupts audio
-  // and starts recording the new user speech request without restarting the session!
+  // If XO is currently speaking, clicking mic interrupts audio and starts recording
   if (isPlayingVoice.value) {
     stopVoicePlayback()
     await startVoiceRecording()
     return
   }
 
+  // If voice session has not greeted yet, greet user through voice (Requirement 1)
+  if (!hasVoiceSessionGreeted.value) {
+    hasVoiceSessionGreeted.value = true
+    await playVoiceGreeting()
+    return
+  }
+
   if (isRecording.value) {
-    await stopVoiceRecording()
+    stopVoiceRecording()
   } else {
     await startVoiceRecording()
   }
 }
 
-const executeVoicePipeline = async (recordedBlob = null) => {
+// 3. Cancel / X Action (Requirement 3)
+const cancelVoiceInput = () => {
+  if (voiceAbortController) {
+    try {
+      voiceAbortController.abort()
+    } catch (e) {}
+    voiceAbortController = null
+  }
+
+  if (speechRecognition) {
+    try {
+      speechRecognition.onresult = null
+      speechRecognition.onerror = null
+      speechRecognition.stop()
+    } catch (e) {
+      // ignore
+    }
+    speechRecognition = null
+  }
+
+  if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
+    mediaRecorder.value.onstop = null // Discard without pipeline execution
+    try {
+      mediaRecorder.value.stop()
+      if (mediaRecorder.value.stream) {
+        mediaRecorder.value.stream.getTracks().forEach(t => t.stop())
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  audioChunks.value = []
+  recordedAudioBlob.value = null
+  liveSpokenText.value = ''
+  inputQuery.value = ''
+  isRecording.value = false
+  isVoiceActive.value = false
+  isVoiceInFlight.value = false
+  // Chatbot remains open, session context completely preserved
+}
+
+// 4. Confirm / ✓ Action (Requirement 3)
+const confirmVoiceInput = async () => {
+  if (isVoiceInFlight.value) return
+
+  const capturedText = liveSpokenText.value.trim() || inputQuery.value.trim()
+
+  if (speechRecognition) {
+    try {
+      speechRecognition.onresult = null
+      speechRecognition.onerror = null
+      speechRecognition.stop()
+    } catch (e) {
+      // ignore
+    }
+    speechRecognition = null
+  }
+
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+
+  if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
+    const recorder = mediaRecorder.value
+    recorder.onstop = async () => {
+      const audioBlob = audioChunks.value.length > 0
+        ? new Blob(audioChunks.value, { type: mimeType })
+        : null
+      if (recorder.stream) {
+        recorder.stream.getTracks().forEach(t => t.stop())
+      }
+      await executeVoicePipeline(audioBlob, capturedText)
+    }
+    try {
+      recorder.stop()
+    } catch (e) {
+      console.warn('MediaRecorder stop error:', e)
+      const audioBlob = audioChunks.value.length > 0 ? new Blob(audioChunks.value, { type: mimeType }) : null
+      await executeVoicePipeline(audioBlob, capturedText)
+    }
+  } else {
+    const audioBlob = recordedAudioBlob.value || (audioChunks.value.length > 0 ? new Blob(audioChunks.value, { type: mimeType }) : null)
+    await executeVoicePipeline(audioBlob, capturedText)
+  }
+}
+
+const executeVoicePipeline = async (recordedBlob = null, textOverride = null) => {
+  if (isVoiceInFlight.value) return
+  isVoiceInFlight.value = true
   isTyping.value = true
+  isVoiceActive.value = false
+  isRecording.value = false
+
+  const textToSend = textOverride || liveSpokenText.value || inputQuery.value || ''
+
+  const controller = new AbortController()
+  voiceAbortController = controller
+  const timeoutId = setTimeout(() => controller.abort(), 60000) // 60s timeout for multi-turn voice pipeline
+
   try {
     const formData = new FormData()
     if (recordedBlob && recordedBlob.size > 200) {
@@ -613,13 +968,20 @@ const executeVoicePipeline = async (recordedBlob = null) => {
     }
     formData.append('session_id', sessionId.value)
     formData.append('language_hint', props.currentLanguage)
+    if (textToSend.trim()) {
+      formData.append('transcribed_text', textToSend.trim())
+    }
 
     const res = await fetch('/api/voice/interact', {
       method: 'POST',
-      body: formData
+      body: formData,
+      signal: controller.signal
     })
 
-    if (!res.ok) throw new Error('Voice pipeline failed')
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}))
+      throw new Error(errJson.detail || `Server error (${res.status})`)
+    }
 
     const data = await res.json()
 
@@ -650,20 +1012,42 @@ const executeVoicePipeline = async (recordedBlob = null) => {
       })
     }
   } catch (err) {
+    let errMsg = err.message
+    if (err.name === 'AbortError') {
+      errMsg = props.currentLanguage === 'ar' 
+        ? 'انتهت مهلة معالجة الصوت، يرجى المحاولة مرة أخرى.' 
+        : 'Voice request timed out. Please try again.'
+    } else if (err.message && err.message.includes('Failed to fetch')) {
+      errMsg = props.currentLanguage === 'ar'
+        ? 'تعذر الاتصال بالخادم. يرجى التحقق من تشغيل الخادم والاتصال بالشبكة.'
+        : 'Could not connect to backend server. Please verify server is running.'
+    }
     messages.value.push({
       id: `err_v_${Date.now()}`,
       role: 'assistant',
-      content: `Voice error: ${err.message}`,
+      content: `Voice error: ${errMsg}`,
       timestamp: new Date().toISOString()
     })
   } finally {
+    clearTimeout(timeoutId)
+    voiceAbortController = null
+    isVoiceInFlight.value = false
     isTyping.value = false
+    liveSpokenText.value = ''
+    inputQuery.value = ''
     scrollToBottom()
   }
 }
 
 onUnmounted(() => {
   stopVoicePlayback()
+  if (speechRecognition) {
+    try {
+      speechRecognition.stop()
+    } catch (e) {
+      // ignore
+    }
+  }
 })
 
 const handlePropertyMortgageCheck = (prop) => {
@@ -767,7 +1151,7 @@ const submitLeadCapture = async () => {
 }
 
 onMounted(() => {
-  initializeWelcomeMessage()
+  initializeChatSession()
 })
 </script>
 
@@ -1219,6 +1603,130 @@ onMounted(() => {
 .btn-standby-connect:hover {
   background: var(--brand-purple);
   color: #FFFFFF;
+}
+
+/* Live Speech Transcription Dock */
+.live-speech-dock {
+  margin: 0 12px 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(3, 164, 244, 0.08);
+  border: 1px dashed var(--brand-cyan);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+[data-theme="dark"] .live-speech-dock {
+  background: rgba(3, 164, 244, 0.14);
+  border-color: var(--brand-cyan-vivid);
+}
+
+.live-speech-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-rec-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #EF4444;
+  box-shadow: 0 0 8px #EF4444;
+  animation: pulseRecording 1.1s infinite;
+}
+
+.live-rec-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--brand-cyan);
+}
+
+[data-theme="dark"] .live-rec-label {
+  color: var(--brand-cyan-vivid);
+}
+
+.live-speech-transcript {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+  font-style: italic;
+  word-break: break-word;
+}
+
+/* Voice Action Buttons (Cancel ✕ / Confirm ✓) */
+.voice-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.voice-cancel-btn {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1.5px solid #EF4444;
+  color: #EF4444;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
+}
+
+.voice-cancel-btn:hover {
+  background: #EF4444;
+  color: #FFFFFF;
+  transform: scale(1.08);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.5);
+}
+
+.voice-confirm-btn {
+  background: rgba(22, 163, 74, 0.14);
+  border: 1.5px solid #16A34A;
+  color: #16A34A;
+  box-shadow: 0 0 10px rgba(22, 163, 74, 0.25);
+}
+
+[data-theme="dark"] .voice-confirm-btn {
+  border-color: var(--brand-lime-vivid);
+  color: var(--brand-lime-vivid);
+  box-shadow: 0 0 10px rgba(100, 239, 10, 0.35);
+}
+
+.voice-confirm-btn:hover:not(:disabled) {
+  background: #16A34A;
+  color: #FFFFFF;
+  transform: scale(1.08);
+  box-shadow: 0 0 16px rgba(22, 163, 74, 0.5);
+}
+
+[data-theme="dark"] .voice-confirm-btn:hover:not(:disabled) {
+  background: var(--brand-lime-vivid);
+  color: #020202;
+}
+
+.voice-confirm-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.chat-input-field.voice-listening-active {
+  color: var(--brand-cyan);
+  font-weight: 600;
+}
+
+[data-theme="dark"] .chat-input-field.voice-listening-active {
+  color: var(--brand-cyan-vivid);
 }
 
 /* Chat Input Footer Dock */

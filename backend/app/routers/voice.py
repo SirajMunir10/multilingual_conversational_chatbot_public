@@ -49,7 +49,8 @@ async def synthesize_speech_endpoint(payload: TTSRequest):
 async def voice_interaction_pipeline(
     audio: UploadFile = File(...),
     session_id: Optional[str] = Form(None),
-    language_hint: Optional[str] = Form("en")
+    language_hint: Optional[str] = Form("en"),
+    transcribed_text: Optional[str] = Form(None)
 ):
     """
     Composed Voice-to-Voice (V2V) Pipeline (Rule 7 & Confirmed Decision 1):
@@ -58,12 +59,16 @@ async def voice_interaction_pipeline(
     """
     audio_bytes = await audio.read()
 
-    # Step 1: STT
-    user_text, detected_lang = await STTService.transcribe_audio(
-        audio_bytes=audio_bytes,
-        filename=audio.filename or "audio.wav",
-        language_hint=language_hint or "en"
-    )
+    # Step 1: STT (Use client-side verified transcript if supplied, otherwise perform STT)
+    if transcribed_text and transcribed_text.strip():
+        user_text = transcribed_text.strip()
+        detected_lang = language_hint or "en"
+    else:
+        user_text, detected_lang = await STTService.transcribe_audio(
+            audio_bytes=audio_bytes,
+            filename=audio.filename or "audio.wav",
+            language_hint=language_hint or "en"
+        )
 
     # Step 2: Conversation Orchestration
     orchestration_result = await ConversationOrchestrator.process_user_turn(
