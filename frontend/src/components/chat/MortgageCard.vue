@@ -39,8 +39,21 @@
       </div>
     </div>
 
-    <!-- Visual DBR Gauge (UAE Central Bank 50% Regulatory Cap) -->
-    <div class="dbr-gauge-box" v-if="dbrStatus">
+    <!-- Compact Expand/Collapse Control Button -->
+    <button 
+      type="button" 
+      class="btn-toggle-mortgage-card" 
+      @click="isExpanded = !isExpanded"
+      :aria-expanded="isExpanded"
+      :title="isExpanded ? 'Collapse assessment details' : 'Expand full assessment (DBR gauge, fees, breakdown)'"
+    >
+      <span>{{ isExpanded ? '▲ Collapse Assessment Details' : '▼ Expand Full Assessment (DBR Gauge & Fee Breakdown)' }}</span>
+    </button>
+
+    <!-- Expanded Details Drawer (Smoothly revealed on click) -->
+    <div class="mortgage-expanded-drawer" v-show="isExpanded">
+      <!-- Visual DBR Gauge (UAE Central Bank 50% Regulatory Cap) -->
+      <div class="dbr-gauge-box" v-if="dbrStatus">
       <div class="dbr-gauge-header">
         <div class="dbr-title-row">
           <span class="dbr-title">Debt Burden Ratio (DBR)</span>
@@ -175,6 +188,8 @@
       </div>
     </div>
 
+    </div><!-- /mortgage-expanded-drawer -->
+
     <!-- Rule 10 Mandatory Disclaimer Block: "estimate only, subject to lender approval" -->
     <div class="mandatory-disclaimer-box" role="note">
       <span class="disclaimer-icon">⚠️</span>
@@ -210,6 +225,8 @@ const props = defineProps({
 
 const emit = defineEmits(['jump-to-properties'])
 
+// Collapsible card state (compact preview by default)
+const isExpanded = ref(false)
 const showCosts = ref(false)
 const showAmortization = ref(false)
 
@@ -317,14 +334,14 @@ const formatNumber = (num) => {
 .mortgage-card {
   width: 100%;
   border-radius: var(--radius-md);
-  padding: 16px;
-  margin-top: 12px;
+  padding: 14px;
+  margin-top: 10px;
   background: var(--bg-surface);
   border: 1px solid var(--border-purple);
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   color: var(--text-primary);
   transition: all var(--transition-normal);
 }
@@ -332,6 +349,57 @@ const formatNumber = (num) => {
 .mortgage-card.dbr-exceeded {
   border-color: rgba(244, 63, 94, 0.6);
   box-shadow: 0 4px 16px rgba(244, 63, 94, 0.15);
+}
+
+.btn-toggle-mortgage-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 7px 12px;
+  background: rgba(92, 3, 155, 0.06);
+  border: 1px dashed var(--border-purple);
+  border-radius: var(--radius-sm);
+  color: var(--brand-purple);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-toggle-mortgage-card:hover {
+  background: var(--brand-purple);
+  color: #fff;
+  border-style: solid;
+}
+
+[data-theme="dark"] .btn-toggle-mortgage-card {
+  color: var(--brand-lime-vivid);
+  border-color: var(--brand-purple-soft);
+  background: rgba(92, 3, 155, 0.15);
+}
+
+[data-theme="dark"] .btn-toggle-mortgage-card:hover {
+  background: var(--brand-purple);
+  color: #fff;
+}
+
+.mortgage-expanded-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: slideDownFade 0.25s ease-out;
+}
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Header */
@@ -754,4 +822,33 @@ const formatNumber = (num) => {
 .text-ruby { color: #E11D48; }
 .font-mono { font-family: monospace; }
 .font-bold { font-weight: 700; }
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .spotlight-value {
+    font-size: 1.25rem;
+    flex-wrap: wrap;
+  }
+  
+  .spotlight-submetrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .dbr-readouts {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .btn-jump-properties {
+    font-size: 0.75rem;
+    padding: 8px 12px;
+    height: auto;
+    text-align: center;
+  }
+  
+  .btn-jump-properties span:first-child {
+    white-space: normal;
+  }
+}
 </style>

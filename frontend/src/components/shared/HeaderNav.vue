@@ -9,13 +9,13 @@
         </div>
         <div class="brand-info">
           <div class="brand-title-row">
-            <h1 class="brand-title">XO Realty AI</h1>
+            <h1 class="brand-title">XO</h1>
             <span class="badge-live">
               <span class="pulse-dot"></span>
               ONLINE &amp; READY
             </span>
           </div>
-          <p class="brand-subtitle">Dubai &amp; UAE Luxury Real Estate &amp; Mortgage Assistant</p>
+          <p class="brand-subtitle">UAE Luxury Real Estate &amp; Mortgage Assistant</p>
         </div>
       </div>
     </div>

@@ -20,64 +20,108 @@
       <div class="property-results-container" v-if="message.metadata?.property_results?.length">
         <div class="property-results-header">
           <span class="results-badge">Featured Listings (Live Inventory)</span>
+          <span class="results-hint">Tap card or arrow to expand details</span>
         </div>
         <div class="property-card-list">
           <div 
             v-for="prop in message.metadata.property_results" 
             :key="prop.id" 
             class="prop-card"
+            :class="{ 'is-expanded': isCardExpanded(prop.id) }"
           >
-            <div class="prop-image-wrap">
-              <img :src="prop.image_url" :alt="prop.title" class="prop-image" />
-              <div class="prop-badges-top">
-                <span class="badge-status" :class="prop.status">{{ prop.status }}</span>
-                <span class="badge-dev" v-if="prop.developer">{{ prop.developer }}</span>
-              </div>
-              <button 
-                class="prop-shortlist-btn" 
-                :class="{ 'is-saved': prop.is_shortlisted }"
-                @click="$emit('shortlist-property', prop)"
-                :title="prop.is_shortlisted ? 'Remove from shortlist' : 'Save to shortlist'"
-                aria-label="Save to shortlist"
-              >
-                {{ prop.is_shortlisted ? '❤️' : '🤍' }}
-              </button>
-              <span class="prop-price">AED {{ formatNumber(prop.price) }}</span>
-            </div>
-            <div class="prop-info">
-              <h5 class="prop-title">{{ prop.title }}</h5>
-              <p class="prop-location">📍 {{ prop.community }}, {{ prop.city }}</p>
-              
-              <div class="prop-specs">
-                <span>🛏️ {{ prop.beds }} Beds</span>
-                <span>🚿 {{ prop.baths }} Baths</span>
-                <span>📐 {{ prop.sq_ft }} sq.ft</span>
+            <!-- 1. COMPACT / COLLAPSED PREVIEW BAR (Always visible, lightweight) -->
+            <div class="prop-compact-bar" @click="toggleCardExpand(prop.id)">
+              <div class="prop-thumb-wrap">
+                <img :src="prop.image_url" :alt="prop.title" class="prop-thumb-img" loading="lazy" />
+                <span class="prop-thumb-status" :class="prop.status">{{ prop.status === 'off-plan' ? 'Off-Plan' : 'Ready' }}</span>
               </div>
 
-              <!-- Amenities Tags -->
-              <div class="prop-amenities-row" v-if="prop.amenities?.length">
-                <span v-for="(amenity, i) in prop.amenities.slice(0, 3)" :key="i" class="amenity-chip">
-                  {{ amenity }}
-                </span>
-              </div>
-
-              <!-- Mortgage Cross-Sell Banner (FR-11) -->
-              <div class="prop-mortgage-banner" v-if="prop.mortgage_cross_sell">
-                <span class="cross-sell-icon">💳</span>
-                <div class="cross-sell-text">
-                  <strong>Est. EMI: AED {{ formatNumber(prop.mortgage_cross_sell.monthly_emi_aed) }}/mo</strong>
-                  <span class="cross-sell-sub">({{ prop.mortgage_cross_sell.required_down_payment_pct }}% down &bull; {{ prop.mortgage_cross_sell.representative_rate_pct }}% profit rate)</span>
+              <div class="prop-compact-info">
+                <h5 class="prop-compact-title" :title="prop.title">{{ prop.title }}</h5>
+                <div class="prop-compact-sub">
+                  <span class="prop-compact-loc">📍 {{ prop.community }}</span>
+                  <span class="prop-compact-beds">{{ prop.beds }} BHK</span>
+                </div>
+                <div class="prop-compact-price">
+                  AED {{ formatNumber(prop.price) }}
                 </div>
               </div>
 
-              <div class="prop-actions">
+              <div class="prop-compact-controls" @click.stop>
                 <button 
-                  class="btn-card-action mortgage-btn"
-                  @click="$emit('select-property-mortgage', prop)"
+                  type="button"
+                  class="prop-shortlist-btn compact-heart" 
+                  :class="{ 'is-saved': prop.is_shortlisted }"
+                  @click="$emit('shortlist-property', prop)"
+                  :title="prop.is_shortlisted ? 'Remove from shortlist' : 'Save to shortlist'"
+                  aria-label="Save to shortlist"
                 >
-                  🧮 Calculate Mortgage
+                  {{ prop.is_shortlisted ? '❤️' : '🤍' }}
                 </button>
-                <a :href="prop.listing_url" target="_blank" class="prop-link">View Details ↗</a>
+                <button 
+                  type="button" 
+                  class="prop-expand-btn"
+                  @click="toggleCardExpand(prop.id)"
+                  :aria-expanded="isCardExpanded(prop.id)"
+                  :title="isCardExpanded(prop.id) ? 'Collapse card' : 'Expand full details'"
+                >
+                  <span class="expand-arrow" :class="{ 'rotated': isCardExpanded(prop.id) }">▼</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 2. EXPANDED CONTENT DRAWER (Revealed smoothly on click) -->
+            <div class="prop-expanded-drawer" v-show="isCardExpanded(prop.id)">
+              <div class="prop-image-wrap">
+                <img :src="prop.image_url" :alt="prop.title" class="prop-image" loading="lazy" />
+                <div class="prop-badges-top">
+                  <span class="badge-status" :class="prop.status">{{ prop.status }}</span>
+                  <span class="badge-dev" v-if="prop.developer">{{ prop.developer }}</span>
+                </div>
+                <span class="prop-price">AED {{ formatNumber(prop.price) }}</span>
+              </div>
+              <div class="prop-info">
+                <p class="prop-location">📍 {{ prop.community }}, {{ prop.city }}</p>
+                
+                <div class="prop-specs">
+                  <span>🛏️ {{ prop.beds }} Beds</span>
+                  <span>🚿 {{ prop.baths }} Baths</span>
+                  <span>📐 {{ prop.sq_ft }} sq.ft</span>
+                </div>
+
+                <!-- Amenities Tags -->
+                <div class="prop-amenities-row" v-if="prop.amenities?.length">
+                  <span v-for="(amenity, i) in prop.amenities.slice(0, 4)" :key="i" class="amenity-chip">
+                    {{ amenity }}
+                  </span>
+                </div>
+
+                <!-- Mortgage Cross-Sell Banner (FR-11) -->
+                <div class="prop-mortgage-banner" v-if="prop.mortgage_cross_sell">
+                  <span class="cross-sell-icon">💳</span>
+                  <div class="cross-sell-text">
+                    <strong>Est. EMI: AED {{ formatNumber(prop.mortgage_cross_sell.monthly_emi_aed) }}/mo</strong>
+                    <span class="cross-sell-sub">({{ prop.mortgage_cross_sell.required_down_payment_pct }}% down &bull; {{ prop.mortgage_cross_sell.representative_rate_pct }}% profit rate)</span>
+                  </div>
+                </div>
+
+                <div class="prop-actions">
+                  <button 
+                    class="btn-card-action mortgage-btn"
+                    @click="$emit('select-property-mortgage', prop)"
+                  >
+                    🧮 Calculate Mortgage
+                  </button>
+                  <a :href="prop.listing_url" target="_blank" class="prop-link">View Details ↗</a>
+                </div>
+
+                <button 
+                  type="button" 
+                  class="btn-collapse-drawer" 
+                  @click="toggleCardExpand(prop.id)"
+                >
+                  ▲ Collapse Preview
+                </button>
               </div>
             </div>
           </div>
@@ -97,7 +141,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import MortgageCard from './MortgageCard.vue'
 
 const props = defineProps({
@@ -108,6 +152,17 @@ const props = defineProps({
 })
 
 defineEmits(['select-property-mortgage', 'jump-to-properties', 'shortlist-property'])
+
+// Track expanded card state per property ID (default collapsed)
+const expandedCards = ref({})
+
+const isCardExpanded = (propId) => {
+  return !!expandedCards.value[propId]
+}
+
+const toggleCardExpand = (propId) => {
+  expandedCards.value[propId] = !expandedCards.value[propId]
+}
 
 const formattedContent = computed(() => {
   if (!props.message.content) return ''
@@ -231,6 +286,9 @@ const formatTime = (isoString) => {
 }
 
 .property-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 8px;
 }
 
@@ -245,10 +303,15 @@ const formatTime = (isoString) => {
   border: 1px solid var(--border-cyan);
 }
 
+.results-hint {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
 .property-card-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .prop-card {
@@ -257,7 +320,7 @@ const formatTime = (isoString) => {
   background: var(--bg-surface);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  transition: all var(--transition-normal);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 [data-theme="dark"] .prop-card {
@@ -267,12 +330,206 @@ const formatTime = (isoString) => {
 .prop-card:hover {
   border-color: var(--brand-purple);
   box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+}
+
+.prop-card.is-expanded {
+  border-color: var(--brand-purple-light);
+  box-shadow: 0 4px 16px rgba(92, 3, 155, 0.12);
+}
+
+/* 1. COMPACT COLLAPSED BAR STYLES */
+.prop-compact-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+  background: var(--bg-surface);
+  transition: background var(--transition-fast);
+}
+
+.prop-compact-bar:hover {
+  background: rgba(92, 3, 155, 0.04);
+}
+
+[data-theme="dark"] .prop-compact-bar:hover {
+  background: rgba(92, 3, 155, 0.12);
+}
+
+.prop-thumb-wrap {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+
+.prop-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.prop-thumb-status {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(15, 23, 42, 0.85);
+  color: #fff;
+  letter-spacing: 0.2px;
+}
+
+.prop-thumb-status.off-plan {
+  color: var(--brand-cyan);
+}
+
+.prop-compact-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.prop-compact-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prop-compact-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.70rem;
+  color: var(--text-muted);
+}
+
+.prop-compact-loc {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.prop-compact-beds {
+  background: var(--bg-surface-elevated);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.prop-compact-price {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--brand-purple);
+}
+
+[data-theme="dark"] .prop-compact-price {
+  color: var(--brand-lime-vivid);
+}
+
+.prop-compact-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.compact-heart {
+  position: static !important;
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 0.75rem !important;
+  background: var(--bg-surface-elevated) !important;
+  border: 1px solid var(--border-subtle) !important;
+}
+
+.prop-expand-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(92, 3, 155, 0.08);
+  border: 1px solid var(--border-purple);
+  color: var(--brand-purple);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.prop-expand-btn:hover {
+  background: var(--brand-purple);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+.expand-arrow {
+  font-size: 0.68rem;
+  transition: transform 0.25s ease;
+  display: inline-block;
+}
+
+.expand-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+/* 2. EXPANDED DRAWER STYLES */
+.prop-expanded-drawer {
+  border-top: 1px solid var(--border-subtle);
+  animation: slideDownFade 0.25s ease-out;
+}
+
+@keyframes slideDownFade {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.btn-collapse-drawer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px;
+  font-size: 0.70rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-collapse-drawer:hover {
+  color: var(--brand-purple);
+  border-color: var(--border-purple);
+  background: rgba(92, 3, 155, 0.04);
 }
 
 .prop-image-wrap {
   position: relative;
-  height: 140px;
+  height: 130px;
   overflow: hidden;
 }
 

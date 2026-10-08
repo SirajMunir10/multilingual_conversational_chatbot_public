@@ -36,6 +36,31 @@ class TestPhase4PropertyDiscoveryAndRecommendation(unittest.TestCase):
         self.assertIn("townhouse", types)
         self.assertIn("penthouse", types)
 
+    def test_all_uae_communities_have_full_bedroom_coverage(self):
+        """Verify that every featured community across UAE has 1BHK, 2BHK, 3BHK, and 4BHK properties."""
+        all_props = PropertyInventoryGateway.get_all_properties()
+        from collections import defaultdict
+        comm_beds = defaultdict(set)
+        for p in all_props:
+            comm_beds[p.community].add(p.beds)
+
+        expected_communities = [
+            "Palm Jumeirah",
+            "Downtown Dubai",
+            "Business Bay",
+            "Dubai Marina",
+            "Dubai Hills Estate",
+            "Dubai Creek Harbour",
+            "Jumeirah Village Circle",
+            "Jumeirah Beach Residence",
+            "Arabian Ranches III",
+            "Yas Island"
+        ]
+        for comm in expected_communities:
+            self.assertIn(comm, comm_beds)
+            for req_bed in [1, 2, 3, 4]:
+                self.assertIn(req_bed, comm_beds[comm], f"Missing {req_bed}BHK in {comm}")
+
     def test_property_search_with_filters(self):
         """FR-7 & FR-8: Test filtering by bedrooms, budget, and location."""
         filt = PropertySearchFilter(

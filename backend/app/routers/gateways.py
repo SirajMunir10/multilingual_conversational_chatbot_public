@@ -88,3 +88,15 @@ def create_vault_lead_endpoint(
     Narrow, explicitly defined write endpoint.
     """
     return VaultGateway.create_lead(payload, session_id=x_session_id)
+
+@router.get("/kb")
+def retrieve_kb_endpoint(
+    query: str = Query(..., description="Natural language question or search query"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID")
+):
+    """
+    PRD Architecture Function: retrieve_kb(query)
+    RAG retriever with access scoping and Phase 5 activation boundary enforcement.
+    """
+    from app.services.rag_service import RAGService
+    return RAGService.retrieve_kb(query, session_id=x_session_id)

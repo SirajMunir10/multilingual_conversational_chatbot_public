@@ -580,34 +580,105 @@ class PropertyDiscoveryService:
         """
         FR-8 Smart Catalog & Fallback Recommendations:
         Inspects catalog when exact criteria yields 0 results.
+        Proactively discovers:
+        1. Alternative bedroom tiers & property types available in the requested community.
+        2. Alternative communities in the catalog with the user's desired bedroom count.
         """
         all_props = PropertyInventoryGateway.get_all_properties()
         target_comm = (filters.city or filters.location or "").lower().strip()
         target_beds = filters.beds
-        max_b = filters.budget_max or 15000000.0
+        req_type = filters.type.lower() if filters.type else None
 
-        same_comm_other_beds = []
-        other_comm_same_beds = []
-
+        # 1. Properties within the requested community/location
+        comm_props = []
         if target_comm:
-            same_comm_other_beds = [
-                p for p in all_props 
-                if (target_comm in p.community.lower() or target_comm in p.city.lower())
-                and (target_beds is None or p.beds != target_beds)
-                and p.price <= max_b * 1.25
-            ]
+            if target_comm in ["uae", "all uae", "all", "united arab emirates", "anywhere in uae", "anywhere"]:
+                comm_props = list(all_props)
+            elif target_comm in ["dubai", "all dubai", "dxb"]:
+                comm_props = [p for p in all_props if "dubai" in p.city.lower()]
+            elif target_comm in ["abu dhabi", "all abu dhabi", "auh"]:
+                comm_props = [p for p in all_props if "abu dhabi" in p.city.lower()]
+            else:
+                comm_props = [
+                    p for p in all_props
+                    if target_comm in p.community.lower() or target_comm in p.city.lower()
+                ]
 
-        if target_beds:
-            other_comm_same_beds = [
+        # Group same-community properties by bedroom count and property type
+        bed_tiers_map = {}
+        for p in comm_props:
+            if target_beds is not None and p.beds == target_beds and req_type and req_type not in p.type.lower():
+                # Same beds but different type (e.g. townhouse instead of apartment)
+                key = (p.beds, p.type)
+            elif target_beds is not None and p.beds == target_beds:
+                # Same beds in this community (zero match must be due to budget/amenity)
+                key = (p.beds, p.type)
+            else:
+                key = (p.beds, p.type)
+
+            if key not in bed_tiers_map:
+                bed_tiers_map[key] = []
+            bed_tiers_map[key].append(p)
+
+        available_beds_in_community = []
+        for (b, t), props_list in sorted(bed_tiers_map.items(), key=lambda x: (x[0][0], min(p.price for p in x[1]))):
+            min_price = min(p.price for p in props_list)
+            sample_prop = min(props_list, key=lambda p: p.price)
+            available_beds_in_community.append({
+                "beds": b,
+                "type": t,
+                "count": len(props_list),
+                "starting_price_aed": min_price,
+                "sample_title": sample_prop.title,
+                "property_id": sample_prop.id
+            })
+
+        # Same community alternative property models (sorted by price ascending)
+        same_comm_other_beds = sorted(
+            [p for p in comm_props if target_beds is None or p.beds != target_beds or (filters.budget_max and p.price > filters.budget_max)],
+            key=lambda x: x.price
+        )
+
+        # 2. Alternative communities matching the requested bedroom count
+        other_comm_same_beds_map = {}
+        if target_beds is not None:
+            matching_bed_props = [
                 p for p in all_props
                 if p.beds == target_beds
                 and (not target_comm or (target_comm not in p.community.lower() and target_comm not in p.city.lower()))
-                and p.price <= max_b * 1.25
             ]
+            for p in matching_bed_props:
+                comm = p.community
+                if comm not in other_comm_same_beds_map:
+                    other_comm_same_beds_map[comm] = []
+                other_comm_same_beds_map[comm].append(p)
+
+        other_communities_summary = []
+        for comm, props_list in other_comm_same_beds_map.items():
+            min_price = min(p.price for p in props_list)
+            sample_prop = min(props_list, key=lambda p: p.price)
+            other_communities_summary.append({
+                "community": comm,
+                "beds": target_beds,
+                "count": len(props_list),
+                "starting_price_aed": min_price,
+                "sample_title": sample_prop.title,
+                "property_id": sample_prop.id
+            })
+        other_communities_summary.sort(key=lambda x: x["starting_price_aed"])
+
+        other_comm_same_beds = []
+        for comm_info in other_communities_summary:
+            other_comm_same_beds.extend(other_comm_same_beds_map[comm_info["community"]])
 
         return {
+            "target_community": filters.city or filters.location or "Dubai",
+            "requested_beds": target_beds,
             "has_same_comm_alternatives": len(same_comm_other_beds) > 0,
-            "same_community_alternatives": [p.model_dump() for p in same_comm_other_beds[:3]],
+            "has_community_properties": len(comm_props) > 0,
+            "available_beds_in_community": available_beds_in_community,
+            "same_community_alternatives": [p.model_dump() for p in same_comm_other_beds[:4]],
             "has_other_comm_alternatives": len(other_comm_same_beds) > 0,
-            "other_community_alternatives": [p.model_dump() for p in other_comm_same_beds[:3]]
+            "other_communities_summary": other_communities_summary[:4],
+            "other_community_alternatives": [p.model_dump() for p in other_comm_same_beds[:4]]
         }

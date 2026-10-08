@@ -9,7 +9,7 @@
         </div>
         <div>
           <div class="header-brand-title">
-            <h3 class="header-title">XO Realty AI</h3>
+            <h3 class="header-title">XO</h3>
             <span class="badge-online">ONLINE &amp; READY</span>
           </div>
           <span class="header-status">
@@ -99,216 +99,158 @@
       @close="showTips = false" 
     />
 
-    <!-- Message Feed -->
-    <div class="chat-feed" ref="feedRef" role="log" aria-live="polite">
-      
-      <!-- HERO CENTERPIECE: Shown upon opening / at start of conversation -->
-      <div v-if="messages.length <= 1" class="hero-centerpiece glass-card">
-        <div class="hero-badge">
-          <span class="pulse-dot"></span>
-          <span>XO AI v4.2</span>
+    <!-- Dedicated Voice Mode Screen: Replicates Perplexity AI Voice UI & Animation -->
+    <div 
+      v-if="isVoiceActive" 
+      class="pplx-voice-screen" 
+      :class="{ 'is-speaking': Boolean(liveSpokenText.trim()) }"
+    >
+      <div class="pplx-voice-stage">
+        <!-- 3D Particle Sphere Model (Perplexity Orb) -->
+        <div class="pplx-orb-container">
+          <VoiceVisualizer 
+            :is-active="isVoiceActive" 
+            :audio-level="currentAudioLevel"
+            :is-compact="Boolean(liveSpokenText.trim())"
+          />
         </div>
 
-        <div class="hero-mascot-visual">
-          <img src="/xo-mascot.png" alt="XO Assistant Mascot" class="hero-mascot-img" />
+        <!-- Live Speech Transcription / Prompt Text -->
+        <div class="pplx-text-zone">
+          <p v-if="liveSpokenText.trim()" class="pplx-transcript-text">
+            “{{ liveSpokenText }}”
+          </p>
+          <p v-else class="pplx-prompt-text">
+            Say something...
+          </p>
+          <div v-if="silenceTimerActive && liveSpokenText.trim()" class="pplx-silence-pulse">
+            <span class="pplx-silence-dot"></span>
+            <span>Sending in 2s...</span>
+          </div>
         </div>
 
-        <h3 class="hero-greeting-title">
-          How can I assist your Dubai investment journey today?
-        </h3>
-        <p class="hero-greeting-sub">
-          Choose a quick action below or speak naturally in English, Arabic, Hindi, or Urdu.
-        </p>
-
-        <!-- 4 Quick Suggestion Prompt Cards -->
-        <div class="quick-prompts-grid">
+        <!-- Circular Action Buttons: Cross ✕ on Left, Tick ✓ on Right -->
+        <div class="pplx-actions-row">
+          <!-- Cross / Cancel Button -->
           <button 
             type="button" 
-            class="prompt-card"
-            @click="sendQuickPrompt('Find a 3-bed penthouse in Downtown or Palm under 5M AED')"
-            title="Search luxury penthouses in Downtown & Palm (<5M AED)"
-            data-tooltip="Search penthouses in Downtown & Palm"
-            data-tooltip-pos="bottom"
-          >
-            <span class="prompt-icon">🏢</span>
-            <div class="prompt-text-group">
-              <strong>Luxury Penthouses</strong>
-              <span>3-bed in Downtown or Palm &lt; 5M AED</span>
-            </div>
-            <span class="prompt-arrow">→</span>
-          </button>
-
-          <button 
-            type="button" 
-            class="prompt-card"
-            @click="sendQuickPrompt('Check what I can afford with AED 350k down and AED 30k salary')"
-            title="Calculate maximum mortgage borrowing capacity"
-            data-tooltip="Calculate mortgage affordability"
-            data-tooltip-pos="bottom"
-          >
-            <span class="prompt-icon">🧮</span>
-            <div class="prompt-text-group">
-              <strong>Mortgage Affordability</strong>
-              <span>AED 350k down &amp; AED 30k salary</span>
-            </div>
-            <span class="prompt-arrow">→</span>
-          </button>
-
-          <button 
-            type="button" 
-            class="prompt-card"
-            @click="sendQuickPrompt('Compare rental yields and high-ROI investment assets in Business Bay')"
-            title="Analyze rental yields and ROI across Dubai districts"
-            data-tooltip="Analyze rental yields & ROI"
-            data-tooltip-pos="bottom"
-          >
-            <span class="prompt-icon">📈</span>
-            <div class="prompt-text-group">
-              <strong>High-ROI Assets</strong>
-              <span>Rental yields in Business Bay &amp; Marina</span>
-            </div>
-            <span class="prompt-arrow">→</span>
-          </button>
-
-          <button 
-            type="button" 
-            class="prompt-card"
-            @click="sendQuickPrompt('I would like to speak with a licensed luxury property & mortgage advisor.')"
-            title="Request human broker & mortgage advisor handoff"
-            data-tooltip="Request licensed advisor handoff"
-            data-tooltip-pos="bottom"
-          >
-            <span class="prompt-icon">🤝</span>
-            <div class="prompt-text-group">
-              <strong>Speak with Advisor</strong>
-              <span>Licensed broker &amp; mortgage specialist</span>
-            </div>
-            <span class="prompt-arrow">→</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Messages Stream -->
-      <MessageItem 
-        v-for="msg in messages" 
-        :key="msg.id" 
-        :message="msg"
-        @select-property-mortgage="handlePropertyMortgageCheck"
-        @jump-to-properties="handleJumpToProperties"
-        @shortlist-property="handleShortlistProperty"
-      />
-
-      <!-- Streaming / Typing Indicator -->
-      <div class="typing-indicator" v-if="isTyping">
-        <div class="mascot-typing-avatar">
-          <img src="/xo-mascot.png" alt="XO" class="typing-mascot-img" />
-        </div>
-        <div class="typing-dots-wrapper">
-          <span class="typing-dot"></span>
-          <span class="typing-dot"></span>
-          <span class="typing-dot"></span>
-          <span class="typing-text">XO AI is analyzing market data...</span>
-        </div>
-      </div>
-
-      <!-- Voice Visualizer during Recording or Playing -->
-      <VoiceVisualizer 
-        :is-active="isRecording" 
-        :label="liveSpokenText ? 'Transcribing: ' + liveSpokenText : 'Listening (Speak in English, Arabic, Hindi, or Urdu)...'" 
-      />
-      <VoiceVisualizer 
-        :is-active="isPlayingVoice" 
-        label="Speaking (XO Audio Stream) • Click mic to interrupt" 
-        @click="stopVoicePlayback"
-        style="cursor: pointer;"
-        title="Click to interrupt voice playback"
-      />
-    </div>
-
-    <!-- Live Speech Transcription Dock (Shows progressive user speech on screen) -->
-    <div v-if="isVoiceActive && (liveSpokenText || isRecording)" class="live-speech-dock">
-      <div class="live-speech-header">
-        <span class="live-rec-dot"></span>
-        <span class="live-rec-label">{{ isRecording ? 'Listening live...' : 'Voice Input Staged' }}</span>
-      </div>
-      <p class="live-speech-transcript" v-if="liveSpokenText">
-        “{{ liveSpokenText }}”
-      </p>
-    </div>
-
-    <!-- Advisor Standby Notification Bar -->
-    <div class="advisor-standby-bar">
-      <div class="standby-status">
-        <span class="standby-icon">🎧</span>
-        <span class="standby-text">
-          Advisor on Standby: <strong>4 licensed specialists</strong> available
-        </span>
-      </div>
-      <button 
-        type="button" 
-        class="btn-standby-connect" 
-        @click="requestHandoff"
-        title="Connect with a licensed human specialist"
-        data-tooltip="Connect with 1 of 4 advisors"
-        data-tooltip-pos="left"
-      >
-        Connect
-      </button>
-    </div>
-
-    <!-- Chat Input Controls (Floating Pill Dock) -->
-    <div class="chat-footer">
-      <form @submit.prevent="sendMessage" class="input-form">
-        <label for="chat-text-input" class="visually-hidden">Type your message</label>
-        <input 
-          id="chat-text-input"
-          ref="inputRef"
-          v-model="inputQuery" 
-          type="text" 
-          :placeholder="isRecording ? 'Listening... Spoken words will appear here' : inputPlaceholder" 
-          class="chat-input-field"
-          :class="{ 'voice-listening-active': isRecording }"
-          :disabled="isTyping"
-          autocomplete="off"
-        />
-
-        <!-- Voice Confirmation & Cancellation Controls when Voice Input is active -->
-        <template v-if="isVoiceActive">
-          <!-- Cancel / X Button (Discards current voice input, preserves session context, does not close widget) -->
-          <button 
-            type="button" 
-            class="voice-btn voice-cancel-btn" 
+            class="pplx-action-btn pplx-btn-cancel" 
             @click="cancelVoiceInput"
-            title="Cancel & discard voice input (✕)"
+            title="Cancel voice input (✕)"
             aria-label="Cancel Voice Input"
-            data-tooltip="Cancel voice input (✕)"
-            data-tooltip-pos="left"
           >
             ✕
           </button>
 
-          <!-- Confirm / ✓ Button (Confirms & sends captured speech through pipeline) -->
+          <!-- Tick / Confirm Button -->
           <button 
             type="button" 
-            class="voice-btn voice-confirm-btn" 
+            class="pplx-action-btn pplx-btn-confirm" 
             :disabled="!liveSpokenText.trim() && !inputQuery.trim() && audioChunks.length === 0"
             @click="confirmVoiceInput"
-            title="Confirm & send speech (✓)"
+            title="Send speech to chat (✓)"
             aria-label="Confirm Voice Input"
-            data-tooltip="Confirm & send (✓)"
-            data-tooltip-pos="left"
           >
             ✓
           </button>
-        </template>
+        </div>
+      </div>
+    </div>
 
-        <!-- Standard Controls when Voice Input is NOT active -->
-        <template v-else>
-          <!-- Microphone Button (Composed V2V Voice Interaction) -->
+    <!-- Standard Chat Interface: Displayed when Voice Mode is NOT active -->
+    <template v-else>
+      <!-- Message Feed -->
+      <div class="chat-feed" ref="feedRef" role="log" aria-live="polite">
+        <!-- HERO CENTERPIECE: Shown upon opening / at start of conversation -->
+        <div v-if="messages.length <= 1" class="hero-centerpiece glass-card">
+          <div class="hero-badge">
+            <span class="pulse-dot"></span>
+            <span>XO AI v4.2</span>
+          </div>
+
+          <div class="hero-mascot-visual">
+            <img src="/xo-mascot.png" alt="XO Assistant Mascot" class="hero-mascot-img" />
+          </div>
+
+          <h3 class="hero-greeting-title">
+            How can I assist your UAE investment journey today?
+          </h3>
+          <p class="hero-greeting-sub">
+            Speak or message naturally in English, Arabic, Hindi, or Urdu.
+          </p>
+        </div>
+
+        <!-- Messages Stream -->
+        <MessageItem 
+          v-for="msg in messages" 
+          :key="msg.id" 
+          :message="msg"
+          @select-property-mortgage="handlePropertyMortgageCheck"
+          @jump-to-properties="handleJumpToProperties"
+          @shortlist-property="handleShortlistProperty"
+        />
+
+        <!-- Streaming / Typing Indicator -->
+        <div class="typing-indicator" v-if="isTyping">
+          <div class="mascot-typing-avatar">
+            <img src="/xo-mascot.png" alt="XO" class="typing-mascot-img" />
+          </div>
+          <div class="typing-dots-wrapper">
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-dot"></span>
+            <span class="typing-text">XO AI is analyzing market data...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compact Voice Playback Bar (when XO is speaking back audio) -->
+      <div v-if="isPlayingVoice" class="voice-playback-bar" @click="stopVoicePlayback" title="Click to stop voice playback">
+        <span class="playback-dot"></span>
+        <span class="playback-text">XO is speaking • Click to interrupt</span>
+        <button type="button" class="btn-stop-playback" @click.stop="stopVoicePlayback" aria-label="Stop audio">⏹</button>
+      </div>
+
+      <!-- Advisor Standby Notification Bar -->
+      <div class="advisor-standby-bar">
+        <div class="standby-status">
+          <span class="standby-icon">🎧</span>
+          <span class="standby-text">
+            Advisor on Standby: <strong>4 licensed specialists</strong> available
+          </span>
+        </div>
+        <button 
+          type="button" 
+          class="btn-standby-connect" 
+          @click="requestHandoff"
+          title="Connect with a licensed human specialist"
+          data-tooltip="Connect with 1 of 4 advisors"
+          data-tooltip-pos="left"
+        >
+          Connect
+        </button>
+      </div>
+
+      <!-- Chat Input Controls (Floating Pill Dock) -->
+      <div class="chat-footer">
+        <form @submit.prevent="sendMessage" class="input-form">
+          <label for="chat-text-input" class="visually-hidden">Type your message</label>
+          <input 
+            id="chat-text-input"
+            ref="inputRef"
+            v-model="inputQuery" 
+            type="text" 
+            :placeholder="inputPlaceholder" 
+            class="chat-input-field"
+            :disabled="isTyping"
+            autocomplete="off"
+          />
+
+          <!-- Microphone Button -->
           <button 
             type="button" 
             class="mic-btn" 
-            :class="{ 'recording': isRecording, 'speaking': isPlayingVoice }"
+            :class="{ 'speaking': isPlayingVoice }"
             @click="toggleVoiceRecording"
             :title="isPlayingVoice ? 'Interrupt XO & Speak' : 'Tap to Speak (Voice STT in EN, AR, HI, UR)'"
             aria-label="Microphone Voice Input"
@@ -334,14 +276,14 @@
           >
             <span class="send-arrow">↑</span>
           </button>
-        </template>
-      </form>
-    </div>
+        </form>
+      </div>
 
-    <!-- Legal Disclaimer Under Input -->
-    <div class="input-disclaimer">
-      <span>XO AI provides informational estimates based on official UAE Central Bank &amp; DLD guidelines. Real-time rates subject to bank approval.</span>
-    </div>
+      <!-- Legal Disclaimer Under Input -->
+      <div class="input-disclaimer">
+        <span>XO AI provides informational estimates based on official UAE Central Bank &amp; DLD guidelines. Real-time rates subject to bank approval.</span>
+      </div>
+    </template>
 
     <!-- Audio Element for synthesized TTS playback -->
     <audio ref="audioPlayerRef" @ended="stopVoicePlayback" class="visually-hidden"></audio>
@@ -469,8 +411,30 @@ const isVoiceActive = ref(false)
 const isVoiceInFlight = ref(false)
 const recordedAudioBlob = ref(null)
 const liveSpokenText = ref('')
+const currentAudioLevel = ref(0)
+const hasMeaningfulSpeech = ref(false)
+const silenceTimerActive = ref(false)
+let silenceTimer = null
+let audioContext = null
+let analyserNode = null
+let audioAnalysisInterval = null
 let speechRecognition = null
 let voiceAbortController = null
+
+const voiceStatusLabel = computed(() => {
+  if (silenceTimerActive.value) {
+    return 'Silence detected • Auto-sending in 2s...'
+  }
+  if (isRecording.value) {
+    return liveSpokenText.value 
+      ? 'Listening • ' + (liveSpokenText.value.length > 28 ? liveSpokenText.value.slice(-28) : liveSpokenText.value)
+      : 'Listening (Speak in EN, AR, HI, UR)...'
+  }
+  if (isPlayingVoice.value) {
+    return 'Speaking (XO Audio Stream) • Click mic to interrupt'
+  }
+  return 'Voice Mode Active'
+})
 
 const feedRef = ref(null)
 const inputRef = ref(null)
@@ -549,6 +513,13 @@ watch(() => props.currentLanguage, () => {
   hasVoiceSessionGreeted.value = false
   if (isVoiceActive.value || isRecording.value) {
     cancelVoiceInput()
+  }
+})
+
+// Auto-trigger silence countdown whenever spoken text updates
+watch(liveSpokenText, (newText) => {
+  if (isVoiceActive.value && !isVoiceInFlight.value && newText.trim()) {
+    restartSilenceTimer()
   }
 })
 
@@ -730,6 +701,43 @@ const playVoiceGreeting = async () => {
 }
 
 // 2. Start Voice Recording & Live Speech Recognition (Requirement 2)
+const resetSilenceTimer = () => {
+  if (silenceTimer) {
+    clearTimeout(silenceTimer)
+    silenceTimer = null
+  }
+  silenceTimerActive.value = false
+}
+
+const restartSilenceTimer = () => {
+  if (silenceTimer) {
+    clearTimeout(silenceTimer)
+    silenceTimer = null
+  }
+  if (!isVoiceActive.value || isVoiceInFlight.value) {
+    silenceTimerActive.value = false
+    return
+  }
+  const text = liveSpokenText.value.trim() || inputQuery.value.trim()
+  if (!text) {
+    silenceTimerActive.value = false
+    return
+  }
+
+  silenceTimerActive.value = true
+  silenceTimer = setTimeout(async () => {
+    silenceTimerActive.value = false
+    silenceTimer = null
+    // Auto-confirm & submit after 2 seconds of continuous silence
+    if (isVoiceActive.value && !isVoiceInFlight.value) {
+      const finalText = liveSpokenText.value.trim() || inputQuery.value.trim()
+      if (finalText) {
+        await confirmVoiceInput()
+      }
+    }
+  }, 2000)
+}
+
 const startVoiceRecording = async () => {
   if (isPlayingVoice.value) {
     stopVoicePlayback()
@@ -739,6 +747,8 @@ const startVoiceRecording = async () => {
   recordedAudioBlob.value = null
   liveSpokenText.value = ''
   inputQuery.value = ''
+  hasMeaningfulSpeech.value = false
+  resetSilenceTimer()
   isVoiceActive.value = true
   isRecording.value = true
 
@@ -749,6 +759,8 @@ const startVoiceRecording = async () => {
       if (speechRecognition) {
         speechRecognition.onresult = null
         speechRecognition.onerror = null
+        speechRecognition.onend = null
+        speechRecognition.onspeechend = null
         speechRecognition.stop()
       }
       speechRecognition = new SpeechRecognition()
@@ -771,8 +783,29 @@ const startVoiceRecording = async () => {
         if (transcript) {
           liveSpokenText.value = transcript
           inputQuery.value = transcript
+          hasMeaningfulSpeech.value = true
+          // Debounce 2 seconds of silence after words are captured
+          restartSilenceTimer()
         }
       }
+
+      speechRecognition.onspeechend = () => {
+        // Native browser VAD detected speech ceased
+        if (liveSpokenText.value.trim()) {
+          restartSilenceTimer()
+        }
+      }
+
+      speechRecognition.onend = () => {
+        if (isVoiceActive.value && !isVoiceInFlight.value) {
+          if (liveSpokenText.value.trim()) {
+            restartSilenceTimer()
+          } else if (isRecording.value) {
+            try { speechRecognition.start() } catch (e) {}
+          }
+        }
+      }
+
       speechRecognition.onerror = (e) => {
         console.warn('SpeechRecognition notice:', e)
       }
@@ -782,7 +815,7 @@ const startVoiceRecording = async () => {
     }
   }
 
-  // Initialize MediaRecorder for audio recording
+  // Initialize MediaRecorder for audio recording & Web Audio API for 3D visualizer
   if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -806,6 +839,39 @@ const startVoiceRecording = async () => {
       }
 
       recorder.start()
+
+      // Connect Web Audio API Analyser exclusively for real-time 3D orb organic pulsation
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext
+        if (AudioCtx) {
+          if (audioContext) {
+            try { audioContext.close() } catch (e) {}
+          }
+          audioContext = new AudioCtx()
+          analyserNode = audioContext.createAnalyser()
+          analyserNode.fftSize = 256
+          const source = audioContext.createMediaStreamSource(stream)
+          source.connect(analyserNode)
+
+          const bufferLength = analyserNode.frequencyBinCount
+          const dataArray = new Uint8Array(bufferLength)
+
+          if (audioAnalysisInterval) clearInterval(audioAnalysisInterval)
+          audioAnalysisInterval = setInterval(() => {
+            if (!isRecording.value || !analyserNode) return
+            analyserNode.getByteFrequencyData(dataArray)
+            let sum = 0
+            for (let i = 0; i < bufferLength; i++) {
+              sum += dataArray[i]
+            }
+            const avg = sum / bufferLength
+            const normalized = Math.min(avg / 65.0, 1.0)
+            currentAudioLevel.value = normalized
+          }, 80)
+        }
+      } catch (audioErr) {
+        console.warn('Web Audio Analyser init notice:', audioErr)
+      }
     } catch (err) {
       console.warn('Microphone permission or hardware unavailable:', err)
     }
@@ -814,6 +880,11 @@ const startVoiceRecording = async () => {
 
 const stopVoiceRecording = () => {
   isRecording.value = false
+  if (audioAnalysisInterval) {
+    clearInterval(audioAnalysisInterval)
+    audioAnalysisInterval = null
+  }
+  currentAudioLevel.value = 0
   if (speechRecognition) {
     try {
       speechRecognition.stop()
@@ -855,6 +926,19 @@ const toggleVoiceRecording = async () => {
 
 // 3. Cancel / X Action (Requirement 3)
 const cancelVoiceInput = () => {
+  resetSilenceTimer()
+  hasMeaningfulSpeech.value = false
+  if (audioAnalysisInterval) {
+    clearInterval(audioAnalysisInterval)
+    audioAnalysisInterval = null
+  }
+  if (audioContext) {
+    try { audioContext.close() } catch (e) {}
+    audioContext = null
+    analyserNode = null
+  }
+  currentAudioLevel.value = 0
+
   if (voiceAbortController) {
     try {
       voiceAbortController.abort()
@@ -898,8 +982,24 @@ const cancelVoiceInput = () => {
 // 4. Confirm / ✓ Action (Requirement 3)
 const confirmVoiceInput = async () => {
   if (isVoiceInFlight.value) return
+  resetSilenceTimer()
+  if (audioAnalysisInterval) {
+    clearInterval(audioAnalysisInterval)
+    audioAnalysisInterval = null
+  }
+  if (audioContext) {
+    try { audioContext.close() } catch (e) {}
+    audioContext = null
+    analyserNode = null
+  }
+  currentAudioLevel.value = 0
 
   const capturedText = liveSpokenText.value.trim() || inputQuery.value.trim()
+  if (!capturedText && audioChunks.value.length === 0 && !recordedAudioBlob.value) {
+    // Empty voice interaction, cancel instead of submitting blank message
+    cancelVoiceInput()
+    return
+  }
 
   if (speechRecognition) {
     try {
@@ -1442,7 +1542,7 @@ onMounted(() => {
 .hero-greeting-sub {
   font-size: 0.78rem;
   color: var(--text-muted);
-  margin: 0 0 16px;
+  margin: 0 0 6px;
   max-width: 320px;
   line-height: 1.45;
 }
@@ -1605,128 +1705,260 @@ onMounted(() => {
   color: #FFFFFF;
 }
 
-/* Live Speech Transcription Dock */
-.live-speech-dock {
-  margin: 0 12px 6px;
-  padding: 8px 14px;
-  border-radius: var(--radius-md);
-  background: rgba(3, 164, 244, 0.08);
-  border: 1px dashed var(--brand-cyan);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  animation: fadeIn 0.2s ease-in-out;
-}
-
-[data-theme="dark"] .live-speech-dock {
-  background: rgba(3, 164, 244, 0.14);
-  border-color: var(--brand-cyan-vivid);
-}
-
-.live-speech-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.live-rec-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #EF4444;
-  box-shadow: 0 0 8px #EF4444;
-  animation: pulseRecording 1.1s infinite;
-}
-
-.live-rec-label {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--brand-cyan);
-}
-
-[data-theme="dark"] .live-rec-label {
-  color: var(--brand-cyan-vivid);
-}
-
-.live-speech-transcript {
-  margin: 0;
-  font-size: 0.88rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  line-height: 1.4;
-  font-style: italic;
-  word-break: break-word;
-}
-
-/* Voice Action Buttons (Cancel ✕ / Confirm ✓) */
-.voice-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+/* ==========================================================================
+   Dedicated Voice Mode Screen: Perplexity AI Replication
+   ========================================================================== */
+.pplx-voice-screen {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-surface, #FFFFFF);
+  position: relative;
+  overflow: hidden;
+  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-theme="dark"] .pplx-voice-screen {
+  background: #111113;
+}
+
+.pplx-voice-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  max-width: 420px;
+  position: relative;
+  padding: 24px 20px;
+}
+
+/* 3D Particle Sphere Orb Container */
+.pplx-orb-container {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  width: 200px;
+  height: 200px;
+  transform: translate(-50%, -50%);
+  transition: all 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* When user starts speaking: 3D model goes down between buttons (Perplexity Style) */
+.pplx-voice-screen.is-speaking .pplx-orb-container {
+  top: calc(100% - 72px);
+  transform: translate(-50%, -50%);
+  width: 104px;
+  height: 104px;
+}
+
+/* Text Zone: Prompts & Live Transcription */
+.pplx-text-zone {
+  position: absolute;
+  top: calc(38% + 120px);
+  left: 50%;
+  transform: translate(-50%, 0);
+  width: 88%;
+  max-width: 320px;
+  text-align: center;
+  transition: all 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 3;
+}
+
+.pplx-prompt-text {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--brand-cyan, #0284c7);
+  margin: 0;
+  letter-spacing: 0.2px;
+  font-family: var(--font-heading, system-ui);
+}
+
+[data-theme="dark"] .pplx-prompt-text {
+  color: var(--brand-cyan-vivid, #03a4f4);
+}
+
+.pplx-transcript-text {
   font-size: 1.05rem;
-  font-weight: 800;
+  font-weight: 500;
+  color: var(--text-primary, #1e293b);
+  line-height: 1.45;
+  font-style: italic;
+  margin: 0;
+  word-break: break-word;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+[data-theme="dark"] .pplx-transcript-text {
+  color: #f1f5f9;
+}
+
+/* When speaking: Text floats cleanly in the center above the descended orb and buttons */
+.pplx-voice-screen.is-speaking .pplx-text-zone {
+  top: 40%;
+  transform: translate(-50%, -50%);
+  max-width: 340px;
+}
+
+.pplx-silence-pulse {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background: rgba(3, 164, 244, 0.08);
+  border: 1px solid rgba(3, 164, 244, 0.2);
+  color: var(--brand-cyan, #0284c7);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  animation: fadeIn 0.25s ease;
+}
+
+.pplx-silence-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brand-cyan, #0284c7);
+  animation: pulseRecording 1s infinite;
+}
+
+/* Action Controls Row (✕ on Left, ✓ on Right) */
+.pplx-actions-row {
+  position: absolute;
+  bottom: 46px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  z-index: 4;
+  transition: gap 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* When speaking: Buttons spread apart to nestle the particle orb right in the middle */
+.pplx-voice-screen.is-speaking .pplx-actions-row {
+  gap: 120px;
+}
+
+/* Perplexity Minimalist Soft Circular Buttons */
+.pplx-action-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.05);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  transition: all var(--transition-fast);
-  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 
-.voice-cancel-btn {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1.5px solid #EF4444;
-  color: #EF4444;
-  box-shadow: 0 0 10px rgba(239, 68, 68, 0.25);
+.pplx-btn-cancel {
+  color: #374151;
+  font-size: 1.15rem;
+  font-weight: 700;
 }
 
-.voice-cancel-btn:hover {
-  background: #EF4444;
-  color: #FFFFFF;
-  transform: scale(1.08);
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.5);
+.pplx-btn-cancel:hover {
+  background: rgba(0, 0, 0, 0.10);
+  transform: scale(1.06);
 }
 
-.voice-confirm-btn {
-  background: rgba(22, 163, 74, 0.14);
-  border: 1.5px solid #16A34A;
-  color: #16A34A;
-  box-shadow: 0 0 10px rgba(22, 163, 74, 0.25);
+.pplx-btn-confirm {
+  color: #16a34a;
+  font-size: 1.35rem;
+  font-weight: 800;
 }
 
-[data-theme="dark"] .voice-confirm-btn {
-  border-color: var(--brand-lime-vivid);
-  color: var(--brand-lime-vivid);
-  box-shadow: 0 0 10px rgba(100, 239, 10, 0.35);
+.pplx-btn-confirm:hover:not(:disabled) {
+  background: rgba(22, 163, 74, 0.12);
+  transform: scale(1.06);
 }
 
-.voice-confirm-btn:hover:not(:disabled) {
-  background: #16A34A;
-  color: #FFFFFF;
-  transform: scale(1.08);
-  box-shadow: 0 0 16px rgba(22, 163, 74, 0.5);
-}
-
-[data-theme="dark"] .voice-confirm-btn:hover:not(:disabled) {
-  background: var(--brand-lime-vivid);
-  color: #020202;
-}
-
-.voice-confirm-btn:disabled {
+.pplx-btn-confirm:disabled {
   opacity: 0.35;
   cursor: not-allowed;
-  box-shadow: none;
+  transform: none;
 }
 
-.chat-input-field.voice-listening-active {
-  color: var(--brand-cyan);
+[data-theme="dark"] .pplx-action-btn {
+  background: rgba(255, 255, 255, 0.10);
+  color: #f4f4f5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .pplx-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+[data-theme="dark"] .pplx-btn-confirm {
+  color: #4ade80;
+}
+
+[data-theme="dark"] .pplx-btn-confirm:hover:not(:disabled) {
+  background: rgba(74, 222, 128, 0.20);
+}
+
+/* Compact Voice Playback Bar (when XO is speaking back audio) */
+.voice-playback-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  margin: 0 12px 6px;
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid var(--border-purple, rgba(168, 85, 247, 0.3));
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.15s ease);
+}
+
+.voice-playback-bar:hover {
+  background: rgba(168, 85, 247, 0.2);
+}
+
+.playback-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #22C55E;
+  box-shadow: 0 0 8px #22C55E;
+  animation: pulseRecording 1.4s infinite;
+}
+
+.playback-text {
+  font-size: 0.74rem;
   font-weight: 600;
+  color: var(--brand-purple, #9333ea);
 }
 
-[data-theme="dark"] .chat-input-field.voice-listening-active {
-  color: var(--brand-cyan-vivid);
+[data-theme="dark"] .playback-text {
+  color: #d8b4fe;
+}
+
+.btn-stop-playback {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.btn-stop-playback:hover {
+  color: #EF4444;
 }
 
 /* Chat Input Footer Dock */

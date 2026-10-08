@@ -217,6 +217,34 @@ docker-compose run --rm backend pytest
 ## 9. Regulatory Scope & Compliance
 
 - **Jurisdiction:** United Arab Emirates (UAE) / Dubai / DIFC.
-- **Financial Compliance:** Aligned with UAE Central Bank mortgage regulations (maximum 50% Debt Burden Ratio, minimum down payment limits, nationality-based LTV caps).
-- **Data Protection:** Scoped customer queries, zero raw database access, consent gates for financial storage, and full audit trails for calculations and customer data access.
 - **Retention Standard:** Adheres strictly to the existing company data-retention policy (`XOTO-CORP-RETENTION-POL-2024-V3`); no bespoke retention duration is introduced.
+
+---
+
+## 10. Phase 5: Official Knowledge Base & RAG Architecture
+
+The Knowledge Base engine grounds all factual UAE real estate, tenancy, mortgage, investment, Golden Visa, area guide, partner developer, and platform policy inquiries:
+
+- **Source Document:** Official Xobia Knowledge Base (`Xobia_KB_v2_FINAL.md`).
+- **Master Knowledge Store:** `backend/app/data/knowledge_base/xobia_kb_master.json` (48 concrete articles + 28 Domain 12 glossary terms).
+- **Scope & Activation Boundaries:**
+  - **Articles 1–8 (`ACTIVE`):** Property purchase process, DLD/Trustee fees, freehold vs leasehold, required documents, Ejari registration, tenant rights & eviction, rental costs, RERA rental index.
+  - **Articles 9–12 (`PARTIALLY_ACTIVE`):** Educational mortgage guidelines, eligibility criteria, and fee structures. Conventional calculations and loan applications are strictly blocked (deferring to deterministic tools in Phase 3).
+  - **Articles 13–24 (`ACTIVE`):** Investment yields, short vs long-term rentals, Golden Visa 2M AED threshold, capital appreciation drivers, off-plan buying journey, escrow account (Law 8/2007), Oqood registration, snagging/handover, delay remedies, and assignment.
+  - **Articles 25–28 (`EXCLUDED`):** Explicitly excluded from Phase 5 scope. Preserved in master JSON with `status: EXCLUDED`; zero calculation logic or APIs exposed; strictly never retrieved.
+  - **Articles 30–53 (`ACTIVE`):** Comprehensive Dubai area guides (Downtown, Marina, Palm Jumeirah, Business Bay, Dubai Hills, JVC, etc.), Xoto platform identity, services, partner developers (Emaar, Nakheel, Sobha, Damac, Meraas), and human escalation.
+- **Strict PRD RAG Architecture Pipeline:**
+  - `Knowledge Documents → Embeddings → Vector Database → Retriever → Reranker → Relevant Context → LLM`
+  - **Embedding Model:** OpenAI `text-embedding-3-small` (1536-dimensional unit-normalized embeddings).
+  - **Vector Database:** `VectorDatabase` (`backend/app/services/vector_store.py`) executing vector dot product cosine similarity with status exclusion filtering.
+  - **Retriever:** Pure vector distance retrieval of top-k candidate document vectors.
+  - **Reranker:** Scope boundary filtering (excludes 25–28, blocks 9–12 loan calculations), statutory disclaimer enforcement, and Domain 11.4 low-confidence fallback (< 0.40) offering human specialist handoff.
+  - **Prompt Injection Defense:** Strips adversarial role-play and jailbreak prompt injection patterns prior to embedding.
+- **PRD Function & Gateway API:**
+  - Function: `retrieve_kb(query)`
+  - Gateway Endpoint: `GET /api/gateways/kb?query=...`
+- **Automated Test Suite:**
+  ```bash
+  python -m unittest backend/tests/test_phase5_kb_rag.py
+  ```
+

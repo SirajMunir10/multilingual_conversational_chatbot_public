@@ -21,6 +21,7 @@ class AppSettings(BaseModel):
     LLM_MODEL: str = Field(default_factory=lambda: os.getenv("LLM_MODEL", "gpt-5-mini"))
     STT_MODEL: str = Field(default_factory=lambda: os.getenv("STT_MODEL", "gpt-live-transcribe"))
     TTS_MODEL: str = Field(default_factory=lambda: os.getenv("TTS_MODEL", "gpt-4o-mini-tts"))
+    EMBEDDING_MODEL: str = Field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"))
     OPENAI_API_KEY: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
 
     # Compliance & Retention Policy

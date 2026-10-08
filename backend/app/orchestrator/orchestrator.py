@@ -434,6 +434,7 @@ class ConversationOrchestrator:
                         "property_results": tool_exec.get("property_results", []),
                         "mortgage_result": tool_exec.get("mortgage_result"),
                         "shortlist_status": tool_exec.get("shortlist_status"),
+                        "kb_result": tool_exec.get("kb_result"),
                         "tool_calls": [{"function": fn_name, "args": fn_args}],
                         "metadata": tool_exec.get("metadata", {})
                     }
@@ -526,6 +527,47 @@ class ConversationOrchestrator:
                     for p in listings[:6]
                 ]
             }
+
+            if count == 0:
+                alts = PropertyDiscoveryService.find_catalog_alternatives(filters)
+                tool_summary["catalog_alternatives"] = alts
+
+                if alts.get("has_community_properties"):
+                    tiers = [
+                        f"{b['beds']}BR {b['type']} (starting from AED {b['starting_price_aed']:,.0f})"
+                        for b in alts.get("available_beds_in_community", [])
+                    ]
+                    other_comm_tiers = [
+                        f"{oc['community']} ({oc['beds']}BR from AED {oc['starting_price_aed']:,.0f})"
+                        for oc in alts.get("other_communities_summary", [])[:3]
+                    ]
+                    guidance = (
+                        f"CRITICAL INSTRUCTION: Exact search returned 0 matching listings in {location_name}. "
+                        f"Do NOT say 'no listings found for {location_name}' or that {location_name} has no properties! "
+                        f"Politely explain that while {filters.beds or 'the requested'}-bedroom units matching the exact search are not currently available in {location_name}, "
+                        f"we DO have these residences available in {location_name}: {', '.join(tiers)}. "
+                    )
+                    if other_comm_tiers:
+                        guidance += f"Additionally, {filters.beds or '1'}-bedroom units are available in neighboring prime communities: {', '.join(other_comm_tiers)}. "
+                    guidance += (
+                        f"Proactively ask the user if they'd like to explore the {location_name} options (e.g. 2BHK or 3BHK) "
+                        f"or see {filters.beds or '1'}-bedroom residences in neighboring communities like Dubai Marina, Downtown Dubai, or Business Bay."
+                    )
+                    tool_summary["guidance_for_assistant"] = guidance
+                elif alts.get("has_other_comm_alternatives"):
+                    other_comm_tiers = [
+                        f"{oc['community']} ({oc['beds']}BR from AED {oc['starting_price_aed']:,.0f})"
+                        for oc in alts.get("other_communities_summary", [])[:3]
+                    ]
+                    tool_summary["guidance_for_assistant"] = (
+                        f"No active listings match the criteria in {location_name}. "
+                        f"However, matching {filters.beds or ''}-bedroom properties are available in: {', '.join(other_comm_tiers)}. "
+                        f"Proactively recommend exploring these alternative communities or broadening across Dubai."
+                    )
+                else:
+                    tool_summary["guidance_for_assistant"] = (
+                        f"No listings found matching criteria in {location_name}. Suggest broadening the search across Dubai or adjusting the budget and bedroom filters."
+                    )
 
             return {
                 "property_results": listings,
@@ -648,6 +690,15 @@ class ConversationOrchestrator:
                 }
             return {
                 "tool_result_for_llm": {"status": "authenticated", "user_id": session.user_id, "saved_count": 2, "active_applications": 1}
+            }
+
+        elif fn_name == "retrieve_kb":
+            from app.services.rag_service import RAGService
+            kb_query = fn_args.get("query", "")
+            kb_res = RAGService.retrieve_kb(kb_query, session_id=session.session_id)
+            return {
+                "kb_result": kb_res,
+                "tool_result_for_llm": kb_res
             }
 
         return {"tool_result_for_llm": {"status": "executed"}}
@@ -779,6 +830,25 @@ class ConversationOrchestrator:
                 }
             return {
                 "text": f"Retrieved profile for user {session.user_id}. You have 2 saved properties and 1 active pre-qualification application in Vault CRM.",
+                "tool_calls": [{"function": fn_name, "args": fn_args}]
+            }
+
+        elif fn_name == "retrieve_kb":
+            kb_res = raw_res.get("kb_result", {})
+            if kb_res.get("status") == "success":
+                short_ans = kb_res.get("short_answer", "")
+                detail = kb_res.get("detail", "")
+                disc = kb_res.get("disclaimer", "")
+                text = f"{short_ans}\n\n{detail}"
+                if disc:
+                    text += f"\n\n*(Legal Disclaimer: {disc})*"
+            elif kb_res.get("status") == "scope_restricted":
+                text = kb_res.get("message", "")
+            else:
+                text = kb_res.get("message", "Sorry, that topic is outside of my knowledge base.")
+            return {
+                "text": text,
+                "kb_result": kb_res,
                 "tool_calls": [{"function": fn_name, "args": fn_args}]
             }
 
@@ -1079,13 +1149,46 @@ class ConversationOrchestrator:
 
         # 4. GENERAL / RAG / GREETING INTENT
         else:
-            greetings = {
-                "ar": "مرحباً بك! أنا XO، مساعدك الذكي للعقارات والتمويل العقاري في الإمارات. يمكنني مساعدتك في البحث عن عقارات، أو احتساب قدرتك على التمويل، أو الإجابة على أي استفسار.",
-                "hi": "नमस्ते! मैं XO हूँ, यूएई में प्रॉपर्टी और होम लोन के लिए आपका एआई सहायक। आप प्रॉपर्टी सर्च, मॉर्गेज ईएमआई कैलकुलेशन या किसी भी सवाल के लिए पूछ सकते हैं।",
-                "ur": "خوش آمدید! میں XO ہوں، دبئی اور متحدہ عرب امارات میں رئیل اسٹیٹ اور مارگیج کے لیے آپ کا AI اسسٹنٹ۔ میں پراپرٹی کی تلاش یا ماہانہ قسط کے حساب میں آپ کی مدد کر سکتا ہوں۔",
-                "en": "Hello! I am XO, your Conversational AI Assistant for premier real estate and mortgages in the UAE. I can help you discover luxury properties, calculate your mortgage affordability and EMI, or answer any questions about our services. How may I assist you today?"
+            is_greeting = any(w in user_text.lower() for w in ["hi", "hello", "hey", "good morning", "good evening", "مرحبا", "أهلا", "اهلا", "سلام", "नमस्ते", "ہیلو"]) and len(user_text.strip().split()) <= 4
+            if is_greeting:
+                greetings = {
+                    "ar": "مرحباً بك! أنا XO، مساعدك الذكي للعقارات والتمويل العقاري في الإمارات. يمكنني مساعدتك في البحث عن عقارات، أو احتساب قدرتك على التمويل، أو الإجابة على أي استفسار. كيف أساعدك اليوم؟ 🎉",
+                    "hi": "नमस्ते! मैं XO हूँ, यूएई में प्रॉपर्टी और होम लोन के लिए आपका एआई सहायक। आप प्रॉपर्टी सर्च, मॉर्गेज ईएमआई कैलकुलेशन या किसी भी सवाल के लिए पूछ सकते हैं। 🎉",
+                    "ur": "خوش آمدید! میں XO ہوں، دبئی اور متحدہ عرب امارات میں رئیل اسٹیٹ اور مارگیج کے لیے آپ کا AI اسسٹنٹ۔ میں پراپرٹی کی تلاش یا قسط کے حساب میں آپ کی مدد کر سکتا ہوں۔ 🎉",
+                    "en": "Hello! I am XO, your Conversational AI Assistant for premier real estate and mortgages in the UAE. I can help you discover luxury properties, calculate your mortgage affordability and EMI, or answer any questions about our services. How may I assist you today? 🎉"
+                }
+                return {"text": greetings.get(lang, greetings["en"])}
+
+            # Ground through RAGService
+            from app.services.rag_service import RAGService
+            kb_res = RAGService.retrieve_kb(user_text, session_id=session.session_id)
+
+            if kb_res.get("status") == "success":
+                short_ans = kb_res.get("short_answer", "")
+                detail = kb_res.get("detail", "")
+                disc = kb_res.get("disclaimer", "")
+                reply = f"{short_ans}\n\n{detail}"
+                if disc:
+                    reply += f"\n\n*(Legal Disclaimer: {disc})*"
+                return {
+                    "text": reply,
+                    "kb_result": kb_res,
+                    "tool_calls": [{"function": "retrieve_kb", "args": {"query": user_text}}]
+                }
+            elif kb_res.get("status") == "scope_restricted":
+                return {
+                    "text": kb_res.get("message", ""),
+                    "kb_result": kb_res,
+                    "tool_calls": [{"function": "retrieve_kb", "args": {"query": user_text}}]
+                }
+
+            # Low confidence fallback per Domain 11.4
+            fallback_detail = kb_res.get("detail", "")
+            return {
+                "text": f"{kb_res.get('short_answer', '')}\n\n{fallback_detail}",
+                "kb_result": kb_res,
+                "tool_calls": [{"function": "retrieve_kb", "args": {"query": user_text}}]
             }
-            return {"text": greetings.get(lang, greetings["en"])}
 
     @classmethod
     async def stream_user_turn(
@@ -1248,12 +1351,14 @@ class ConversationOrchestrator:
             if has_same and has_other:
                 s = alts["same_community_alternatives"][0]
                 o = alts["other_community_alternatives"][0]
+                tiers = alts.get("available_beds_in_community", [])
+                comm_desc = f"تتوفر خيارات متعددة تشمل {', '.join([f'{t['beds']} غرف نوم (بدءاً من {t['starting_price_aed']:,.0f} درهم)' for t in tiers[:2]])}" if len(tiers) > 1 else f"تتوفر شقق {s['beds']} غرف نوم فاخرة (مثل *{s['title']}* بسعر {s['price']:,.0f} درهم)"
                 return (
                     f"بحثتُ في قائمة العقارات الحالية، وللأسف لا تتوفر حالياً شقق {beds_str}في {location_name} تطابق ميزانيتك ومعاييرك بدقة.\n\n"
                     f"ومع ذلك، لدينا بدائل مميزة ومباشرة في النظام:\n"
-                    f"• **في {location_name}:** تتوفر شقق {s['beds']} غرف نوم فاخرة (مثل *{s['title']}* بسعر {s['price']:,.0f} درهم).\n"
+                    f"• **في {location_name}:** {comm_desc} (مثل *{s['title']}*).\n"
                     f"• **في مجمعات مجاورة:** تتوفر شقق {o['beds']} غرف في {o['community']} (مثل *{o['title']}* بسعر {o['price']:,.0f} درهم) وداون تاون دبي.\n\n"
-                    f"هل ترغب في استعراض شقق {s['beds']} غرف في {location_name}، أم تفضل رؤية شقق {o['beds']} غرف في المجمعات المجاورة؟"
+                    f"هل ترغب في استعراض الخيارات المتاحة في {location_name}، أم تفضل رؤية شقق {o['beds']} غرف في المجمعات المجاورة؟"
                 )
             elif has_same:
                 s = alts["same_community_alternatives"][0]
@@ -1264,7 +1369,7 @@ class ConversationOrchestrator:
             elif has_other:
                 o = alts["other_community_alternatives"][0]
                 return (
-                    f"لم تتوفر وحدات مطابقة تماماً في {location_name}، ولكن تتوفر شقق {o['beds']} غرف نوم ممتازة في {o['community']} (مثل *{o['title']}*). هل تود استعراضها؟"
+                    f"لم تتوفر وحدات مطابقة تماماً في {location_name}، ولكن تتوفر شقق {o['beds']} غرف نوم ممتازة في {o['community']} (مثل *{o['title']}* بسعر {o['price']:,.0f} درهم). هل تود استعراضها؟"
                 )
             else:
                 return f"لم أجد حالياً عقارات نشطة تطابق هذه المعايير في {location_name}. هل ترغب في توسيع البحث ليشمل كافة مناطق دبي أو تعديل الميزانية وعدد الغرف؟"
@@ -1273,19 +1378,21 @@ class ConversationOrchestrator:
             if has_same and has_other:
                 s = alts["same_community_alternatives"][0]
                 o = alts["other_community_alternatives"][0]
+                tiers = alts.get("available_beds_in_community", [])
+                comm_desc = f"हमारे पास {', '.join([f'{t['beds']} बेडरूम (शुरुआती कीमत {t['starting_price_aed']:,.0f} AED)' for t in tiers[:2]])} के विकल्प उपलब्ध हैं" if len(tiers) > 1 else f"हमारे पास लक्ज़री {s['beds']} बेडरूम निवास उपलब्ध हैं (जैसे *{s['title']}* मूल्य {s['price']:,.0f} AED)"
                 return (
                     f"मैंने हमारे लाइव इन्वेंट्री की जांच की, दुर्भाग्य से {location_name} में {beds_str}अपार्टमेंट के लिए सटीक मैच अभी उपलब्ध नहीं है।\n\n"
                     f"हालाँकि, आपके लिए बेहतरीन विकल्प मौजूद हैं:\n"
-                    f"• **{location_name} में:** हमारे पास लक्ज़री {s['beds']} बेडरूम निवास उपलब्ध हैं (जैसे *{s['title']}* मूल्य {s['price']:,.0f} AED)।\n"
+                    f"• **{location_name} में:** {comm_desc} (जैसे *{s['title']}*)।\n"
                     f"• **नजदीकी कम्युनिटीज में:** हमारे पास {o['community']} और डाउनटाउन दुबई में {o['beds']} बेडरूम विकल्प उपलब्ध हैं (जैसे *{o['title']}* मूल्य {o['price']:,.0f} AED)।\n\n"
-                    f"क्या आप {location_name} में {s['beds']} बेडरूम विकल्प देखना चाहेंगे, या नजदीकी क्षेत्रों में {o['beds']} बेडरूम विकल्प देखना पसंद करेंगे?"
+                    f"क्या आप {location_name} में उपलब्ध विकल्प देखना चाहेंगे, या नजदीकी क्षेत्रों में {o['beds']} बेडरूम विकल्प देखना पसंद करेंगे?"
                 )
             elif has_same:
                 s = alts["same_community_alternatives"][0]
-                return f"दुर्भाग्य से {location_name} में सटीक {beds_str}अपार्टमेंट नहीं मिला, लेकिन {location_name} में शानदार {s['beds']} बेडरूम विकल्प (जैसे *{s['title']}*) उपलब्ध हैं। क्या आप इन्हें देखना चाहेंगे?"
+                return f"दुर्भाग्य से {location_name} में सटीक {beds_str}अपार्टमेंट नहीं मिला, लेकिन {location_name} में शानदार {s['beds']} बेडरूम विकल्प (जैसे *{s['title']}* मूल्य {s['price']:,.0f} AED) उपलब्ध हैं। क्या आप इन्हें देखना चाहेंगे?"
             elif has_other:
                 o = alts["other_community_alternatives"][0]
-                return f"{location_name} में लिस्टिंग नहीं मिली, लेकिन {o['community']} में बेहतरीन {o['beds']} बेडरूम विकल्प उपलब्ध हैं। क्या मैं आपको ये विकल्प दिखाऊं?"
+                return f"{location_name} में लिस्टिंग नहीं मिली, लेकिन {o['community']} में बेहतरीन {o['beds']} बेडरूम विकल्प (जैसे *{o['title']}*) उपलब्ध हैं। क्या मैं आपको ये विकल्प दिखाऊं?"
             else:
                 return f"{location_name} में इस सटीक मानदंड पर कोई लिस्टिंग नहीं मिली। क्या आप पूरे दुबई में अन्य विकल्प देखना चाहेंगे?"
 
@@ -1293,19 +1400,21 @@ class ConversationOrchestrator:
             if has_same and has_other:
                 s = alts["same_community_alternatives"][0]
                 o = alts["other_community_alternatives"][0]
+                tiers = alts.get("available_beds_in_community", [])
+                comm_desc = f"ہمارے پاس {', '.join([f'{t['beds']} بیڈ روم (ابتدائی قیمت {t['starting_price_aed']:,.0f} درہم)' for t in tiers[:2]])} کی رہائشیں دستیاب ہیں" if len(tiers) > 1 else f"لگژری {s['beds']} بیڈ روم رہائشیں دستیاب ہیں (جیسے *{s['title']}* قیمت {s['price']:,.0f} درہم)"
                 return (
                     f"میں نے لائیو انوینٹری چیک کی ہے، بدقسمتی سے {location_name} میں آپ کے عین مطابق {beds_str}اپارٹمنٹ فی الوقت دستیاب نہیں ہے۔\n\n"
                     f"تاہم، ہمارے کیٹلاگ میں شاندار متبادل موجود ہیں:\n"
-                    f"• **{location_name} میں:** لگژری {s['beds']} بیڈ روم رہائشیں دستیاب ہیں (جیسے *{s['title']}* قیمت {s['price']:,.0f} درہم)۔\n"
+                    f"• **{location_name} میں:** {comm_desc} (جیسے *{s['title']}*)۔\n"
                     f"• **قریبی علاقوں میں:** {o['community']} اور ڈاؤن ٹاؤن دبئی میں {o['beds']} بیڈ روم رہائشیں دستیاب ہیں (جیسے *{o['title']}* قیمت {o['price']:,.0f} درہم)۔\n\n"
-                    f"کیا آپ {location_name} میں {s['beds']} بیڈ روم آپشنز دیکھنا چاہیں گے، یا قریبی علاقوں میں {o['beds']} بیڈ روم آپشنز؟"
+                    f"کیا آپ {location_name} میں دستیاب آپشنز دیکھنا چاہیں گے، یا قریبی علاقوں میں {o['beds']} بیڈ روم آپشنز؟"
                 )
             elif has_same:
                 s = alts["same_community_alternatives"][0]
-                return f"{location_name} میں اس وقت {beds_str}اپارٹمنٹ دستیاب نہیں، لیکن {location_name} میں {s['beds']} بیڈ روم رہائشیں (جیسے *{s['title']}*) موجود ہیں۔ کیا آپ انہیں دیکھنا چاہیں گے؟"
+                return f"{location_name} میں اس وقت {beds_str}اپارٹمنٹ دستیاب نہیں، لیکن {location_name} میں {s['beds']} بیڈ روم رہائشیں (جیسے *{s['title']}* قیمت {s['price']:,.0f} درہم) موجود ہیں۔ کیا آپ انہیں دیکھنا چاہیں گے؟"
             elif has_other:
                 o = alts["other_community_alternatives"][0]
-                return f"{location_name} میں نتائج نہیں ملے، لیکن {o['community']} میں شاندار {o['beds']} بیڈ روم رہائشیں موجود ہیں۔ کیا آپ ان کا معائنہ کرنا چاہیں گے؟"
+                return f"{location_name} میں نتائج نہیں ملے، لیکن {o['community']} میں شاندار {o['beds']} بیڈ روم رہائشیں (جیسے *{o['title']}*) موجود ہیں۔ کیا آپ ان کا معائنہ کرنا چاہیں گے؟"
             else:
                 return f"{location_name} میں ان شرائط پر کوئی پراپرٹی نہیں ملی۔ کیا آپ اپنا بجٹ یا بیڈ رومز کی تعداد ایڈجسٹ کرنا چاہیں گے؟"
 
@@ -1313,15 +1422,37 @@ class ConversationOrchestrator:
             if has_same and has_other:
                 s = alts["same_community_alternatives"][0]
                 o = alts["other_community_alternatives"][0]
+                tiers = alts.get("available_beds_in_community", [])
+                if len(tiers) > 1:
+                    tiers_txt = ", ".join([f"{t['beds']}-bedroom {t['type']}s (starting from AED {t['starting_price_aed']:,.0f})" for t in tiers[:2]])
+                    comm_txt = f"• **Within {location_name}:** We have luxury residences available in {tiers_txt} (such as *{s['title']}*)."
+                else:
+                    comm_txt = f"• **Within {location_name}:** We have luxury {s['beds']}-bedroom residences available (such as *{s['title']}* at AED {s['price']:,.0f})."
+
+                other_summary = alts.get("other_communities_summary", [])
+                if other_summary:
+                    o_top = other_summary[0]
+                    other_txt = f"• **In nearby prime communities:** We have exceptional {o_top['beds']}-bedroom residences in {o_top['community']} (starting from AED {o_top['starting_price_aed']:,.0f}, such as *{o_top['sample_title']}*) and Downtown Dubai."
+                else:
+                    other_txt = f"• **In nearby prime communities:** We have exceptional {o['beds']}-bedroom residences available in {o['community']} (such as *{o['title']}* at AED {o['price']:,.0f}) and Downtown Dubai."
+
                 return (
                     f"I checked our live inventory, but unfortunately we don't currently have an active {beds_str}listing in {location_name} matching your exact parameters.\n\n"
                     f"However, we have relevant options available in the catalog:\n"
-                    f"• **Within {location_name}:** We have luxury {s['beds']}-bedroom residences available (such as *{s['title']}* at AED {s['price']:,.0f}).\n"
-                    f"• **In nearby prime communities:** We have exceptional {o['beds']}-bedroom residences available in {o['community']} (such as *{o['title']}* at AED {o['price']:,.0f}) and Downtown Dubai.\n\n"
-                    f"Would you like me to show you the {s['beds']}BR options in {location_name}, or explore {o['beds']}BR residences in adjacent areas?"
+                    f"{comm_txt}\n"
+                    f"{other_txt}\n\n"
+                    f"Would you like me to show you the available options in {location_name}, or explore {beds_str or '1-bedroom '}residences in adjacent areas like {o['community']}?"
                 )
             elif has_same:
                 s = alts["same_community_alternatives"][0]
+                tiers = alts.get("available_beds_in_community", [])
+                if len(tiers) > 1:
+                    tiers_txt = ", ".join([f"{t['beds']}-bedroom {t['type']}s (from AED {t['starting_price_aed']:,.0f})" for t in tiers[:2]])
+                    return (
+                        f"We couldn't find an exact {beds_str}match in {location_name} in our live inventory. "
+                        f"However, we do have luxury residences in {location_name} including {tiers_txt} (such as *{s['title']}* at AED {s['price']:,.0f}). "
+                        f"Would you like to explore those?"
+                    )
                 return (
                     f"We couldn't find an exact {beds_str}match in {location_name} in our live inventory. "
                     f"However, we do have luxury {s['beds']}-bedroom residences in {location_name} (such as *{s['title']}* at AED {s['price']:,.0f}). "
@@ -1329,6 +1460,14 @@ class ConversationOrchestrator:
                 )
             elif has_other:
                 o = alts["other_community_alternatives"][0]
+                other_summary = alts.get("other_communities_summary", [])
+                if other_summary:
+                    o_top = other_summary[0]
+                    return (
+                        f"We couldn't find active listings matching your exact criteria in {location_name}. "
+                        f"However, we have exceptional {o_top['beds']}-bedroom residences in {o_top['community']} (such as *{o_top['sample_title']}* at AED {o_top['starting_price_aed']:,.0f}) and Downtown Dubai. "
+                        f"Would you like me to present these alternative properties?"
+                    )
                 return (
                     f"We couldn't find active listings matching your exact criteria in {location_name}. "
                     f"However, we have exceptional {o['beds']}-bedroom residences in {o['community']} (such as *{o['title']}* at AED {o['price']:,.0f}). "

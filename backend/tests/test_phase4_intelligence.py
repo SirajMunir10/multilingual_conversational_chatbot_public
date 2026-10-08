@@ -137,6 +137,28 @@ class TestPhase4IntelligenceEnhancements(unittest.TestCase):
         has_places = any(area in text for area in ["Downtown", "Dubai Marina", "Business Bay", "Palm Jumeirah", "Dubai Hills", "Creek", "JVC"])
         self.assertTrue(has_places, f"Response should list investment locations on first attempt, got: {text}")
 
+    def test_palm_jumeirah_1bhk_proactive_alternatives(self):
+        """
+        Verify that searching for 1 BHK in Palm Jumeirah with a budget under 2 Million AED
+        (where Palm Jumeirah 1 BHK starts at 2.85M)
+        proactively informs the user, suggests available tiers in Palm Jumeirah,
+        and suggests 1 BHK in nearby communities (e.g. Dubai Marina, Business Bay).
+        """
+        session_id = "test_palm_1bhk_alts_sess"
+        res = self.client.post("/api/chat/message", json={
+            "session_id": session_id,
+            "message": "Can you show me 1 BHK apartments in Palm Jumeirah under 2 million AED?"
+        })
+        self.assertEqual(res.status_code, 200)
+        turn = res.json()
+        text = turn["text"]
+
+        self.assertIn("Palm Jumeirah", text)
+        # Should note Palm Jumeirah pricing or alternatives
+        self.assertTrue("2.85" in text or "2,850,000" in text or "start" in text.lower() or "million" in text.lower() or "price" in text.lower())
+        # Must suggest nearby alternative communities (such as Dubai Marina or Business Bay or JVC)
+        self.assertTrue("Marina" in text or "Business Bay" in text or "Jumeirah Village" in text or "JVC" in text or "Downtown" in text)
+
 if __name__ == "__main__":
     unittest.main()
 
