@@ -44,6 +44,28 @@ class GridGateway:
             "user_id": user_id,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
+        # Live external API integration if endpoint configured
+        from app.core.config import settings
+        if settings.GRID_API_URL:
+            try:
+                import httpx
+                headers = {"Content-Type": "application/json"}
+                if settings.GRID_API_KEY:
+                    headers["Authorization"] = f"Bearer {settings.GRID_API_KEY}"
+                with httpx.Client(timeout=5.0) as client:
+                    resp = client.post(
+                        f"{settings.GRID_API_URL.rstrip('/')}/leads",
+                        json=record["payload"],
+                        headers=headers
+                    )
+                    if resp.is_success:
+                        resp_data = resp.json()
+                        lead_id = resp_data.get("lead_id") or resp_data.get("id") or lead_id
+                        record["lead_id"] = lead_id
+            except Exception as e:
+                import logging
+                logging.getLogger("xo.gateways.grid").warning(f"Could not sync with live GRID API: {e}")
+
         cls._leads_store.append(record)
 
         # Mandatory audit logging for business write action
@@ -56,7 +78,8 @@ class GridGateway:
             details={
                 "lead_id": lead_id,
                 "property_id": payload.property_id,
-                "inquiry_type": payload.inquiry_type
+                "inquiry_type": payload.inquiry_type,
+                "live_api_synced": bool(settings.GRID_API_URL)
             }
         )
 

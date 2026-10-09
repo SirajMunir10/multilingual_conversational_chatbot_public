@@ -29,6 +29,12 @@ class AppSettings(BaseModel):
     REGULATORY_SCOPE: str = "UAE / Dubai / DIFC"
     MAX_DBR_RATIO: float = 0.50  # UAE Central Bank 50% Debt Burden Ratio cap
 
+    # CRM Gateways Configuration (GRID & Vault)
+    GRID_API_URL: str = Field(default_factory=lambda: os.getenv("GRID_API_URL", ""))
+    GRID_API_KEY: str = Field(default_factory=lambda: os.getenv("GRID_API_KEY", ""))
+    VAULT_API_URL: str = Field(default_factory=lambda: os.getenv("VAULT_API_URL", ""))
+    VAULT_API_KEY: str = Field(default_factory=lambda: os.getenv("VAULT_API_KEY", ""))
+
     # Launch Languages
     LAUNCH_LANGUAGES: List[str] = ["en", "ar", "hi", "ur"]
 
