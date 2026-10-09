@@ -67,6 +67,18 @@
           <span>🎧 Advisor</span>
         </button>
 
+        <!-- User Auth Context Toggle (FR-21/FR-22) -->
+        <button 
+          class="auth-toggle-btn" 
+          @click="toggleAuthUser" 
+          :title="currentUserId ? 'Authenticated: Siraj Munir (VIP Client). Click to switch to Guest mode.' : 'Guest Mode (Unauthenticated). Click to switch to VIP Client.'"
+          :aria-label="currentUserId ? 'Signed in as Siraj Munir' : 'Guest Mode'"
+          :data-tooltip="currentUserId ? '👑 VIP: Siraj (Click to Sign Out)' : '👤 Guest (Click to Sign In)'"
+          data-tooltip-pos="bottom"
+        >
+          <span>{{ currentUserId ? '👑 Siraj' : '👤 Guest' }}</span>
+        </button>
+
         <!-- Clear Chat Button -->
         <button 
           class="icon-btn clear-chat-btn" 
@@ -405,6 +417,13 @@ const isPlayingVoice = ref(false)
 const showTips = ref(false)
 const sessionId = ref(getInitialSessionId())
 
+// Phase 6: Authenticated User Context (FR-21, FR-22, FR-23)
+// Default to Siraj Munir VIP client; can toggle to null (Guest) to test unauthenticated rejection flow
+const currentUserId = ref('user_siraj_vip')
+const toggleAuthUser = () => {
+  currentUserId.value = currentUserId.value ? null : 'user_siraj_vip'
+}
+
 // Voice UX Refinement State
 const hasVoiceSessionGreeted = ref(false)
 const isVoiceActive = ref(false)
@@ -578,12 +597,17 @@ const sendMessage = async () => {
   scrollToBottom()
 
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Session-ID': sessionId.value
+    }
+    if (currentUserId.value) {
+      headers['X-User-ID'] = currentUserId.value
+    }
+
     const res = await fetch('/api/chat/message', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Session-ID': sessionId.value
-      },
+      headers,
       body: JSON.stringify({
         message: query,
         session_id: sessionId.value,
@@ -611,7 +635,10 @@ const sendMessage = async () => {
       language: data.language,
       metadata: {
         property_results: data.property_results,
-        mortgage_result: data.mortgage_result
+        mortgage_result: data.mortgage_result,
+        saved_properties: data.saved_properties,
+        application_status: data.application_status,
+        handoff_data: data.handoff_data
       }
     })
   } catch (err) {
@@ -1068,6 +1095,9 @@ const executeVoicePipeline = async (recordedBlob = null, textOverride = null) =>
     }
     formData.append('session_id', sessionId.value)
     formData.append('language_hint', props.currentLanguage)
+    if (currentUserId.value) {
+      formData.append('user_id', currentUserId.value)
+    }
     if (textToSend.trim()) {
       formData.append('transcribed_text', textToSend.trim())
     }
@@ -1099,7 +1129,10 @@ const executeVoicePipeline = async (recordedBlob = null, textOverride = null) =>
       timestamp: new Date().toISOString(),
       metadata: {
         property_results: data.property_results,
-        mortgage_result: data.mortgage_result
+        mortgage_result: data.mortgage_result,
+        saved_properties: data.saved_properties,
+        application_status: data.application_status,
+        handoff_data: data.handoff_data
       }
     })
 
@@ -1462,6 +1495,33 @@ onMounted(() => {
   background: var(--brand-purple);
   color: #FFFFFF;
   box-shadow: var(--shadow-sm);
+}
+
+.auth-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(217, 119, 6, 0.10);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  color: #B45309;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+[data-theme="dark"] .auth-toggle-btn {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.40);
+  color: #FBBF24;
+}
+
+.auth-toggle-btn:hover {
+  background: rgba(217, 119, 6, 0.22);
+  border-color: #D97706;
+  transform: translateY(-1px);
 }
 
 /* Chat Feed */

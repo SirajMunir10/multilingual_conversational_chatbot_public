@@ -100,3 +100,81 @@ def retrieve_kb_endpoint(
     """
     from app.services.rag_service import RAGService
     return RAGService.retrieve_kb(query, session_id=x_session_id)
+
+@router.get("/account/saved-properties")
+def get_my_saved_properties_endpoint(
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID")
+):
+    """
+    PRD Architecture Function: get_my_saved_properties()
+    User-scoped read API (FR-21, FR-23a).
+    """
+    from app.services.account_service import AccountService
+    return AccountService.get_my_saved_properties(user_id=x_user_id, session_id=x_session_id)
+
+@router.get("/account/applications")
+def get_my_application_status_endpoint(
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID")
+):
+    """
+    PRD Architecture Function: get_my_application_status()
+    User-scoped read API for Vault & GRID status (FR-21, FR-23a).
+    """
+    from app.services.account_service import AccountService
+    return AccountService.get_my_application_status(user_id=x_user_id, session_id=x_session_id)
+
+@router.post("/account/saved-properties/{property_id}")
+def save_property_to_account_endpoint(
+    property_id: str,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID")
+):
+    """Save property to authenticated user account (FR-10, FR-21)."""
+    from app.services.account_service import AccountService
+    if not x_user_id:
+        return {"status": "auth_required", "message": "Sign in required to bookmark properties"}
+    return AccountService.save_property(user_id=x_user_id, property_id=property_id, session_id=x_session_id)
+
+@router.delete("/account/saved-properties/{property_id}")
+def remove_saved_property_endpoint(
+    property_id: str,
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID")
+):
+    """Remove property from authenticated user account."""
+    from app.services.account_service import AccountService
+    if not x_user_id:
+        return {"status": "auth_required", "message": "Sign in required"}
+    return AccountService.remove_saved_property(user_id=x_user_id, property_id=property_id, session_id=x_session_id)
+
+@router.post("/handoff")
+def initiate_human_handoff_endpoint(
+    reason: str = Query("explicit_request"),
+    preferred_team: Optional[str] = Query(None),
+    notes: Optional[str] = Query(None),
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
+):
+    """
+    Initiates warm human handoff with full serialized transcript (FR-5, FR-20).
+    """
+    from app.services.handoff_service import HandoffService
+    active_session_id = x_session_id or "sess_direct_handoff"
+    return HandoffService.initiate_handoff(
+        session_id=active_session_id,
+        reason=reason,
+        preferred_team=preferred_team,
+        notes=notes,
+        user_id=x_user_id
+    )
+
+@router.get("/handoff/queue")
+def get_handoff_queue_endpoint(
+    queue: Optional[str] = Query(None, description="Optional filter by queue: sales, mortgage, support")
+):
+    """Inspect active human handoff queue for back-office review (Phase 7)."""
+    from app.services.handoff_service import HandoffService
+    return HandoffService.get_queue(queue=queue)
+

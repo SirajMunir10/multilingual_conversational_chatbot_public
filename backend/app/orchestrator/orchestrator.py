@@ -117,6 +117,9 @@ class ConversationOrchestrator:
             "text": response_data["text"],
             "property_results": response_data.get("property_results", []),
             "mortgage_result": response_data.get("mortgage_result"),
+            "saved_properties": response_data.get("saved_properties", []),
+            "application_status": response_data.get("application_status"),
+            "handoff_data": response_data.get("handoff_data"),
             "handoff_offered": response_data.get("handoff_offered", False),
             "tool_calls": response_data.get("tool_calls", [])
         }
@@ -137,12 +140,24 @@ class ConversationOrchestrator:
         if LanguageDetector.check_explicit_language_switch(text):
             return "general"
 
+        # Human Handoff intent keywords (FR-5, FR-20)
+        handoff_kw = [
+            "human", "agent", "advisor", "broker", "specialist", "consultant", "representative",
+            "speak with advisor", "talk to human", "talk to agent", "connect me", "transfer me",
+            "speak to human", "speak to an agent", "human please", "talk to a person", "advisor please",
+            "مستشار", "وكيل", "تحدث مع موظف", "تحدث مع إنسان", "إنسان", "موظف",
+            "एजेंट", "सलाहकार", "इंसान", "बात करनी है", "ایجنٹ", "مشیر", "انسان سے بات"
+        ]
+        if any(kw in lowered for kw in handoff_kw):
+            return "human_handoff"
+
         # Account intent keywords (strictly scoped to user profile/vault access)
         account_kw = [
             "my application", "my status", "saved properties", "my shortlist",
             "view shortlist", "view my shortlist", "show shortlist", "show my shortlist",
-            "saved shortlist", "my favorites", "my inquiries", "حسابي", "طلباتي",
-            "قائمتي المحفوظة", "मेरा स्टेटस"
+            "saved shortlist", "my favorites", "my inquiries", "my saved", "saved homes",
+            "shortlisted properties", "حسابي", "طلباتي", "عقاراتي", "عقاراتي المحفوظة",
+            "قائمتي المحفوظة", "मेरा स्टेटस", "मेरी सेव की गई", "میری محفوظ"
         ]
         if any(kw in lowered for kw in account_kw):
             return "account"
@@ -322,7 +337,14 @@ class ConversationOrchestrator:
 
                 tool_choice = "auto"
                 comp_data = None
-                if session.active_intent == "property_comparison":
+                if session.active_intent == "human_handoff":
+                    tool_choice = {"type": "function", "function": {"name": "request_human_handoff"}}
+                elif session.active_intent == "account":
+                    if any(w in user_text.lower() for w in ["application", "status", "طلب", "स्थिति", "صورتحال"]):
+                        tool_choice = {"type": "function", "function": {"name": "get_my_application_status"}}
+                    else:
+                        tool_choice = {"type": "function", "function": {"name": "get_my_saved_properties"}}
+                elif session.active_intent == "property_comparison":
                     tool_choice = "none"
                     comp_data = PropertyDiscoveryService.compare_displayed_properties(session.last_recommended_properties)
                     comp_context = (
@@ -435,8 +457,35 @@ class ConversationOrchestrator:
                         "mortgage_result": tool_exec.get("mortgage_result"),
                         "shortlist_status": tool_exec.get("shortlist_status"),
                         "kb_result": tool_exec.get("kb_result"),
+                        "saved_properties": tool_exec.get("saved_properties_result", {}).get("saved_properties", []),
+                        "application_status": tool_exec.get("application_status_result"),
+                        "handoff_data": tool_exec.get("handoff_result"),
+                        "handoff_offered": bool(tool_exec.get("handoff_result")),
                         "tool_calls": [{"function": fn_name, "args": fn_args}],
                         "metadata": tool_exec.get("metadata", {})
+                    }
+
+                if session.active_intent == "human_handoff":
+                    from app.services.handoff_service import HandoffService
+                    handoff_res = HandoffService.initiate_handoff(
+                        session_id=session.session_id,
+                        reason="explicit_request",
+                        user_id=session.user_id
+                    )
+                    return {
+                        "text": reply_message.content or "",
+                        "handoff_data": handoff_res,
+                        "handoff_offered": True
+                    }
+
+                if session.active_intent == "account" and session.user_id:
+                    from app.services.account_service import AccountService
+                    saved_data = AccountService.get_my_saved_properties(session.user_id, session_id=session.session_id)
+                    app_data = AccountService.get_my_application_status(session.user_id, session_id=session.session_id)
+                    return {
+                        "text": reply_message.content or "",
+                        "saved_properties": saved_data.get("saved_properties", []),
+                        "application_status": app_data
                     }
 
                 if session.active_intent == "property_comparison":
@@ -683,13 +732,55 @@ class ConversationOrchestrator:
                 "tool_result_for_llm": {"count": len(prods), "products": prods[:5]}
             }
 
-        elif fn_name in ["get_my_saved_properties", "get_my_application_status"]:
-            if not session.user_id:
-                return {
-                    "tool_result_for_llm": {"status": "auth_required", "message": "Sign in required to view account data"}
-                }
+        elif fn_name == "get_my_saved_properties":
+            from app.services.account_service import AccountService
+            res = AccountService.get_my_saved_properties(session.user_id, session_id=session.session_id)
             return {
-                "tool_result_for_llm": {"status": "authenticated", "user_id": session.user_id, "saved_count": 2, "active_applications": 1}
+                "saved_properties_result": res,
+                "tool_result_for_llm": res
+            }
+
+        elif fn_name == "get_my_application_status":
+            from app.services.account_service import AccountService
+            res = AccountService.get_my_application_status(session.user_id, session_id=session.session_id)
+            return {
+                "application_status_result": res,
+                "tool_result_for_llm": res
+            }
+
+        elif fn_name == "create_lead_grid":
+            from app.gateways.grid_gateway import GridGateway, GridLeadPayload
+            payload = GridLeadPayload(**fn_args)
+            lead_res = GridGateway.create_lead(payload, session_id=session.session_id, user_id=session.user_id)
+            return {
+                "grid_lead_result": lead_res.model_dump(),
+                "tool_result_for_llm": lead_res.model_dump()
+            }
+
+        elif fn_name == "create_lead_vault":
+            from app.gateways.vault_gateway import VaultGateway, VaultMortgageLeadPayload
+            payload = VaultMortgageLeadPayload(**fn_args)
+            vault_res = VaultGateway.create_lead(payload, session_id=session.session_id, user_id=session.user_id)
+            return {
+                "vault_lead_result": vault_res.model_dump(),
+                "tool_result_for_llm": vault_res.model_dump()
+            }
+
+        elif fn_name == "request_human_handoff":
+            from app.services.handoff_service import HandoffService
+            reason = fn_args.get("reason", "explicit_request")
+            preferred_team = fn_args.get("preferred_team")
+            notes = fn_args.get("notes")
+            handoff_res = HandoffService.initiate_handoff(
+                session_id=session.session_id,
+                reason=reason,
+                preferred_team=preferred_team,
+                notes=notes,
+                user_id=session.user_id
+            )
+            return {
+                "handoff_result": handoff_res,
+                "tool_result_for_llm": handoff_res
             }
 
         elif fn_name == "retrieve_kb":
@@ -822,14 +913,106 @@ class ConversationOrchestrator:
                 "tool_calls": [{"function": fn_name, "args": fn_args}]
             }
 
-        elif fn_name in ["get_my_saved_properties", "get_my_application_status"]:
-            if not session.user_id:
+        elif fn_name == "get_my_saved_properties":
+            saved_res = raw_res.get("saved_properties_result", {})
+            if not saved_res.get("authenticated"):
+                auth_msgs = {
+                    "ar": "للوصول إلى عقاراتك المحفوظة والمختارة، يرجى تسجيل الدخول أولاً لحماية بياناتك الشخصية.",
+                    "hi": "अपनी सेव की गई पसंदीदा प्रॉपर्टीज देखने के लिए, कृपया पहले साइन इन करें।",
+                    "ur": "اپنی محفوظ شدہ پراپرٹیز دیکھنے کے لیے، براہ کرم پہلے سائن ان کریں۔",
+                    "en": "To access your shortlisted properties, please sign in. All account data is strictly user-scoped and secure."
+                }
                 return {
-                    "text": "Please sign in to access your saved properties and application status.",
+                    "text": auth_msgs.get(lang, auth_msgs["en"]),
+                    "saved_properties": [],
                     "tool_calls": [{"function": fn_name, "args": fn_args}]
                 }
+            
+            items = saved_res.get("saved_properties", [])
+            narratives = {
+                "ar": f"أهلاً {saved_res.get('user_name', '')}! لديك {len(items)} عقارات محفوظة في قائمة رغباتك الخاصة.",
+                "hi": f"नमस्ते {saved_res.get('user_name', '')}! आपकी विशलिस्ट में {len(items)} प्रॉपर्टीज सेव हैं।",
+                "ur": f"خوش آمدید {saved_res.get('user_name', '')}! آپ کی فہرست میں {len(items)} محفوظ پراپرٹیز موجود ہیں۔",
+                "en": f"Welcome back, {saved_res.get('user_name', '')}! You have {len(items)} premier residences saved in your portfolio."
+            }
             return {
-                "text": f"Retrieved profile for user {session.user_id}. You have 2 saved properties and 1 active pre-qualification application in Vault CRM.",
+                "text": narratives.get(lang, narratives["en"]),
+                "saved_properties": items,
+                "tool_calls": [{"function": fn_name, "args": fn_args}]
+            }
+
+        elif fn_name == "get_my_application_status":
+            app_res = raw_res.get("application_status_result", {})
+            if not app_res.get("authenticated"):
+                auth_msgs = {
+                    "ar": "للاطلاع على حالة طلبات التمويل ومعاينات العقارات الخاصة بك، يرجى تسجيل الدخول أولاً.",
+                    "hi": "अपने मॉर्गेज या प्रॉपर्टी आवेदनों की स्थिति देखने के लिए कृपया साइन इन करें।",
+                    "ur": "اپنی مارگیج درخواست یا پراپرٹی کی صورتحال دیکھنے کے لیے براہ کرم لاگ ان کریں۔",
+                    "en": "To check your application and viewing status, please sign in. Your inquiries are strictly confidential."
+                }
+                return {
+                    "text": auth_msgs.get(lang, auth_msgs["en"]),
+                    "application_status": None,
+                    "tool_calls": [{"function": fn_name, "args": fn_args}]
+                }
+
+            apps = app_res.get("applications", [])
+            narratives = {
+                "ar": f"عزيزي {app_res.get('user_name', '')}، لديك {len(apps)} طلبات نشطة مسجلة في نظامنا (Vault & GRID).",
+                "hi": f"नमस्ते {app_res.get('user_name', '')}، आपके {len(apps)} सक्रिय आवेदन हमारे सिस्टम में दर्ज हैं।",
+                "ur": f"معزز {app_res.get('user_name', '')}، آپ کے {len(apps)} فعال درخواستیں ہمارے سسٹم میں رجسٹرڈ ہیں۔",
+                "en": f"Hello {app_res.get('user_name', '')}, you have {len(apps)} active records in our system across Vault Mortgage and GRID."
+            }
+            return {
+                "text": narratives.get(lang, narratives["en"]),
+                "application_status": app_res,
+                "tool_calls": [{"function": fn_name, "args": fn_args}]
+            }
+
+        elif fn_name == "create_lead_grid":
+            grid_res = raw_res.get("grid_lead_result", {})
+            lead_id = grid_res.get("lead_id", "GRID-LEAD")
+            narratives = {
+                "ar": f"تم تسجيل طلبك بنجاح في نظام إدارة العقارات (رقم المرجع: {lead_id}). سيتواصل معك أحد مستشارينا قريباً.",
+                "hi": f"आपकी इंक्वायरी सफलतापूर्वक दर्ज कर ली गई है (संदर्भ संख्या: {lead_id})। हमारे विशेषज्ञ जल्द ही आपसे संपर्क करेंगे।",
+                "ur": f"آپ کی درخواست کامیابی سے رجسٹر کر لی گئی ہے (ریفرنس نمبر: {lead_id})۔ ہمارے نمائندے جلد رابطہ کریں گے۔",
+                "en": f"Your inquiry has been successfully lodged with GRID Real Estate (Reference: {lead_id}). A premier property consultant will contact you shortly."
+            }
+            return {
+                "text": narratives.get(lang, narratives["en"]),
+                "grid_lead": grid_res,
+                "tool_calls": [{"function": fn_name, "args": fn_args}]
+            }
+
+        elif fn_name == "create_lead_vault":
+            vault_res = raw_res.get("vault_lead_result", {})
+            app_id = vault_res.get("application_id", "VAULT-MORT")
+            narratives = {
+                "ar": f"تم إرسال طلب التمويل العقاري المبدئي بنجاح إلى نظام Vault (رقم الطلب: {app_id}). جاري مراجعة الأهلية مع شركائنا من البنوك.",
+                "hi": f"आपका मॉर्गेज प्री-अप्रूवल आवेदन Vault CRM में दर्ज हो चुका है (आवेदन आईडी: {app_id})। हमारे बैंक पार्टनर इसकी समीक्षा कर रहे हैं।",
+                "ur": f"آپ کی مارگیج پری اپروول درخواست کامیابی سے Vault میں درج ہو گئی ہے (درخواست نمبر: {app_id})۔",
+                "en": f"Your mortgage pre-qualification has been securely submitted to Vault CRM (Application ID: {app_id}). Our mortgage advisory desk is reviewing your file."
+            }
+            return {
+                "text": narratives.get(lang, narratives["en"]),
+                "vault_lead": vault_res,
+                "tool_calls": [{"function": fn_name, "args": fn_args}]
+            }
+
+        elif fn_name == "request_human_handoff":
+            handoff_res = raw_res.get("handoff_result", {})
+            advisor = handoff_res.get("assigned_advisor", {})
+            ticket_id = handoff_res.get("ticket_id", "XO-HD")
+            narratives = {
+                "ar": f"يسعدني تحويلك إلى مستشارنا المتخصص: {advisor.get('name', 'المستشار')} ({advisor.get('title', 'مستشار XOTO')}). تم إرفاق كامل تفاصيل المحادثة (تذكرة: {ticket_id}).",
+                "hi": f"मुझे आपको हमारे विशेषज्ञ सलाहकार {advisor.get('name', 'Advisor')} ({advisor.get('title', '')}) से जोड़ते हुए खुशी हो रही है। बातचीत का पूरा विवरण शेयर कर दिया गया है (टिकट: {ticket_id})।",
+                "ur": f"مجھے آپ کو ہمارے سینیئر مشیر {advisor.get('name', 'Advisor')} ({advisor.get('title', '')}) سے منسلک کرتے ہوئے خوشی ہے۔ آپ کی گفتگو کا مکمل ریکارڈ فراہم کر دیا گیا ہے (ٹکٹ: {ticket_id})۔",
+                "en": f"I am pleased to connect you directly with our licensed specialist: {advisor.get('name', 'Advisor')} ({advisor.get('title', 'Senior Advisor')}). Your complete conversation transcript has been forwarded (Ticket: {ticket_id})."
+            }
+            return {
+                "text": narratives.get(lang, narratives["en"]),
+                "handoff_data": handoff_res,
+                "handoff_offered": True,
                 "tool_calls": [{"function": fn_name, "args": fn_args}]
             }
 
@@ -1131,19 +1314,64 @@ class ConversationOrchestrator:
                 "tool_calls": [{"function": "calc_affordability", "args": {"income": income, "debt": debt, "down_payment": down_payment}}]
             }
 
-        # 3. ACCOUNT INTENT
-        elif intent == "account":
-            if not session.user_id:
-                auth_prompts = {
-                    "ar": "للوصول إلى عقاراتك المحفوظة أو حالة طلب التمويل، يرجى تسجيل الدخول لحماية بياناتك الشخصية.",
-                    "hi": "अपनी सेव की गई प्रॉपर्टीज या लोन आवेदन का स्टेटस देखने के लिए कृपया लॉग इन करें।",
-                    "ur": "اپنی محفوظ شدہ پراپرٹیز یا مارگیج درخواست کا اسٹیٹس جاننے کے لیے براہ کرم لاگ ان کریں۔",
-                    "en": "To access your shortlisted properties or mortgage application status, please sign in. All account data is strictly protected and user-scoped."
-                }
-                return {"text": auth_prompts.get(lang, auth_prompts["en"])}
+        # 3. HUMAN HANDOFF INTENT (FR-5, FR-20)
+        elif intent == "human_handoff":
+            from app.services.handoff_service import HandoffService
+            handoff_res = HandoffService.initiate_handoff(
+                session_id=session.session_id,
+                reason="explicit_request",
+                user_id=session.user_id
+            )
+            advisor = handoff_res.get("assigned_advisor", {})
+            ticket_id = handoff_res.get("ticket_id", "XO-HD")
+
+            responses = {
+                "ar": f"يسعدني تحويلك مباشرة إلى مستشارنا المرخص: {advisor.get('name')} ({advisor.get('title')}). تم إرفاق ملخص تفضيلاتك وتفاصيل محادثتنا كاملة (تذكرة رقم: {ticket_id}). كيف تفضل التواصل، عبر الواتساب أم الاتصال المباشر؟",
+                "hi": f"मुझे आपको हमारे लाइसेंस प्राप्त विशेषज्ञ {advisor.get('name')} ({advisor.get('title')}) से कनेक्ट करते हुए खुशी हो रही है। बातचीत का पूरा ब्योरा भेज दिया गया है (टिकट: {ticket_id})। क्या आप व्हाट्सऐप या फोन कॉल पसंद करेंगे?",
+                "ur": f"مجھے آپ کو ہمارے مجاز مشیر {advisor.get('name')} ({advisor.get('title')}) سے براہ راست منسلک کرتے ہوئے خوشی ہے۔ گفتگو کا مکمل احوال پہنچا دیا گیا ہے (ٹکٹ نمبر: {ticket_id})۔ کیا آپ واٹس ایپ یا فون پر بات کرنا پسند کریں گے؟",
+                "en": f"I am delighted to connect you with our licensed specialist: {advisor.get('name')} ({advisor.get('title')}). Your full conversation transcript and financial profile have been transferred (Ticket: {ticket_id}). Would you like to continue via WhatsApp or a direct phone call?"
+            }
 
             return {
-                "text": f"Your account ({session.user_id}) has 2 saved properties in Downtown Dubai and 1 active pre-approval application in Vault CRM under review.",
+                "text": responses.get(lang, responses["en"]),
+                "handoff_data": handoff_res,
+                "handoff_offered": True,
+                "tool_calls": [{"function": "request_human_handoff", "args": {"reason": "explicit_request"}}]
+            }
+
+        # 4. ACCOUNT INTENT (FR-21, FR-22)
+        elif intent == "account":
+            from app.services.account_service import AccountService
+            if not session.user_id:
+                auth_prompts = {
+                    "ar": "للوصول إلى عقاراتك المحفوظة وحالة طلباتك، يرجى تسجيل الدخول أولاً. جميع بياناتك الشخصية محمية بالكامل وخاصة بحسابك.",
+                    "hi": "अपनी सेव की गई पसंदीदा प्रॉपर्टीज और लोन आवेदनों का स्टेटस देखने के लिए कृपया साइन इन करें। आपकी व्यक्तिगत जानकारी पूरी तरह सुरक्षित है।",
+                    "ur": "اپنی محفوظ شدہ پراپرٹیز اور درخواستوں کا اسٹیٹس دیکھنے کے لیے براہ کرم پہلے سائن ان کریں۔ تمام ڈیٹا محفوظ اور نجی ہے۔",
+                    "en": "To access your shortlisted properties and active application status, please sign in. All account data is strictly user-scoped and private."
+                }
+                return {
+                    "text": auth_prompts.get(lang, auth_prompts["en"]),
+                    "saved_properties": [],
+                    "tool_calls": [{"function": "get_my_saved_properties"}]
+                }
+
+            saved_data = AccountService.get_my_saved_properties(session.user_id, session_id=session.session_id)
+            app_data = AccountService.get_my_application_status(session.user_id, session_id=session.session_id)
+            user_name = saved_data.get("user_name", "Valued Client")
+            saved_count = saved_data.get("count", 0)
+            apps_count = app_data.get("total_count", 0)
+
+            responses = {
+                "ar": f"مرحباً بك {user_name}! لديك {saved_count} عقارات محفوظة في قائمتك، و{apps_count} طلبات نشطة مسجلة في نظامنا (Vault & GRID). يمكنك الاطلاع على التفاصيل أدناه.",
+                "hi": f"नमस्ते {user_name}! आपकी विशलिस्ट में {saved_count} प्रॉपर्टीज सेव हैं और {apps_count} सक्रिय आवेदन हमारे सिस्टम में दर्ज हैं। आप नीचे विवरण देख सकते हैं।",
+                "ur": f"خوش آمدید {user_name}! آپ کی لسٹ میں {saved_count} محفوظ پراپرٹیز اور {apps_count} فعال درخواستیں ہمارے سسٹم میں موجود ہیں۔ تفصیلات نیچے ملاحظہ کریں۔",
+                "en": f"Welcome back, {user_name}! You have {saved_count} saved residences in your portfolio and {apps_count} active applications on record (Vault Mortgage & GRID). Here are your account details:"
+            }
+
+            return {
+                "text": responses.get(lang, responses["en"]),
+                "saved_properties": saved_data.get("saved_properties", []),
+                "application_status": app_data,
                 "tool_calls": [{"function": "get_my_saved_properties"}, {"function": "get_my_application_status"}]
             }
 
@@ -1195,6 +1423,7 @@ class ConversationOrchestrator:
         cls,
         user_message: str,
         session_id: Optional[str] = None,
+        user_id: Optional[str] = None,
         manual_language: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         """
@@ -1204,6 +1433,7 @@ class ConversationOrchestrator:
         response = await cls.process_user_turn(
             user_message=user_message,
             session_id=session_id,
+            user_id=user_id,
             manual_language=manual_language
         )
         full_text = response["text"]
@@ -1216,7 +1446,10 @@ class ConversationOrchestrator:
                 "language": response["language"],
                 "is_final": (i == len(words) - 1),
                 "property_results": response.get("property_results") if (i == len(words) - 1) else None,
-                "mortgage_result": response.get("mortgage_result") if (i == len(words) - 1) else None
+                "mortgage_result": response.get("mortgage_result") if (i == len(words) - 1) else None,
+                "saved_properties": response.get("saved_properties") if (i == len(words) - 1) else None,
+                "application_status": response.get("application_status") if (i == len(words) - 1) else None,
+                "handoff_data": response.get("handoff_data") if (i == len(words) - 1) else None
             }
             yield f"data: {json.dumps(chunk)}\n\n"
 

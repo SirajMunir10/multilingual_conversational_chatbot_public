@@ -77,5 +77,21 @@ class GridGateway:
                 return data
         return None
 
+    @classmethod
+    def get_user_leads(cls, user_id: str) -> List[Dict[str, Any]]:
+        """Retrieve leads scoped strictly to the authenticated user ID."""
+        results = []
+        for item in cls._leads_store:
+            if item.get("user_id") == user_id:
+                data = dict(item["payload"])
+                data["lead_id"] = item["lead_id"]
+                data["crm"] = "GRID"
+                data["type"] = f"GRID {item['payload'].get('inquiry_type', 'Property Inquiry').replace('_', ' ').title()}"
+                data["status"] = "in_progress"
+                data["status_label"] = "Agent Review In Progress"
+                data["created_at"] = item["created_at"]
+                results.append(data)
+        return results
+
 # Alias for backward-compatible service imports
 LeadCreationRequest = GridLeadPayload

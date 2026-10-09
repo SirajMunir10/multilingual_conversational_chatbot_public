@@ -43,7 +43,8 @@ async def send_chat_message(
 @router.post("/stream")
 async def stream_chat_message(
     payload: ChatRequest,
-    x_session_id: Optional[str] = Header(None, alias="X-Session-ID")
+    x_session_id: Optional[str] = Header(None, alias="X-Session-ID"),
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
 ):
     """
     Server-Sent Events (SSE) streaming endpoint.
@@ -53,6 +54,7 @@ async def stream_chat_message(
     generator = ConversationOrchestrator.stream_user_turn(
         user_message=payload.message,
         session_id=active_session_id,
+        user_id=x_user_id,
         manual_language=payload.language
     )
     return StreamingResponse(generator, media_type="text/event-stream")

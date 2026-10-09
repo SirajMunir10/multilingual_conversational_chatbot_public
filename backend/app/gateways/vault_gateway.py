@@ -67,3 +67,20 @@ class VaultGateway:
             status="submitted",
             created_at=record["created_at"]
         )
+
+    @classmethod
+    def get_user_applications(cls, user_id: str) -> List[Dict[str, Any]]:
+        """Retrieve mortgage applications scoped strictly to the authenticated user ID."""
+        results = []
+        for item in cls._applications_store:
+            if item.get("user_id") == user_id:
+                data = dict(item["payload"])
+                data["application_id"] = item["application_id"]
+                data["crm"] = "Vault"
+                data["type"] = "Mortgage Pre-Approval Application"
+                data["status"] = "under_review"
+                data["status_label"] = "Under Review by Mortgage Specialist"
+                data["created_at"] = item["created_at"]
+                results.append(data)
+        return results
+

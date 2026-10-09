@@ -184,6 +184,66 @@ XO_FUNCTION_TOOLS = [
                 "required": ["category", "area_sq_ft"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_lead_grid",
+            "description": "Submit a real estate property inquiry, viewing request, or lead to GRID CRM. Narrow scoped write endpoint.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "contact_name": {"type": "string", "description": "Full name of the contact"},
+                    "contact_phone": {"type": "string", "description": "Contact phone number"},
+                    "contact_email": {"type": "string", "description": "Contact email address"},
+                    "property_id": {"type": "string", "description": "Property ID if inquiring about a specific property"},
+                    "inquiry_type": {"type": "string", "enum": ["property_inquiry", "shortlist_save", "viewing_request"], "description": "Type of inquiry"},
+                    "budget_max": {"type": "number", "description": "Maximum budget in AED"},
+                    "preferred_timeline": {"type": "string", "description": "Expected timeline (e.g. immediate, 1-3 months)"},
+                    "notes": {"type": "string", "description": "Any additional preferences or notes"}
+                },
+                "required": ["contact_name"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_lead_vault",
+            "description": "Submit a qualified mortgage pre-approval application or lead to Vault CRM including calculated affordability data and verified customer consent (FR-16).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "applicant_name": {"type": "string", "description": "Full name of the applicant"},
+                    "applicant_phone": {"type": "string", "description": "Contact phone number"},
+                    "applicant_email": {"type": "string", "description": "Contact email address"},
+                    "monthly_income": {"type": "number", "description": "Monthly verified salary in AED"},
+                    "existing_debt": {"type": "number", "description": "Existing monthly liabilities/debt in AED"},
+                    "calculated_affordability_max": {"type": "number", "description": "Calculated maximum borrowing capacity from calc_affordability"},
+                    "estimated_emi": {"type": "number", "description": "Estimated monthly installment in AED"},
+                    "nationality_status": {"type": "string", "enum": ["uae_national", "expat"], "description": "UAE National or Expat"},
+                    "consent_given": {"type": "boolean", "description": "Must be true confirming customer consent to submit financial application"},
+                    "notes": {"type": "string", "description": "Application notes"}
+                },
+                "required": ["applicant_name", "monthly_income", "existing_debt", "consent_given"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "request_human_handoff",
+            "description": "Connect the user with a licensed human specialist (Sales, Mortgage, or Support) with full serialized conversation history (FR-5).",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "reason": {"type": "string", "enum": ["explicit_request", "high_value_lead", "negative_sentiment", "low_confidence_fallback", "complex_inquiry"], "description": "Reason for handoff"},
+                    "preferred_team": {"type": "string", "enum": ["sales", "mortgage", "support"], "description": "Designated specialist department"},
+                    "notes": {"type": "string", "description": "Summary notes for the human specialist"}
+                },
+                "required": []
+            }
+        }
     }
 ]
 

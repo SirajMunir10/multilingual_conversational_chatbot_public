@@ -135,6 +135,113 @@
         @jump-to-properties="$emit('jump-to-properties', $event)" 
       />
 
+      <!-- Saved Properties Display (FR-21) -->
+      <div class="account-card-container" v-if="message.metadata?.saved_properties?.length">
+        <div class="account-card-header">
+          <span class="account-badge">⭐ Saved Residences (User Account)</span>
+          <span class="account-badge-sub">{{ message.metadata.saved_properties.length }} Shortlisted</span>
+        </div>
+        <div class="account-saved-list">
+          <div v-for="prop in message.metadata.saved_properties" :key="prop.id" class="account-prop-item">
+            <img :src="prop.image_url" :alt="prop.title" class="account-prop-thumb" loading="lazy" />
+            <div class="account-prop-details">
+              <h6 class="account-prop-title">{{ prop.title }}</h6>
+              <span class="account-prop-sub">📍 {{ prop.community }} • {{ prop.beds }} BHK</span>
+              <span class="account-prop-price">AED {{ formatNumber(prop.price) }}</span>
+            </div>
+            <button 
+              type="button"
+              class="account-prop-action-btn"
+              @click="$emit('select-property-mortgage', prop)"
+              title="Calculate Mortgage for this property"
+            >
+              🧮 Check EMI
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Application Status Display (FR-21) -->
+      <div class="account-card-container" v-if="message.metadata?.application_status?.applications?.length">
+        <div class="account-card-header">
+          <span class="account-badge">📁 Application & Viewing Status (Vault & GRID)</span>
+          <span class="account-badge-sub">{{ message.metadata.application_status.applications.length }} Records</span>
+        </div>
+        <div class="account-apps-list">
+          <div v-for="app in message.metadata.application_status.applications" :key="app.application_id || app.lead_id" class="account-app-item">
+            <div class="app-item-top">
+              <span class="app-badge-crm" :class="app.crm?.toLowerCase()">{{ app.crm }}</span>
+              <span class="app-title-text">{{ app.type || 'Application' }}</span>
+              <span class="app-status-pill" :class="app.status">{{ app.status_label || app.status }}</span>
+            </div>
+            <div class="app-item-body">
+              <div class="app-field" v-if="app.requested_loan_aed">
+                <span class="label">Loan Requested:</span>
+                <span class="val">AED {{ formatNumber(app.requested_loan_aed) }} ({{ app.lender_partner || 'Lender Partner' }})</span>
+              </div>
+              <div class="app-field" v-if="app.property_title">
+                <span class="label">Property:</span>
+                <span class="val">{{ app.property_title }}</span>
+              </div>
+              <div class="app-field" v-if="app.assigned_officer || app.assigned_agent">
+                <span class="label">Assigned Specialist:</span>
+                <span class="val">👤 {{ app.assigned_officer || app.assigned_agent }}</span>
+              </div>
+              <div class="app-field" v-if="app.scheduled_date">
+                <span class="label">Scheduled Time:</span>
+                <span class="val">📅 {{ app.scheduled_date }}</span>
+              </div>
+            </div>
+            <div class="app-item-footer">
+              <span class="app-ref-id">Ref: {{ app.application_id || app.lead_id }}</span>
+              <span class="app-updated">{{ app.last_update || 'In Progress' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Human Handoff Status Card (FR-5, FR-20) -->
+      <div class="handoff-card-container" v-if="message.metadata?.handoff_data">
+        <div class="handoff-card-header">
+          <div class="handoff-header-left">
+            <span class="handoff-pulse-dot"></span>
+            <span class="handoff-badge-title">VIP Specialist Connected</span>
+          </div>
+          <span class="handoff-ticket-id">Ticket #{{ message.metadata.handoff_data.ticket_id }}</span>
+        </div>
+        <div class="handoff-card-body">
+          <div class="advisor-profile-row">
+            <div class="advisor-avatar-box">
+              <span class="advisor-icon">👩‍💼</span>
+            </div>
+            <div class="advisor-info-box">
+              <h6 class="advisor-name">{{ message.metadata.handoff_data.assigned_advisor?.name }}</h6>
+              <p class="advisor-title">{{ message.metadata.handoff_data.assigned_advisor?.title }}</p>
+              <span class="advisor-license">Official License: {{ message.metadata.handoff_data.assigned_advisor?.license }}</span>
+            </div>
+          </div>
+          <div class="handoff-metrics-badge">
+            <span class="metrics-icon">📋</span>
+            <span>Full conversation transcript & financial profile securely forwarded</span>
+          </div>
+          <div class="handoff-actions-row">
+            <a 
+              :href="`https://wa.me/${(message.metadata.handoff_data.assigned_advisor?.whatsapp || '').replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(message.metadata.handoff_data.assigned_advisor?.name || '')},%20referring%20to%20ticket%20${message.metadata.handoff_data.ticket_id}`" 
+              target="_blank" 
+              class="handoff-btn whatsapp-btn"
+            >
+              💬 WhatsApp Advisor
+            </a>
+            <a 
+              :href="`tel:${message.metadata.handoff_data.assigned_advisor?.phone || '+97148009686'}`" 
+              class="handoff-btn call-btn"
+            >
+              📞 Request Call
+            </a>
+          </div>
+        </div>
+      </div>
+
       <span class="message-timestamp">{{ message.timestamp ? formatTime(message.timestamp) : '' }}</span>
     </div>
   </div>
@@ -756,5 +863,333 @@ const formatTime = (isoString) => {
 .prop-link:hover {
   color: var(--brand-purple);
   text-decoration: underline;
+}
+
+/* =========================================================================
+   PHASE 6: ACCOUNT AWARENESS & HUMAN HANDOFF LUXURY STYLES
+   ========================================================================= */
+
+.account-card-container,
+.handoff-card-container {
+  margin-top: 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: fadeIn 200ms ease;
+}
+
+.account-card-header,
+.handoff-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.account-badge,
+.handoff-badge-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.account-badge-sub,
+.handoff-ticket-id {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--brand-purple);
+  background: rgba(142, 68, 173, 0.1);
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(142, 68, 173, 0.2);
+}
+
+/* Saved Properties List */
+.account-saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-prop-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.account-prop-item:hover {
+  border-color: var(--brand-purple-light);
+  transform: translateY(-1px);
+}
+
+.account-prop-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.account-prop-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-prop-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 2px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.account-prop-sub {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  display: block;
+}
+
+.account-prop-price {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--brand-purple);
+}
+
+.account-prop-action-btn {
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, var(--brand-purple-light), var(--brand-purple));
+  color: #FFFFFF;
+  border: none;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.account-prop-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(142, 68, 173, 0.3);
+}
+
+/* Application Status List */
+.account-apps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.account-app-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+
+.app-item-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.app-badge-crm {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.app-badge-crm.vault {
+  background: rgba(243, 156, 18, 0.15);
+  color: #f39c12;
+  border: 1px solid rgba(243, 156, 18, 0.3);
+}
+
+.app-badge-crm.grid {
+  background: rgba(52, 152, 219, 0.15);
+  color: #3498db;
+  border: 1px solid rgba(52, 152, 219, 0.3);
+}
+
+.app-title-text {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.app-status-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(46, 204, 113, 0.15);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.3);
+}
+
+.app-status-pill.under_review {
+  background: rgba(241, 196, 15, 0.15);
+  color: #f1c40f;
+  border-color: rgba(241, 196, 15, 0.3);
+}
+
+.app-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.app-field {
+  font-size: 0.72rem;
+  display: flex;
+  gap: 6px;
+}
+
+.app-field .label {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.app-field .val {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.app-item-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  border-top: 1px dashed var(--border-glass);
+  padding-top: 6px;
+}
+
+/* Human Handoff Card */
+.handoff-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.handoff-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 8px #2ecc71;
+  animation: pulse 1.5s infinite;
+}
+
+.advisor-profile-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.advisor-avatar-box {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(142, 68, 173, 0.2), rgba(0, 210, 255, 0.2));
+  border: 1px solid var(--border-glass);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.advisor-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.advisor-title {
+  font-size: 0.74rem;
+  color: var(--brand-purple);
+  margin: 2px 0;
+  font-weight: 600;
+}
+
+.advisor-license {
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+
+.handoff-metrics-badge {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-glass);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.handoff-actions-row {
+  display: flex;
+  gap: 8px;
+}
+
+.handoff-btn {
+  flex: 1;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.handoff-btn.whatsapp-btn {
+  background: #25d366;
+  color: #FFFFFF;
+}
+
+.handoff-btn.whatsapp-btn:hover {
+  background: #1ebc59;
+  transform: translateY(-1px);
+}
+
+.handoff-btn.call-btn {
+  background: linear-gradient(135deg, var(--brand-purple), var(--brand-purple-light));
+  color: #FFFFFF;
+}
+
+.handoff-btn.call-btn:hover {
+  transform: translateY(-1px);
 }
 </style>

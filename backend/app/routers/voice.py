@@ -1,7 +1,7 @@
 import base64
 from typing import Optional
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Response
+from fastapi import APIRouter, UploadFile, File, Form, Header, HTTPException, Response
 from app.voice.stt_service import STTService
 from app.voice.tts_service import TTSService
 from app.orchestrator.orchestrator import ConversationOrchestrator
@@ -50,13 +50,16 @@ async def voice_interaction_pipeline(
     audio: UploadFile = File(...),
     session_id: Optional[str] = Form(None),
     language_hint: Optional[str] = Form("en"),
-    transcribed_text: Optional[str] = Form(None)
+    transcribed_text: Optional[str] = Form(None),
+    user_id: Optional[str] = Form(None),
+    x_user_id: Optional[str] = Header(None, alias="X-User-ID")
 ):
     """
     Composed Voice-to-Voice (V2V) Pipeline (Rule 7 & Confirmed Decision 1):
     Audio In → STT (gpt-live-transcribe) → Conversation Orchestrator → TTS (gpt-4o-mini-tts) → Audio Stream
     Uses the exact same business logic and conversation orchestrator as text.
     """
+    active_user_id = user_id or x_user_id
     audio_bytes = await audio.read()
 
     # Step 1: STT (Use client-side verified transcript if supplied, otherwise perform STT)
@@ -74,6 +77,7 @@ async def voice_interaction_pipeline(
     orchestration_result = await ConversationOrchestrator.process_user_turn(
         user_message=user_text,
         session_id=session_id,
+        user_id=active_user_id,
         manual_language=detected_lang
     )
 
@@ -93,6 +97,10 @@ async def voice_interaction_pipeline(
         "reply_text": bot_reply_text,
         "property_results": orchestration_result.get("property_results", []),
         "mortgage_result": orchestration_result.get("mortgage_result"),
+        "saved_properties": orchestration_result.get("saved_properties", []),
+        "application_status": orchestration_result.get("application_status"),
+        "handoff_data": orchestration_result.get("handoff_data"),
+        "handoff_offered": orchestration_result.get("handoff_offered", False),
         "audio_base64": f"data:audio/wav;base64,{audio_base64}",
         "pipeline": "gpt-live-transcribe -> gpt-5-mini -> gpt-4o-mini-tts"
     }
