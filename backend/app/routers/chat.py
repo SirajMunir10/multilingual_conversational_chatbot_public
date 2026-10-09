@@ -57,7 +57,12 @@ async def stream_chat_message(
         user_id=x_user_id,
         manual_language=payload.language
     )
-    return StreamingResponse(generator, media_type="text/event-stream")
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no"
+    }
+    return StreamingResponse(generator, media_type="text/event-stream", headers=headers)
 
 @router.get("/session/{session_id}")
 def get_session_details(session_id: str):

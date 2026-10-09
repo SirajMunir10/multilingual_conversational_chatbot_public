@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+import asyncio
 from typing import Dict, Any, List, Optional, AsyncGenerator
 from app.core.config import settings
 from app.core.security import assert_no_payment_intent, sanitize_input_for_injection
@@ -1427,31 +1428,56 @@ class ConversationOrchestrator:
         manual_language: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         """
-        Streaming generator supporting perceived latency < 2s (PRD Sec 7).
-        Yields Server-Sent Events (SSE) formatted text tokens.
+        Progressive streaming conversational turn generator (Server-Sent Events).
+        Streams tokens with progressive cadence, preserving full formatting,
+        and yields complete metadata upon conclusion.
         """
-        response = await cls.process_user_turn(
-            user_message=user_message,
-            session_id=session_id,
-            user_id=user_id,
-            manual_language=manual_language
-        )
-        full_text = response["text"]
-        words = full_text.split(" ")
+        try:
+            response = await cls.process_user_turn(
+                user_message=user_message,
+                session_id=session_id,
+                user_id=user_id,
+                manual_language=manual_language
+            )
+            full_text = response.get("text", "")
+            tokens = re.findall(r'\S+\s*|\s+', full_text) if full_text else [""]
 
-        for i, word in enumerate(words):
-            chunk = {
-                "token": word + (" " if i < len(words) - 1 else ""),
+            for tok in tokens:
+                chunk = {
+                    "token": tok,
+                    "session_id": response["session_id"],
+                    "language": response["language"],
+                    "is_final": False
+                }
+                yield f"data: {json.dumps(chunk)}\n\n"
+                await asyncio.sleep(0.015)
+
+            final_chunk = {
+                "token": "",
                 "session_id": response["session_id"],
                 "language": response["language"],
-                "is_final": (i == len(words) - 1),
-                "property_results": response.get("property_results") if (i == len(words) - 1) else None,
-                "mortgage_result": response.get("mortgage_result") if (i == len(words) - 1) else None,
-                "saved_properties": response.get("saved_properties") if (i == len(words) - 1) else None,
-                "application_status": response.get("application_status") if (i == len(words) - 1) else None,
-                "handoff_data": response.get("handoff_data") if (i == len(words) - 1) else None
+                "is_final": True,
+                "text": full_text,
+                "property_results": response.get("property_results"),
+                "mortgage_result": response.get("mortgage_result"),
+                "saved_properties": response.get("saved_properties"),
+                "application_status": response.get("application_status"),
+                "handoff_data": response.get("handoff_data"),
+                "handoff_offered": response.get("handoff_offered", False),
+                "tool_calls": response.get("tool_calls", [])
             }
-            yield f"data: {json.dumps(chunk)}\n\n"
+            yield f"data: {json.dumps(final_chunk)}\n\n"
+
+        except Exception as exc:
+            logger.error(f"Error in stream_user_turn: {exc}", exc_info=True)
+            err_msg = exc.detail if hasattr(exc, "detail") else str(exc)
+            err_chunk = {
+                "token": "",
+                "session_id": session_id or "",
+                "is_final": True,
+                "error": err_msg
+            }
+            yield f"data: {json.dumps(err_chunk)}\n\n"
 
     @classmethod
     def _format_comparison_narrative(cls, comp: Dict[str, Any], lang: str) -> str:
