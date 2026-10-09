@@ -172,7 +172,7 @@
     <!-- Standard Chat Interface: Displayed when Voice Mode is NOT active -->
     <template v-else>
       <!-- Message Feed -->
-      <div class="chat-feed" ref="feedRef" role="log" aria-live="polite">
+      <div class="chat-feed" ref="feedRef" role="log" aria-live="polite" @scroll="handleFeedScroll">
         <!-- HERO CENTERPIECE: Shown upon opening / at start of conversation -->
         <div v-if="messages.length <= 1" class="hero-centerpiece glass-card">
           <div class="hero-badge">
@@ -215,6 +215,21 @@
           </div>
         </div>
       </div>
+
+      <!-- Floating Jump to Latest Button (Auto-scroll assistance) -->
+      <transition name="jump-fade">
+        <button 
+          v-if="isUserScrolledUp" 
+          type="button" 
+          class="jump-to-latest-btn" 
+          @click="scrollToLatest"
+          title="Jump to latest message"
+          aria-label="Jump to latest message"
+        >
+          <span class="jump-arrow">↓</span>
+          <span class="jump-text">Latest</span>
+        </button>
+      </transition>
 
       <!-- Compact Voice Playback Bar (when XO is speaking back audio) -->
       <div v-if="isPlayingVoice" class="voice-playback-bar" @click="stopVoicePlayback" title="Click to stop voice playback">
@@ -370,7 +385,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, toRefs } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, toRefs } from 'vue'
 import MessageItem from './MessageItem.vue'
 import OnboardingTooltips from './OnboardingTooltips.vue'
 import VoiceVisualizer from './VoiceVisualizer.vue'
@@ -505,8 +520,17 @@ const initializeChatSession = () => {
       try {
         const parsed = JSON.parse(saved)
         if (Array.isArray(parsed) && parsed.length > 0) {
-          messages.value = parsed
-          return
+          // Filter out corrupted/empty placeholder assistant messages and clear any stuck streaming flags
+          const cleaned = parsed
+            .filter(msg => msg.role === 'user' || (msg.role === 'assistant' && (msg.content?.trim() || msg.metadata?.property_results?.length || msg.metadata?.mortgage_result)))
+            .map(msg => ({
+              ...msg,
+              isStreaming: false
+            }))
+          if (cleaned.length > 0) {
+            messages.value = cleaned
+            return
+          }
         }
       } catch (e) {
         console.warn('Could not parse saved chat messages:', e)
@@ -559,15 +583,49 @@ const clearChat = () => {
   if (isVoiceActive.value || isRecording.value) {
     if (typeof cancelVoiceInput === 'function') cancelVoiceInput()
   }
+  if (chatAbortController) {
+    chatAbortController.abort()
+    chatAbortController = null
+  }
   isTyping.value = false
 
   // Re-initialize the welcome message
   initializeWelcomeMessage()
 }
 
+// Scroll and Progressive Auto-Scroll State
+const isUserScrolledUp = ref(false)
+let chatAbortController = null
+
+const handleFeedScroll = () => {
+  if (!feedRef.value) return
+  const el = feedRef.value
+  // User is considered at bottom if within 60px of the bottom edge
+  const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+  isUserScrolledUp.value = distanceFromBottom > 60
+}
+
+const scrollToLatest = () => {
+  isUserScrolledUp.value = false
+  if (feedRef.value) {
+    feedRef.value.scrollTo({
+      top: feedRef.value.scrollHeight,
+      behavior: 'smooth'
+    })
+  }
+}
+
 const scrollToBottom = async () => {
   await nextTick()
   if (feedRef.value) {
+    feedRef.value.scrollTop = feedRef.value.scrollHeight
+  }
+}
+
+const conditionallyScrollToBottom = async (force = false) => {
+  await nextTick()
+  if (!feedRef.value) return
+  if (force || !isUserScrolledUp.value) {
     feedRef.value.scrollTop = feedRef.value.scrollHeight
   }
 }
@@ -584,6 +642,12 @@ const sendMessage = async () => {
   const query = inputQuery.value.trim()
   if (!query) return
 
+  // Abort any in-flight streaming request cleanly
+  if (chatAbortController) {
+    chatAbortController.abort()
+    chatAbortController = null
+  }
+
   // Add User Message
   messages.value.push({
     id: `usr_${Date.now()}`,
@@ -594,7 +658,61 @@ const sendMessage = async () => {
   })
   inputQuery.value = ''
   isTyping.value = true
-  scrollToBottom()
+  isUserScrolledUp.value = false
+  await conditionallyScrollToBottom(true)
+
+  // Do NOT add an empty assistant message yet!
+  // While XO AI is analyzing, the user sees ONLY the typing indicator:
+  // "XO AI is analyzing market data..."
+  let assistantMsg = null
+
+  chatAbortController = new AbortController()
+
+  const processChunkPayload = (payload) => {
+    // When the first packet arrives, dismiss the typing indicator and instantiate the reactive assistant message
+    if (!assistantMsg) {
+      isTyping.value = false
+      assistantMsg = reactive({
+        id: `ast_${Date.now()}`,
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+        timestamp: new Date().toISOString(),
+        language: props.currentLanguage,
+        metadata: {}
+      })
+      messages.value.push(assistantMsg)
+    }
+
+    if (payload.error) {
+      assistantMsg.content = `Notice: ${payload.error}`
+      assistantMsg.isStreaming = false
+      return
+    }
+
+    if (payload.token) {
+      assistantMsg.content += payload.token
+      conditionallyScrollToBottom(false)
+    }
+
+    if (payload.is_final) {
+      assistantMsg.isStreaming = false
+      if (payload.text && !assistantMsg.content) {
+        assistantMsg.content = payload.text
+      }
+      if (payload.language && payload.language !== props.currentLanguage) {
+        emit('language-changed', payload.language)
+      }
+      assistantMsg.metadata = {
+        property_results: payload.property_results || [],
+        mortgage_result: payload.mortgage_result || null,
+        saved_properties: payload.saved_properties || [],
+        application_status: payload.application_status || null,
+        handoff_data: payload.handoff_data || null
+      }
+      conditionallyScrollToBottom(false)
+    }
+  }
 
   try {
     const headers = {
@@ -605,9 +723,10 @@ const sendMessage = async () => {
       headers['X-User-ID'] = currentUserId.value
     }
 
-    const res = await fetch('/api/chat/message', {
+    const res = await fetch('/api/chat/stream', {
       method: 'POST',
       headers,
+      signal: chatAbortController.signal,
       body: JSON.stringify({
         message: query,
         session_id: sessionId.value,
@@ -616,41 +735,82 @@ const sendMessage = async () => {
     })
 
     if (!res.ok) {
-      const errData = await res.json()
-      throw new Error(errData.detail || 'Failed to process message')
+      const errData = await res.json().catch(() => ({}))
+      throw new Error(errData.detail || `Server error (${res.status})`)
     }
 
-    const data = await res.json()
-
-    // If server detected a different language, notify parent
-    if (data.language && data.language !== props.currentLanguage) {
-      emit('language-changed', data.language)
+    if (!res.body) {
+      throw new Error('Streaming response body unavailable')
     }
 
-    messages.value.push({
-      id: `ast_${Date.now()}`,
-      role: 'assistant',
-      content: data.text,
-      timestamp: new Date().toISOString(),
-      language: data.language,
-      metadata: {
-        property_results: data.property_results,
-        mortgage_result: data.mortgage_result,
-        saved_properties: data.saved_properties,
-        application_status: data.application_status,
-        handoff_data: data.handoff_data
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    let sseBuffer = ''
+
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) {
+        if (sseBuffer.trim()) {
+          const remainingLines = sseBuffer.split('\n\n')
+          for (const line of remainingLines) {
+            const trimmed = line.trim()
+            if (trimmed.startsWith('data: ')) {
+              try {
+                processChunkPayload(JSON.parse(trimmed.slice(6)))
+              } catch (e) {}
+            }
+          }
+        }
+        break
       }
-    })
+
+      sseBuffer += decoder.decode(value, { stream: true })
+      const lines = sseBuffer.split('\n\n')
+      sseBuffer = lines.pop() || ''
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data: ')) continue
+
+        try {
+          const payload = JSON.parse(trimmed.slice(6))
+          processChunkPayload(payload)
+        } catch (jsonErr) {
+          console.warn('Failed to parse SSE JSON chunk:', jsonErr, trimmed)
+        }
+      }
+    }
   } catch (err) {
-    messages.value.push({
-      id: `err_${Date.now()}`,
-      role: 'assistant',
-      content: `Notice: ${err.message}`,
-      timestamp: new Date().toISOString()
-    })
+    if (err.name === 'AbortError') {
+      console.log('Chat stream turn cancelled by user or next request.')
+    } else {
+      console.error('Streaming turn error:', err)
+      isTyping.value = false
+      if (!assistantMsg) {
+        assistantMsg = reactive({
+          id: `ast_${Date.now()}`,
+          role: 'assistant',
+          content: `Notice: ${err.message || 'Unable to connect to assistant.'}`,
+          isStreaming: false,
+          timestamp: new Date().toISOString(),
+          language: props.currentLanguage,
+          metadata: {}
+        })
+        messages.value.push(assistantMsg)
+      } else {
+        if (!assistantMsg.content) {
+          assistantMsg.content = `Notice: ${err.message || 'Unable to connect to assistant.'}`
+        }
+        assistantMsg.isStreaming = false
+      }
+    }
   } finally {
     isTyping.value = false
-    scrollToBottom()
+    if (assistantMsg) {
+      assistantMsg.isStreaming = false
+    }
+    chatAbortController = null
+    conditionallyScrollToBottom(false)
   }
 }
 
@@ -1285,6 +1445,13 @@ const submitLeadCapture = async () => {
 
 onMounted(() => {
   initializeChatSession()
+})
+
+onUnmounted(() => {
+  if (chatAbortController) {
+    chatAbortController.abort()
+    chatAbortController = null
+  }
 })
 </script>
 
@@ -2019,6 +2186,78 @@ onMounted(() => {
 
 .btn-stop-playback:hover {
   color: #EF4444;
+}
+
+/* Floating Jump to Latest Button */
+.jump-to-latest-btn {
+  position: absolute;
+  bottom: 84px;
+  right: 18px;
+  z-index: 25;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-surface-elevated, #ffffff);
+  border: 1.5px solid var(--border-purple, #5c039b);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 0 10px rgba(92, 3, 155, 0.20);
+  color: var(--brand-purple, #5c039b);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+[data-theme="dark"] .jump-to-latest-btn {
+  background: rgba(26, 26, 36, 0.92);
+  border-color: var(--border-cyan, #03a4f4);
+  color: var(--brand-cyan, #03a4f4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(3, 164, 244, 0.25);
+}
+
+.jump-to-latest-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(92, 3, 155, 0.35);
+  background: var(--brand-purple, #5c039b);
+  color: #ffffff;
+}
+
+[data-theme="dark"] .jump-to-latest-btn:hover {
+  background: var(--brand-cyan, #03a4f4);
+  color: #000000;
+  box-shadow: 0 6px 20px rgba(3, 164, 244, 0.45);
+}
+
+.jump-arrow {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1;
+  animation: bounceDown 1.5s infinite;
+}
+
+.jump-text {
+  font-size: 0.75rem;
+  letter-spacing: 0.2px;
+}
+
+@keyframes bounceDown {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(2px); }
+}
+
+/* Transition */
+.jump-fade-enter-active,
+.jump-fade-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.jump-fade-enter-from,
+.jump-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
 }
 
 /* Chat Input Footer Dock */

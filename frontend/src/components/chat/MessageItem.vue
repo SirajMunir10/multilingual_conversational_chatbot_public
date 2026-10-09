@@ -12,8 +12,11 @@
     </div>
 
     <div class="message-bubble-container">
-      <div class="message-bubble">
-        <div class="message-content" v-html="formattedContent"></div>
+      <div class="message-bubble" v-if="message.content || message.isStreaming">
+        <div class="message-content">
+          <span v-html="formattedContent"></span>
+          <span v-if="message.isStreaming" class="streaming-cursor" aria-hidden="true"></span>
+        </div>
       </div>
 
       <!-- Property Recommendations Display (FR-8) -->
@@ -385,6 +388,26 @@ const formatTime = (isoString) => {
   font-size: 0.68rem;
   color: var(--text-muted);
   margin-top: 4px;
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  background-color: var(--brand-purple, #5c039b);
+  margin-left: 4px;
+  vertical-align: -1px;
+  border-radius: 1px;
+  animation: cursorBlink 0.8s infinite;
+}
+
+[data-theme="dark"] .streaming-cursor {
+  background-color: var(--brand-cyan, #03a4f4);
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.15; }
 }
 
 /* Property Results Inside Chat */
