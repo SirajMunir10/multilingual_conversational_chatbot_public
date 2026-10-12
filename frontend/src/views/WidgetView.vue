@@ -346,7 +346,7 @@ const openWidget = () => {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 430px;
+  width: 450px;
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 40px);
   z-index: 1000;
@@ -356,7 +356,7 @@ const openWidget = () => {
 }
 
 .embedded-widget-shell.expanded {
-  width: 780px;
+  width: 820px;
   max-width: calc(100vw - 40px);
 }
 

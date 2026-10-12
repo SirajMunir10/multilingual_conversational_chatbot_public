@@ -7,101 +7,108 @@
           <img src="/xo-mascot.png" alt="XO Mascot" class="mascot-avatar-img" />
           <span class="live-status-dot"></span>
         </div>
-        <div>
+        <div class="header-brand-info">
           <div class="header-brand-title">
             <h3 class="header-title">XO</h3>
-            <span class="badge-online">ONLINE &amp; READY</span>
+            <span class="badge-online">ONLINE</span>
           </div>
-          <span class="header-status">
-            {{ activeLanguageLabel }} &bull; Luxury Property &amp; Mortgage Specialist
+          <span class="header-status" :title="activeLanguageLabel + ' • Luxury Property & Mortgage Specialist'">
+            {{ activeLanguageLabel }} &bull; Real Estate &amp; Mortgages
           </span>
         </div>
       </div>
 
       <div class="header-actions">
-        <!-- Theme Toggle (Light / Dark) -->
-        <button 
-          class="icon-btn theme-toggle-btn"
-          @click="toggleTheme" 
-          :title="currentTheme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'"
-          :aria-label="currentTheme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'"
-          :data-tooltip="currentTheme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'"
-          data-tooltip-pos="bottom"
-        >
-          <span>{{ currentTheme === 'light' ? '🌙' : '☀️' }}</span>
-        </button>
+        <!-- Context Pills -->
+        <div class="header-pills-group">
+          <!-- Persistent Human Handoff (FR-5) -->
+          <button 
+            class="handoff-btn" 
+            @click="requestHandoff" 
+            title="Connect with Human Specialist"
+            aria-label="Connect with Human Specialist"
+            data-tooltip="Human Advisor"
+            data-tooltip-pos="bottom"
+          >
+            <span class="pill-icon">🎧</span>
+            <span class="pill-label">Advisor</span>
+          </button>
 
-        <!-- Feature Tips Toggle -->
-        <button 
-          class="icon-btn" 
-          @click="showTips = !showTips" 
-          title="Toggle Feature Tips (💡)"
-          aria-label="Toggle Feature Tips"
-          data-tooltip="Feature Tips & Guide"
-          data-tooltip-pos="bottom"
-        >
-          💡
-        </button>
+          <!-- User Auth Context Toggle (FR-21/FR-22) -->
+          <button 
+            class="auth-toggle-btn" 
+            @click="toggleAuthUser" 
+            :title="currentUserId ? 'Authenticated: Siraj Munir (VIP Client). Click to switch to Guest mode.' : 'Guest Mode (Unauthenticated). Click to switch to VIP Client.'"
+            :aria-label="currentUserId ? 'Signed in as Siraj Munir' : 'Guest Mode'"
+            :data-tooltip="currentUserId ? '👑 VIP: Siraj (Sign Out)' : '👤 Guest (Sign In)'"
+            data-tooltip-pos="bottom"
+          >
+            <span class="pill-icon">{{ currentUserId ? '👑' : '👤' }}</span>
+            <span class="pill-label">{{ currentUserId ? 'Siraj' : 'Guest' }}</span>
+          </button>
+        </div>
 
-        <!-- Resize / Preview Size Toggle (Arrow button) -->
-        <button 
-          class="icon-btn resize-toggle-btn" 
-          @click="$emit('toggle-expand')" 
-          :title="isExpanded ? 'Restore compact preview (⤡)' : 'Expand to larger preview (⤢)'"
-          :aria-label="isExpanded ? 'Restore compact preview' : 'Expand preview'"
-          :data-tooltip="isExpanded ? 'Restore compact view' : 'Expand to larger view'"
-          data-tooltip-pos="bottom"
-        >
-          <span class="resize-icon">{{ isExpanded ? '⤡' : '⤢' }}</span>
-        </button>
+        <!-- Utility Action Controls Cluster -->
+        <div class="header-tools-group">
+          <!-- Theme Toggle (Light / Dark) -->
+          <button 
+            class="icon-btn theme-toggle-btn"
+            @click="toggleTheme" 
+            :title="currentTheme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'"
+            :aria-label="currentTheme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'"
+            data-tooltip="Theme"
+            data-tooltip-pos="bottom"
+          >
+            <span>{{ currentTheme === 'light' ? '🌙' : '☀️' }}</span>
+          </button>
 
-        <!-- Persistent Human Handoff (FR-5) -->
-        <button 
-          class="handoff-btn" 
-          @click="requestHandoff" 
-          title="Connect with Human Specialist"
-          aria-label="Connect with Human Specialist"
-          data-tooltip="Connect with Human Specialist"
-          data-tooltip-pos="bottom"
-        >
-          <span>🎧 Advisor</span>
-        </button>
+          <!-- Feature Tips Toggle -->
+          <button 
+            class="icon-btn tips-toggle-btn" 
+            @click="showTips = !showTips" 
+            title="Toggle Feature Tips (💡)"
+            aria-label="Toggle Feature Tips"
+            data-tooltip="Tips"
+            data-tooltip-pos="bottom"
+          >
+            <span>💡</span>
+          </button>
 
-        <!-- User Auth Context Toggle (FR-21/FR-22) -->
-        <button 
-          class="auth-toggle-btn" 
-          @click="toggleAuthUser" 
-          :title="currentUserId ? 'Authenticated: Siraj Munir (VIP Client). Click to switch to Guest mode.' : 'Guest Mode (Unauthenticated). Click to switch to VIP Client.'"
-          :aria-label="currentUserId ? 'Signed in as Siraj Munir' : 'Guest Mode'"
-          :data-tooltip="currentUserId ? '👑 VIP: Siraj (Click to Sign Out)' : '👤 Guest (Click to Sign In)'"
-          data-tooltip-pos="bottom"
-        >
-          <span>{{ currentUserId ? '👑 Siraj' : '👤 Guest' }}</span>
-        </button>
+          <!-- Clear Chat Button with explicit Clear Chat hover tooltip -->
+          <button 
+            class="icon-btn clear-chat-btn" 
+            @click="clearChat" 
+            title="Clear Chat"
+            aria-label="Clear Chat"
+          >
+            <span class="btn-icon">🗑️</span>
+            <span class="clear-tooltip-bubble">Clear Chat</span>
+          </button>
 
-        <!-- Clear Chat Button -->
-        <button 
-          class="icon-btn clear-chat-btn" 
-          @click="clearChat" 
-          title="Clear Chat & Restart"
-          aria-label="Clear Chat"
-          data-tooltip="Clear Chat"
-          data-tooltip-pos="bottom"
-        >
-          🗑️
-        </button>
+          <!-- Resize / Preview Size Toggle (Arrow button) -->
+          <button 
+            class="icon-btn resize-toggle-btn" 
+            @click="$emit('toggle-expand')" 
+            :title="isExpanded ? 'Restore compact view (⤡)' : 'Expand to larger view (⤢)'"
+            :aria-label="isExpanded ? 'Restore compact view' : 'Expand preview'"
+            :data-tooltip="isExpanded ? 'Compact' : 'Expand'"
+            data-tooltip-pos="bottom"
+          >
+            <span class="resize-icon">{{ isExpanded ? '⤡' : '⤢' }}</span>
+          </button>
 
-        <!-- Close Chatbot Button (✕) -->
-        <button 
-          class="icon-btn close-widget-btn" 
-          @click="$emit('close')" 
-          title="Close Chatbot & return to page (✕)"
-          aria-label="Close Chatbot"
-          data-tooltip="Close Chatbot"
-          data-tooltip-pos="left"
-        >
-          ✕
-        </button>
+          <!-- Close Chatbot Button (✕) -->
+          <button 
+            class="icon-btn close-widget-btn" 
+            @click="$emit('close')" 
+            title="Close Chatbot (✕)"
+            aria-label="Close Chatbot"
+            data-tooltip="Close"
+            data-tooltip-pos="bottom"
+          >
+            <span>✕</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1480,6 +1487,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 10px 14px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-subtle);
@@ -1493,13 +1501,16 @@ onUnmounted(() => {
 .chat-header-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .mascot-avatar-container {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(92, 3, 155, 0.15) 0%, rgba(3, 164, 244, 0.10) 70%);
   border: 1.5px solid var(--brand-purple);
@@ -1507,13 +1518,14 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 2px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(92, 3, 155, 0.15);
+  flex-shrink: 0;
 }
 
 .mascot-avatar-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 50%;
 }
 
@@ -1521,50 +1533,83 @@ onUnmounted(() => {
   position: absolute;
   bottom: 0;
   right: 0;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--brand-lime-vivid);
-  border: 2px solid var(--bg-surface);
+  border: 1.5px solid var(--bg-surface);
   box-shadow: 0 0 6px var(--brand-lime-vivid);
   animation: pulseLive 2s infinite;
+}
+
+.header-brand-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .header-brand-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  line-height: 1.2;
 }
 
 .header-title {
-  font-size: 0.96rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  line-height: 1.2;
 }
 
 .badge-online {
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   font-weight: 800;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: #020202;
   background: var(--brand-lime-vivid);
-  padding: 2px 7px;
+  padding: 1.5px 6px;
   border-radius: 999px;
-  box-shadow: 0 0 8px rgba(100, 239, 10, 0.3);
+  box-shadow: 0 0 6px rgba(100, 239, 10, 0.3);
+  line-height: 1.2;
 }
 
 .header-status {
   display: block;
-  font-size: 0.72rem;
+  font-size: 0.69rem;
   color: var(--text-muted);
-  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+  margin-top: 2px;
+  line-height: 1.2;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
+}
+
+.header-pills-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.header-tools-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: var(--bg-surface);
+  padding: 2px 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-xs);
 }
 
 .icon-btn {
@@ -1572,64 +1617,113 @@ onUnmounted(() => {
   border: 1px solid transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 5px 7px;
-  font-size: 0.95rem;
+  width: 26px;
+  height: 26px;
+  font-size: 0.85rem;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  position: relative;
 }
 
 .icon-btn:hover {
   color: var(--text-primary);
   background: var(--bg-surface-hover);
   border-color: var(--border-subtle);
+  transform: translateY(-1px);
+}
+
+/* Dedicated Clear Chat button with prominent hover tooltip */
+.clear-chat-btn {
+  position: relative;
+}
+
+.clear-chat-btn:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #DC2626;
+}
+
+.clear-tooltip-bubble {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: -8px;
+  background: #0F172A;
+  color: #FFFFFF;
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-3px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  z-index: 10002;
+}
+
+.clear-tooltip-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  right: 14px;
+  border: 4px solid transparent;
+  border-bottom-color: #0F172A;
+}
+
+.clear-chat-btn:hover .clear-tooltip-bubble,
+.clear-chat-btn:focus-visible .clear-tooltip-bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+[data-theme="dark"] .clear-tooltip-bubble {
+  background: #1E293B;
+  border-color: rgba(255, 255, 255, 0.20);
+}
+
+[data-theme="dark"] .clear-tooltip-bubble::before {
+  border-bottom-color: #1E293B;
 }
 
 .resize-toggle-btn {
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   color: var(--brand-purple);
-  background: rgba(92, 3, 155, 0.08);
-  border-color: var(--border-purple);
 }
 
 .resize-toggle-btn:hover {
-  background: rgba(92, 3, 155, 0.18);
+  background: rgba(92, 3, 155, 0.15);
   color: var(--brand-purple);
-  transform: scale(1.05);
 }
 
 [data-theme="dark"] .resize-toggle-btn {
   color: var(--brand-cyan-vivid);
-  background: rgba(3, 164, 244, 0.12);
-  border-color: rgba(3, 164, 244, 0.35);
 }
 
 [data-theme="dark"] .resize-toggle-btn:hover {
-  background: rgba(3, 164, 244, 0.25);
+  background: rgba(3, 164, 244, 0.20);
   color: #FFFFFF;
 }
 
 .close-widget-btn {
-  font-size: 0.95rem;
-  font-weight: 800;
+  font-size: 0.85rem;
+  font-weight: 700;
   color: var(--text-muted);
-  background: rgba(0, 0, 0, 0.04);
-  border-color: var(--border-subtle);
 }
 
 .close-widget-btn:hover {
   background: rgba(239, 68, 68, 0.14);
   border-color: rgba(239, 68, 68, 0.40);
   color: #DC2626;
-  transform: scale(1.05);
-}
-
-[data-theme="dark"] .close-widget-btn {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: var(--text-muted);
 }
 
 [data-theme="dark"] .close-widget-btn:hover {
@@ -1642,15 +1736,16 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(92, 3, 155, 0.10);
+  background: rgba(92, 3, 155, 0.08);
   border: 1px solid var(--border-purple);
   color: var(--brand-purple);
-  font-size: 0.74rem;
+  font-size: 0.70rem;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
 [data-theme="dark"] .handoff-btn {
@@ -1662,21 +1757,23 @@ onUnmounted(() => {
   background: var(--brand-purple);
   color: #FFFFFF;
   box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
 }
 
 .auth-toggle-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: rgba(217, 119, 6, 0.10);
-  border: 1px solid rgba(217, 119, 6, 0.35);
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.30);
   color: #B45309;
-  font-size: 0.74rem;
+  font-size: 0.70rem;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 3px 8px;
   border-radius: 999px;
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
 [data-theme="dark"] .auth-toggle-btn {
@@ -1689,6 +1786,24 @@ onUnmounted(() => {
   background: rgba(217, 119, 6, 0.22);
   border-color: #D97706;
   transform: translateY(-1px);
+}
+
+/* Responsive collapse for header pills on narrow widget widths */
+@media (max-width: 460px) {
+  .chat-header {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+  .header-status {
+    max-width: 110px;
+  }
+  .header-pills-group .pill-label {
+    display: none;
+  }
+  .handoff-btn,
+  .auth-toggle-btn {
+    padding: 3px 6px;
+  }
 }
 
 /* Chat Feed */
