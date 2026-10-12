@@ -1611,7 +1611,11 @@ class ConversationOrchestrator:
                 s = alts["same_community_alternatives"][0]
                 o = alts["other_community_alternatives"][0]
                 tiers = alts.get("available_beds_in_community", [])
-                comm_desc = f"تتوفر خيارات متعددة تشمل {', '.join([f'{t['beds']} غرف نوم (بدءاً من {t['starting_price_aed']:,.0f} درهم)' for t in tiers[:2]])}" if len(tiers) > 1 else f"تتوفر شقق {s['beds']} غرف نوم فاخرة (مثل *{s['title']}* بسعر {s['price']:,.0f} درهم)"
+                if len(tiers) > 1:
+                    tier_strs = [f"{t['beds']} غرف نوم (بدءاً من {t['starting_price_aed']:,.0f} درهم)" for t in tiers[:2]]
+                    comm_desc = f"تتوفر خيارات متعددة تشمل {', '.join(tier_strs)}"
+                else:
+                    comm_desc = f"تتوفر شقق {s['beds']} غرف نوم فاخرة (مثل *{s['title']}* بسعر {s['price']:,.0f} درهم)"
                 return (
                     f"بحثتُ في قائمة العقارات الحالية، وللأسف لا تتوفر حالياً شقق {beds_str}في {location_name} تطابق ميزانيتك ومعاييرك بدقة.\n\n"
                     f"ومع ذلك، لدينا بدائل مميزة ومباشرة في النظام:\n"
@@ -1638,7 +1642,11 @@ class ConversationOrchestrator:
                 s = alts["same_community_alternatives"][0]
                 o = alts["other_community_alternatives"][0]
                 tiers = alts.get("available_beds_in_community", [])
-                comm_desc = f"हमारे पास {', '.join([f'{t['beds']} बेडरूम (शुरुआती कीमत {t['starting_price_aed']:,.0f} AED)' for t in tiers[:2]])} के विकल्प उपलब्ध हैं" if len(tiers) > 1 else f"हमारे पास लक्ज़री {s['beds']} बेडरूम निवास उपलब्ध हैं (जैसे *{s['title']}* मूल्य {s['price']:,.0f} AED)"
+                if len(tiers) > 1:
+                    tier_strs = [f"{t['beds']} बेडरूम (शुरुआती कीमत {t['starting_price_aed']:,.0f} AED)" for t in tiers[:2]]
+                    comm_desc = f"हमारे पास {', '.join(tier_strs)} के विकल्प उपलब्ध हैं"
+                else:
+                    comm_desc = f"हमारे पास लक्ज़री {s['beds']} बेडरूम निवास उपलब्ध हैं (जैसे *{s['title']}* मूल्य {s['price']:,.0f} AED)"
                 return (
                     f"मैंने हमारे लाइव इन्वेंट्री की जांच की, दुर्भाग्य से {location_name} में {beds_str}अपार्टमेंट के लिए सटीक मैच अभी उपलब्ध नहीं है।\n\n"
                     f"हालाँकि, आपके लिए बेहतरीन विकल्प मौजूद हैं:\n"
@@ -1660,7 +1668,11 @@ class ConversationOrchestrator:
                 s = alts["same_community_alternatives"][0]
                 o = alts["other_community_alternatives"][0]
                 tiers = alts.get("available_beds_in_community", [])
-                comm_desc = f"ہمارے پاس {', '.join([f'{t['beds']} بیڈ روم (ابتدائی قیمت {t['starting_price_aed']:,.0f} درہم)' for t in tiers[:2]])} کی رہائشیں دستیاب ہیں" if len(tiers) > 1 else f"لگژری {s['beds']} بیڈ روم رہائشیں دستیاب ہیں (جیسے *{s['title']}* قیمت {s['price']:,.0f} درہم)"
+                if len(tiers) > 1:
+                    tier_strs = [f"{t['beds']} بیڈ روم (ابتدائی قیمت {t['starting_price_aed']:,.0f} درہم)" for t in tiers[:2]]
+                    comm_desc = f"ہمارے پاس {', '.join(tier_strs)} کی رہائشیں دستیاب ہیں"
+                else:
+                    comm_desc = f"لگژری {s['beds']} بیڈ روم رہائشیں دستیاب ہیں (جیسے *{s['title']}* قیمت {s['price']:,.0f} درہم)"
                 return (
                     f"میں نے لائیو انوینٹری چیک کی ہے، بدقسمتی سے {location_name} میں آپ کے عین مطابق {beds_str}اپارٹمنٹ فی الوقت دستیاب نہیں ہے۔\n\n"
                     f"تاہم، ہمارے کیٹلاگ میں شاندار متبادل موجود ہیں:\n"
