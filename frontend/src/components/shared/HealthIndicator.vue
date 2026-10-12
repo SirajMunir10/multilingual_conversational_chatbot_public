@@ -22,7 +22,7 @@ const health = ref({
   models: {
     llm: 'gpt-5-mini',
     stt: 'gpt-live-transcribe',
-    tts: 'gpt-4o-mini-tts'
+    tts: 'eleven_flash_v2_5'
   },
   availability_target_pct: 99.9
 })

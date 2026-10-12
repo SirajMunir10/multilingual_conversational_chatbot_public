@@ -22,7 +22,7 @@ class TestPhase1Foundation(unittest.TestCase):
         self.assertEqual(data["status"], "healthy")
         self.assertEqual(data["models"]["llm"], "gpt-5-mini")
         self.assertEqual(data["models"]["stt"], "gpt-live-transcribe")
-        self.assertEqual(data["models"]["tts"], "gpt-4o-mini-tts")
+        self.assertEqual(data["models"]["tts"], "eleven_flash_v2_5")
         self.assertIn("en", data["launch_languages"])
         self.assertIn("ar", data["launch_languages"])
         self.assertIn("hi", data["launch_languages"])

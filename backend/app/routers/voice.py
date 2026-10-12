@@ -2,6 +2,7 @@ import base64
 from typing import Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, UploadFile, File, Form, Header, HTTPException, Response
+from app.core.config import settings
 from app.voice.stt_service import STTService
 from app.voice.tts_service import TTSService
 from app.orchestrator.orchestrator import ConversationOrchestrator
@@ -36,14 +37,14 @@ async def transcribe_audio_endpoint(
 @router.post("/synthesize")
 async def synthesize_speech_endpoint(payload: TTSRequest):
     """
-    Text-to-Speech endpoint using OpenAI's gpt-4o-mini-tts model.
+    Text-to-Speech endpoint using ElevenLabs' eleven_flash_v2_5 model.
     Synthesizes speech in EN, AR, HI, UR.
     """
     audio_bytes = await TTSService.synthesize_speech(
         text=payload.text,
         language=payload.language
     )
-    return Response(content=audio_bytes, media_type="audio/wav")
+    return Response(content=audio_bytes, media_type="audio/mpeg")
 
 @router.post("/interact")
 async def voice_interaction_pipeline(
@@ -56,7 +57,7 @@ async def voice_interaction_pipeline(
 ):
     """
     Composed Voice-to-Voice (V2V) Pipeline (Rule 7 & Confirmed Decision 1):
-    Audio In → STT (gpt-live-transcribe) → Conversation Orchestrator → TTS (gpt-4o-mini-tts) → Audio Stream
+    Audio In → STT (gpt-live-transcribe) → Conversation Orchestrator → TTS (eleven_flash_v2_5) → Audio Stream
     Uses the exact same business logic and conversation orchestrator as text.
     """
     active_user_id = user_id or x_user_id
@@ -81,7 +82,7 @@ async def voice_interaction_pipeline(
         manual_language=detected_lang
     )
 
-    # Step 3: TTS Synthesis
+    # Step 3: TTS Synthesis (ElevenLabs Flash v2.5)
     bot_reply_text = orchestration_result["text"]
     reply_audio_bytes = await TTSService.synthesize_speech(
         text=bot_reply_text,
@@ -101,6 +102,6 @@ async def voice_interaction_pipeline(
         "application_status": orchestration_result.get("application_status"),
         "handoff_data": orchestration_result.get("handoff_data"),
         "handoff_offered": orchestration_result.get("handoff_offered", False),
-        "audio_base64": f"data:audio/wav;base64,{audio_base64}",
-        "pipeline": "gpt-live-transcribe -> gpt-5-mini -> gpt-4o-mini-tts"
+        "audio_base64": f"data:audio/mp3;base64,{audio_base64}",
+        "pipeline": f"{settings.STT_MODEL} -> {settings.LLM_MODEL} -> {settings.TTS_MODEL}"
     }

@@ -30,7 +30,7 @@ XO is an enterprise-grade embedded conversational AI assistant designed for real
 | **Containerization** | Docker & Docker Compose | Multi-container architecture (`docker-compose.yml`); no venv deployment |
 | **AI / LLM** | OpenAI `gpt-5-mini` | High-reasoning language model, system persona guardrails, function calling |
 | **Speech-to-Text (STT)**| OpenAI `gpt-live-transcribe` | Real-time audio transcription across EN, AR, HI, UR |
-| **Text-to-Speech (TTS)**| OpenAI `gpt-4o-mini-tts` | Low-latency voice synthesis across EN, AR, HI, UR |
+| **Text-to-Speech (TTS)**| ElevenLabs `eleven_flash_v2_5` | Ultra-low latency neural voice synthesis across EN, AR, HI, UR |
 | **Voice Architecture** | Composed STT → LLM → TTS | Shared conversation orchestrator; identical business logic for text & voice |
 | **Knowledge / RAG** | Vector DB & Embeddings | Scoped vector retrieval, cosine similarity, reranking, query caching |
 | **Financial Engine** | Deterministic Calculation Service | Python math engine using UAE Central Bank rules (DBR, LTV, salary caps) |
@@ -45,7 +45,7 @@ User (Web Widget / Product Surface — Text & Voice)
                       ▼
         Conversation Orchestrator (FastAPI)
  ├─ Automatic Language Detection (EN / AR / HI / UR) + Manual Override
- ├─ Voice Layer (STT: gpt-live-transcribe; TTS: gpt-4o-mini-tts)
+ ├─ Voice Layer (STT: gpt-live-transcribe; TTS: eleven_flash_v2_5)
  ├─ Intent Routing (Property / Mortgage / General / Account)
  ├─ Session & Dialogue State Store
  │
@@ -93,7 +93,7 @@ User (Web Widget / Product Surface — Text & Voice)
 
 ### 4.3 Composed Voice-to-Voice (V2V) Pipeline
 - Voice interactions share the **identical** intent router, business rules, and state engine as text chat.
-- User Audio → `gpt-live-transcribe` (STT) → Text → Conversation Orchestrator → `gpt-5-mini` → Response Text → `gpt-4o-mini-tts` (TTS) → Audio Stream.
+- User Audio → `gpt-live-transcribe` (STT) → Text → Conversation Orchestrator → `gpt-5-mini` → Response Text → `eleven_flash_v2_5` (TTS) → Audio Stream.
 - Supported in all four launch languages: English, Arabic, Hindi, and Urdu.
 
 ### 4.4 Zero Payment Scope

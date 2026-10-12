@@ -33,7 +33,7 @@ class TestVoiceUXRefinement(unittest.TestCase):
         self.assertEqual(res_data["session_id"], session_id)
         self.assertEqual(res_data["transcribed_user_text"], "Show me 2 bedroom apartments in Downtown Dubai")
         self.assertIn("Downtown", res_data["reply_text"])
-        self.assertTrue(res_data["audio_base64"].startswith("data:audio/wav;base64,"))
+        self.assertTrue(res_data["audio_base64"].startswith("data:audio/mp3;base64,") or res_data["audio_base64"].startswith("data:audio/wav;base64,"))
         self.assertEqual(res_data["intent"], "property")
 
     def test_voice_interact_fallback_when_no_transcribed_text(self):
@@ -53,7 +53,7 @@ class TestVoiceUXRefinement(unittest.TestCase):
         res_data = res.json()
         self.assertEqual(res_data["session_id"], session_id)
         self.assertTrue(len(res_data["transcribed_user_text"]) > 0)
-        self.assertTrue(res_data["audio_base64"].startswith("data:audio/wav;base64,"))
+        self.assertTrue(res_data["audio_base64"].startswith("data:audio/mp3;base64,") or res_data["audio_base64"].startswith("data:audio/wav;base64,"))
 
     def test_voice_greeting_synthesis_all_languages(self):
         """
@@ -73,7 +73,7 @@ class TestVoiceUXRefinement(unittest.TestCase):
                 "language": lang
             })
             self.assertEqual(res.status_code, 200)
-            self.assertEqual(res.headers["content-type"], "audio/wav")
+            self.assertIn(res.headers["content-type"], ["audio/mpeg", "audio/wav"])
             self.assertGreater(len(res.content), 40)
 
     def test_session_state_preserved_across_multiple_interactions(self):

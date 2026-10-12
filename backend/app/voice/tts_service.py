@@ -2,25 +2,24 @@ import logging
 import io
 import struct
 from typing import Optional
+import httpx
 from app.core.config import settings
-from app.llm.client import LLMService
 
 logger = logging.getLogger("xo.tts")
 
 class TTSService:
     """
-    Text-to-Speech service utilizing OpenAI's gpt-4o-mini-tts model.
-    Synthesizes speech in English, Arabic, Hindi, and Urdu.
+    Text-to-Speech service utilizing ElevenLabs' eleven_flash_v2_5 model.
+    Synthesizes low-latency, high-realism speech in English, Arabic, Hindi, and Urdu.
     """
 
-    # Cheerleader & Cute Voice Profile (Nova / Marin)
-    # OpenAI API enum supports: 'nova', 'shimmer', 'echo', 'onyx', 'fable', 'alloy', 'ash', 'sage', 'coral'
-    # 'nova' is OpenAI's official energetic, upbeat, cute female voice.
+    # Curated Voice IDs for ElevenLabs Flash v2.5
+    # Default is Rachel (21m00Tcm4TlvDq8ikWAM) - luxury, warm, natural female concierge
     VOICE_PROFILES = {
-        "en": "nova",
-        "ar": "nova",
-        "hi": "nova",
-        "ur": "nova"
+        "en": "21m00Tcm4TlvDq8ikWAM",  # Rachel (Warm, calm, luxury concierge)
+        "ar": "21m00Tcm4TlvDq8ikWAM",  # Multilingual Flash v2.5 native Arabic
+        "hi": "21m00Tcm4TlvDq8ikWAM",  # Multilingual Flash v2.5 native Hindi
+        "ur": "21m00Tcm4TlvDq8ikWAM"   # Multilingual Flash v2.5 native Urdu
     }
 
     @classmethod
@@ -31,47 +30,50 @@ class TTSService:
         voice: Optional[str] = None
     ) -> bytes:
         """
-        Synthesizes text into audio bytes (MP3/WAV format).
-        Uses cute, upbeat cheerleader voice profile (Nova / Marin).
+        Synthesizes text into audio bytes (MP3 format) using ElevenLabs Flash v2.5.
         """
-        async_client = LLMService.get_async_client()
-        # Default to nova (OpenAI's cute/cheerleader voice)
-        requested_voice = voice or cls.VOICE_PROFILES.get(language, "nova")
+        voice_id = voice or getattr(settings, "ELEVENLABS_VOICE_ID", "") or cls.VOICE_PROFILES.get(language, "21m00Tcm4TlvDq8ikWAM")
+        api_key = settings.ELEVENLABS_API_KEY
+        model_id = settings.TTS_MODEL or "eleven_flash_v2_5"
 
-        if async_client and settings.OPENAI_API_KEY:
+        if api_key:
             try:
-                # Use tts-1 model with 15-second timeout for snappy speech synthesis
-                model_to_use = "tts-1" if settings.TTS_MODEL == "gpt-4o-mini-tts" else settings.TTS_MODEL
-                
-                # Attempt synthesis with requested voice (e.g. marin or nova)
-                try:
-                    response = await async_client.audio.speech.create(
-                        model=model_to_use,
-                        voice=requested_voice,
-                        input=text,
-                        timeout=15.0
-                    )
-                except Exception as ve:
-                    # If OpenAI API endpoint doesn't support 'marin' yet, automatically fall back to 'nova'
-                    if "voice" in str(ve).lower() or requested_voice.lower() == "marin":
-                        logger.info(f"Voice '{requested_voice}' not supported by endpoint. Using cute cheerleader voice 'nova'.")
-                        response = await async_client.audio.speech.create(
-                            model=model_to_use,
-                            voice="nova",
-                            input=text,
-                            timeout=15.0
+                url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+                headers = {
+                    "xi-api-key": api_key,
+                    "Content-Type": "application/json",
+                    "Accept": "audio/mpeg"
+                }
+                params = {
+                    "output_format": "mp3_44100_128"
+                }
+                payload = {
+                    "text": text,
+                    "model_id": model_id,
+                    "voice_settings": {
+                        "stability": 0.5,
+                        "similarity_boost": 0.75
+                    }
+                }
+
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    response = await client.post(url, headers=headers, params=params, json=payload)
+                    if response.status_code == 200:
+                        audio_bytes = response.content
+                        logger.info(
+                            f"ElevenLabs Flash v2.5 synthesized {len(text)} chars in [{language}] "
+                            f"(voice={voice_id}, size={len(audio_bytes)} bytes)"
                         )
+                        return audio_bytes
                     else:
-                        raise ve
-
-                audio_bytes = await response.aread()
-                logger.info(f"TTS synthesized {len(text)} chars in [{language}] using cheerleader voice ({len(audio_bytes)} bytes)")
-                return audio_bytes
+                        logger.warning(
+                            f"ElevenLabs API returned status {response.status_code}: {response.text}. "
+                            f"Falling back to mock audio."
+                        )
             except Exception as e:
-                logger.warning(f"Live OpenAI TTS ({settings.TTS_MODEL}) error: {e}. Generating prototype audio fallback.")
+                logger.warning(f"Live ElevenLabs TTS ({model_id}) error: {e}. Generating prototype audio fallback.")
 
-        # Valid minimal WAV audio fallback (1 sec 44.1kHz mono silent/tone pulse)
-        # Allows frontend audio element to play without errors in offline dev mode
+        # Valid minimal audio fallback (for offline development/test runs)
         return cls._generate_mock_wav_audio()
 
     @staticmethod

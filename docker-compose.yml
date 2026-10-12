@@ -15,7 +15,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
       - LLM_MODEL=gpt-5-mini
       - STT_MODEL=gpt-live-transcribe
-      - TTS_MODEL=gpt-4o-mini-tts
+      - TTS_MODEL=eleven_flash_v2_5
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-21m00Tcm4TlvDq8ikWAM}
       - COMPANY_RETENTION_POLICY_REF=XOTO-CORP-RETENTION-POL-2024-V3
       - REGULATORY_SCOPE=UAE / Dubai / DIFC
       - MAX_DBR_RATIO=0.50
