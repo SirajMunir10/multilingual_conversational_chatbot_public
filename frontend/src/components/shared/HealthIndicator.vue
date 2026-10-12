@@ -9,7 +9,7 @@
     <div class="models-strip" v-if="health.models">
       <span class="model-tag"><strong class="tag-label">LLM:</strong> {{ health.models.llm }}</span>
       <span class="model-tag"><strong class="tag-label">STT:</strong> {{ health.models.stt }}</span>
-      <span class="model-tag"><strong class="tag-label">TTS:</strong> {{ health.models.tts }}</span>
+      <span class="model-tag"><strong class="tag-label">TTS:</strong> {{ health.models.tts }} <span v-if="health.models.voice" class="voice-label">({{ health.models.voice.split(' - ')[0] }})</span></span>
     </div>
   </div>
 </template>
@@ -22,7 +22,8 @@ const health = ref({
   models: {
     llm: 'gpt-5-mini',
     stt: 'gpt-live-transcribe',
-    tts: 'eleven_flash_v2_5'
+    tts: 'eleven_flash_v2_5',
+    voice: 'Horatius - Energetic Character voice'
   },
   availability_target_pct: 99.9
 })
@@ -107,6 +108,11 @@ onMounted(() => {
 
 .tag-label {
   color: var(--gold-light);
+}
+
+.voice-label {
+  color: var(--gold-light);
+  font-weight: 500;
 }
 
 @keyframes pulseDot {

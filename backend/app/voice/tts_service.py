@@ -14,12 +14,12 @@ class TTSService:
     """
 
     # Curated Voice IDs for ElevenLabs Flash v2.5
-    # Default is Rachel (21m00Tcm4TlvDq8ikWAM) - luxury, warm, natural female concierge
+    # Default is Horatius (qXpMhyvQqiRxWQs4qSSB) - Energetic Character voice
     VOICE_PROFILES = {
-        "en": "21m00Tcm4TlvDq8ikWAM",  # Rachel (Warm, calm, luxury concierge)
-        "ar": "21m00Tcm4TlvDq8ikWAM",  # Multilingual Flash v2.5 native Arabic
-        "hi": "21m00Tcm4TlvDq8ikWAM",  # Multilingual Flash v2.5 native Hindi
-        "ur": "21m00Tcm4TlvDq8ikWAM"   # Multilingual Flash v2.5 native Urdu
+        "en": "qXpMhyvQqiRxWQs4qSSB",  # Horatius (Energetic, confident character voice)
+        "ar": "qXpMhyvQqiRxWQs4qSSB",  # Multilingual Flash v2.5 native Arabic
+        "hi": "qXpMhyvQqiRxWQs4qSSB",  # Multilingual Flash v2.5 native Hindi
+        "ur": "qXpMhyvQqiRxWQs4qSSB"   # Multilingual Flash v2.5 native Urdu
     }
 
     @classmethod
@@ -32,7 +32,7 @@ class TTSService:
         """
         Synthesizes text into audio bytes (MP3 format) using ElevenLabs Flash v2.5.
         """
-        voice_id = voice or getattr(settings, "ELEVENLABS_VOICE_ID", "") or cls.VOICE_PROFILES.get(language, "21m00Tcm4TlvDq8ikWAM")
+        voice_id = voice or getattr(settings, "ELEVENLABS_VOICE_ID", "") or cls.VOICE_PROFILES.get(language, "qXpMhyvQqiRxWQs4qSSB")
         api_key = settings.ELEVENLABS_API_KEY
         model_id = settings.TTS_MODEL or "eleven_flash_v2_5"
 

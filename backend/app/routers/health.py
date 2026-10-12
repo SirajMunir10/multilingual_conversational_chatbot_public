@@ -18,6 +18,8 @@ def get_system_health():
             "llm": settings.LLM_MODEL,
             "stt": settings.STT_MODEL,
             "tts": settings.TTS_MODEL,
+            "voice": settings.ELEVENLABS_VOICE_NAME,
+            "voice_id": settings.ELEVENLABS_VOICE_ID,
             "v2v_pipeline": f"{settings.STT_MODEL} -> {settings.LLM_MODEL} -> {settings.TTS_MODEL}"
         },
         "gateways": {

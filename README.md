@@ -30,7 +30,7 @@ XO is an enterprise-grade embedded conversational AI assistant designed for real
 | **Containerization** | Docker & Docker Compose | Multi-container architecture (`docker-compose.yml`); no venv deployment |
 | **AI / LLM** | OpenAI `gpt-5-mini` | High-reasoning language model, system persona guardrails, function calling |
 | **Speech-to-Text (STT)**| OpenAI `gpt-live-transcribe` | Real-time audio transcription across EN, AR, HI, UR |
-| **Text-to-Speech (TTS)**| ElevenLabs `eleven_flash_v2_5` | Ultra-low latency neural voice synthesis across EN, AR, HI, UR |
+| **Text-to-Speech (TTS)**| ElevenLabs `eleven_flash_v2_5` | Voice: Horatius (`qXpMhyvQqiRxWQs4qSSB`) - Energetic Character voice across EN, AR, HI, UR |
 | **Voice Architecture** | Composed STT → LLM → TTS | Shared conversation orchestrator; identical business logic for text & voice |
 | **Knowledge / RAG** | Vector DB & Embeddings | Scoped vector retrieval, cosine similarity, reranking, query caching |
 | **Financial Engine** | Deterministic Calculation Service | Python math engine using UAE Central Bank rules (DBR, LTV, salary caps) |

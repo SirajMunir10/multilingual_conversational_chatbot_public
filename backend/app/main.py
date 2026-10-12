@@ -49,6 +49,6 @@ def root():
 @app.on_event("startup")
 async def on_startup():
     logger.info(f"Starting {settings.APP_NAME}")
-    logger.info(f"Active Models: LLM={settings.LLM_MODEL}, STT={settings.STT_MODEL}, TTS={settings.TTS_MODEL} (ElevenLabs Flash v2.5)")
+    logger.info(f"Active Models: LLM={settings.LLM_MODEL}, STT={settings.STT_MODEL}, TTS={settings.TTS_MODEL} (ElevenLabs Flash v2.5 - Voice: {settings.ELEVENLABS_VOICE_NAME} [{settings.ELEVENLABS_VOICE_ID}])")
     logger.info(f"Compliance Standard: {settings.REGULATORY_SCOPE} (Policy: {settings.COMPANY_RETENTION_POLICY_REF})")
     logger.info("Data Access Boundary: ZERO direct database connections enabled. All I/O scoped through API Gateways.")

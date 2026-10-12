@@ -22,7 +22,8 @@ class AppSettings(BaseModel):
     STT_MODEL: str = Field(default_factory=lambda: os.getenv("STT_MODEL", "gpt-live-transcribe"))
     TTS_MODEL: str = Field(default_factory=lambda: os.getenv("TTS_MODEL", "eleven_flash_v2_5"))
     ELEVENLABS_API_KEY: str = Field(default_factory=lambda: os.getenv("ELEVENLABS_API_KEY", ""))
-    ELEVENLABS_VOICE_ID: str = Field(default_factory=lambda: os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"))
+    ELEVENLABS_VOICE_ID: str = Field(default_factory=lambda: os.getenv("ELEVENLABS_VOICE_ID", "qXpMhyvQqiRxWQs4qSSB"))
+    ELEVENLABS_VOICE_NAME: str = Field(default_factory=lambda: os.getenv("ELEVENLABS_VOICE_NAME", "Horatius - Energetic Character voice"))
     EMBEDDING_MODEL: str = Field(default_factory=lambda: os.getenv("EMBEDDING_MODEL", "text-embedding-3-small"))
     OPENAI_API_KEY: str = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
 
