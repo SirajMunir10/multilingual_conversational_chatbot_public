@@ -150,7 +150,18 @@ class ConversationOrchestrator:
             "speak with advisor", "talk to human", "talk to agent", "connect me", "transfer me",
             "speak to human", "speak to an agent", "human please", "talk to a person", "advisor please",
             "مستشار", "وكيل", "تحدث مع موظف", "تحدث مع إنسان", "إنسان", "موظف",
-            "एजेंट", "सलाहकार", "इंसान", "बात करनी है", "ایجنٹ", "مشیر", "انسان سے بات"
+            "एजेंट", "सलाहकार", "इंसान", "बात करनी है", "ایجنٹ", "مشیر", "انسان سے بات",
+            "humain", "conseiller", "représentant", "parler à un conseiller", "parler à un humain",
+            "humano", "asesor", "agente", "hablar con un agente", "hablar con un humano",
+            "mensch", "berater", "makler", "mit einem berater sprechen", "mit einem menschen sprechen",
+            "人工", "客服", "房产顾问", "经纪人", "转人工", "人工服务",
+            "ahente", "tagapayo", "kausapin ang tao", "makipag-usap sa tao",
+            "مشاور", "کارشناس", "صحبت با مشاور", "صحبت با انسان", "نماینده", "اپراتور",
+            "এজেন্ট", "পরামর্শদাতা", "মানুষের সাথে কথা", "উপদেষ্টা",
+            "முகவர்", "ஆலோசகர்", "மனிதர்", "பேச வேண்டும்",
+            "ਸਲਾਹਕਾਰ", "ਇਨਸਾਨ ਨਾਲ ਗੱਲ", "ਨੁਮਾਇੰਦਾ",
+            "ഏജന്റ്", "ഉപദേശകൻ", "മനുഷ്യൻ", "സംസാരിക്കണം",
+            "ପରାମର୍ଶଦାତା", "ମଣିଷ ସହିତ କଥା"
         ]
         if any(kw in lowered for kw in handoff_kw):
             return "human_handoff"
@@ -161,7 +172,18 @@ class ConversationOrchestrator:
             "view shortlist", "view my shortlist", "show shortlist", "show my shortlist",
             "saved shortlist", "my favorites", "my inquiries", "my saved", "saved homes",
             "shortlisted properties", "حسابي", "طلباتي", "عقاراتي", "عقاراتي المحفوظة",
-            "قائمتي المحفوظة", "मेरा स्टेटस", "मेरी सेव की गई", "میری محفوظ"
+            "قائمتي المحفوظة", "मेरा स्टेटस", "मेरी सेव की गई", "میری محفوظ",
+            "mon dossier", "mes favoris", "mes biens enregistrés", "ma sélection",
+            "mi solicitud", "mis favoritos", "mis propiedades guardadas",
+            "meine anfrage", "gespeicherte immobilien", "meine favoriten",
+            "我的申请", "收藏的房产", "我的收藏", "房产清单",
+            "aking aplikasyon", "mga naka-save na ari-arian",
+            "درخواست من", "املاک ذخیره شده", "علاقه‌مندی‌های من",
+            "আমার সংরক্ষিত", "সংরক্ষিত সম্পত্তি",
+            "என் சேமிக்கப்பட்ட",
+            "ਮੇਰੀਆਂ ਸੁਰੱਖਿਅਤ",
+            "എന്റെ പ്രോപ്പർട്ടികൾ",
+            "ମୋର ସଂରକ୍ଷିତ"
         ]
         if any(kw in lowered for kw in account_kw):
             return "account"
@@ -173,18 +195,57 @@ class ConversationOrchestrator:
             "what do you suggest", "which should i buy", "which one should i buy", "which is better",
             "which should i be buying", "compare", "comparison", "most beneficial", "better investment",
             "which to buy", "should i buy", "which would you recommend",
-            "اي واحد", "مقارنة", "أيهما أفضل", "أفضل للاستثمار", "तुलना", "कौन सा बेहतर", "موازنہ", "کون سا بہتر"
+            "اي واحد", "مقارنة", "أيهما أفضل", "أفضل للاستثمار", "तुलना", "कौन सा बेहतर", "موازنہ", "کون سا بہتر",
+            "comparer", "lequel choisir", "lequel est meilleur", "quel est le meilleur",
+            "comparar", "cuál es mejor", "cuál de estos", "cuál debería comprar",
+            "vergleichen", "welches ist besser", "welches soll ich kaufen",
+            "对比", "比较", "哪一个更好", "应该买哪个",
+            "ihambing", "alin ang mas maganda",
+            "مقایسه", "کدام بهتر است", "کدام را بخرم",
+            "তুলনা", "কোনটি ভালো",
+            "ஒப்பீடு", "எது சிறந்தது",
+            "ਮੁਕਾਬਲਾ", "ਕਿਹੜਾ ਬਿਹਤਰ ਹੈ",
+            "താരതമ്യം", "ഏതാണ് നല്ലത്",
+            "ତୁଳନା", "କେଉଁଟି ଭଲ"
         ]
         if bool(session.last_recommended_properties) and any(kw in lowered for kw in comparison_kw):
             return "property_comparison"
 
         # Mortgage intent keywords
-        mortgage_kw = ["emi", "monthly payment", "mortgage", "afford", "affordability", "interest rate", "loan", "down payment", "dbr", "قرض", "تمويل", "رهن", "دفعة شهرية", "किस्त", "लोन", "مارگیج"]
+        mortgage_kw = [
+            "emi", "monthly payment", "mortgage", "afford", "affordability", "interest rate", "loan", "down payment", "dbr",
+            "قرض", "تمويل", "رهن", "دفعة شهرية", "किस्त", "लोन", "مارگیج",
+            "hypothèque", "prêt", "taux d'intérêt", "mensualité", "crédit immobilier",
+            "hipoteca", "préstamo", "tasa de interés", "pago mensual",
+            "hypothek", "kredit", "zinssatz", "monatliche rate", "darlehen",
+            "房贷", "贷款", "按揭", "月供", "利率",
+            "sangla", "utang", "buwanang bayad",
+            "وام مسکن", "وام", "اقساط", "نرخ بهره", "پرداخت ماهیانه",
+            "বন্ধক", "ঋণ", "গৃহঋণ",
+            "கடன்", "மாத தவணை",
+            "ਕਰਜ਼ਾ", "ਕਿਸ਼ਤ",
+            "വായ്പ", "പ്രതിമാസ അടവ്",
+            "ଋଣ", "ମାସିକ କିସ୍ତି"
+        ]
         if any(kw in lowered for kw in mortgage_kw):
             return "mortgage"
 
         # Property intent keywords
-        property_kw = ["bedroom", "bed", "br", "apartment", "villa", "townhouse", "penthouse", "studio", "downtown", "marina", "hills", "property", "buy", "rent", "invest", "residence", "residences", "شقة", "فيلا", "عقار", "شراء", "إيجار", "फ्लैट", "پراپرٹی"]
+        property_kw = [
+            "bedroom", "bed", "br", "apartment", "villa", "townhouse", "penthouse", "studio", "downtown", "marina", "hills", "property", "buy", "rent", "invest", "residence", "residences",
+            "شقة", "فيلا", "عقار", "شراء", "إيجار", "फ्लैट", "پراپرٹی",
+            "chambre", "appartement", "propriété", "acheter", "louer", "immobilier",
+            "habitación", "apartamento", "departamento", "propiedad", "comprar", "alquilar",
+            "schlafzimmer", "wohnung", "immobilie", "kaufen", "mieten",
+            "卧室", "公寓", "别墅", "房产", "买房", "租房", "住宅",
+            "kuwarto", "bahay", "lupa", "bumili", "umupa",
+            "اتاق", "آپارتمان", "ویلا", "ملک", "خرید", "اجاره",
+            "বেডরুম", "অ্যাপার্টমেন্ট", "বাড়ি", "ক্রয়",
+            "படுக்கையறை", "அபார்ட்மெண்ட்", "வீடு", "வாங்க",
+            "ਬੈੱਡਰੂਮ", "ਅਪਾਰਟਮੈਂਟ", "ਘਰ", "ਖਰੀਦਣਾ",
+            "മുറി", "അപ്പാർട്ട്മെന്റ്", "വീട്", "വാങ്ങുക",
+            "ରୁମ", "ଫ୍ଲାଟ", "ଘର", "କିଣିବା"
+        ]
         if any(kw in lowered for kw in property_kw):
             return "property"
 
@@ -207,12 +268,12 @@ class ConversationOrchestrator:
         lowered = text.lower()
 
         # Extract bedrooms
-        bed_match = re.search(r'(\d+)\s*(?:bed|bedroom|br|bhk|غرف)', lowered)
+        bed_match = re.search(r'(\d+)\s*(?:bed|bedroom|br|bhk|غرف|غرفة|chambres?|dormitorios?|zimmer|房|室|kuwarto|اتاق|ঘর|படுக்கையறை|ਕਮਰਾ|മുറി|ରୁମ)', lowered)
         if bed_match:
             session.slots.property_beds = int(bed_match.group(1))
 
         # Extract budget / numbers with suffixes (e.g. 800k, 1.5m)
-        num_k = re.search(r'(\d+(?:\.\d+)?)\s*(?:k|thousand|ألف|हज़ार)', lowered)
+        num_k = re.search(r'(\d+(?:\.\d+)?)\s*(?:k|thousand|ألف|हज़ार|হাজার|ஆயிரம்|हजार|kilo|mil|tausend|هزار)', lowered)
         if num_k:
             val = float(num_k.group(1)) * 1000
             if session.active_intent == "property":
@@ -220,13 +281,13 @@ class ConversationOrchestrator:
             elif session.active_intent == "mortgage":
                 session.slots.mortgage_income = val
 
-        num_m = re.search(r'(\d+(?:\.\d+)?)\s*(?:m|million|مليون|मिलियन)', lowered)
+        num_m = re.search(r'(\d+(?:\.\d+)?)\s*(?:m|million|مليون|मिलियन|মিলিয়ন|மில்லியன்|میلیون|milhão|millones|mio|万|亿)', lowered)
         if num_m:
             val = float(num_m.group(1)) * 1000000
             session.slots.property_budget_max = val
 
         # Specific Mortgage Income slot extraction (e.g., "earn 25000 AED", "salary 30,000", "25000 per month")
-        income_match = re.search(r'(?:earn|salary|income|راتب|دخل|मासिक आय|آمدنی)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9,]+)', lowered)
+        income_match = re.search(r'(?:earn|salary|income|راتب|دخل|मासिक आय|آمدنی|salaire|sueldo|gehalt|收入|sweldo|حقوق|বেতন|வருமானம்|ਤਨਖਾਹ|ശമ്പളം|ଦରମା)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9,]+)', lowered)
         if income_match:
             session.slots.mortgage_income = float(income_match.group(1).replace(',', ''))
         else:
@@ -235,7 +296,7 @@ class ConversationOrchestrator:
                 session.slots.mortgage_income = float(monthly_match.group(1).replace(',', ''))
 
         # Specific Mortgage Debt slot extraction (e.g., "2000 AED car loan debt", "debt of 1500")
-        debt_match = re.search(r'(?:debt|car loan|loan debt|liabilities|ديون|التزامات|कर्ज|واجبات)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9,]+)', lowered)
+        debt_match = re.search(r'(?:debt|car loan|loan debt|liabilities|ديون|التزامات|कर्ज|واجبات|dette|deuda|schulden|负债|utang|بدهی|ঋণ|கடன்|ਕਰਜ਼ਾ|കടം|ଋଣ)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9,]+)', lowered)
         if debt_match:
             session.slots.mortgage_existing_debt = float(debt_match.group(1).replace(',', ''))
         else:
@@ -244,13 +305,15 @@ class ConversationOrchestrator:
                 session.slots.mortgage_existing_debt = float(debt_match_alt.group(1).replace(',', ''))
 
         # Down payment extraction (e.g., "200000 down payment", "down payment 20%")
-        dp_match = re.search(r'(?:down payment|downpayment|equity|دفعة أولى|ڈاؤن پیمنٹ)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9,]+)', lowered)
+        dp_match = re.search(r'(?:down payment|downpayment|equity|دفعة أولى|ڈاؤن پیمنٹ|apport|pago inicial|anzahlung|首付|paunang bayad|پیش پرداخت|ডাউন পেমেন্ট|முன்பணம்|ਡਾਊਨ ਪੇਮੈਂਟ|ഡൗൺ പേയ്മെന്റ്|ଅଗ୍ରୀମ)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9,]+)', lowered)
         if dp_match:
             session.slots.mortgage_down_payment = float(dp_match.group(1).replace(',', ''))
 
         # Extract property type
         for ptype in ["apartment", "villa", "townhouse", "penthouse"]:
-            if ptype in lowered or ("شقة" in text and ptype == "apartment") or ("فيلا" in text and ptype == "villa"):
+            if ptype in lowered or \
+               ("شقة" in text or "appartement" in lowered or "apartamento" in lowered or "wohnung" in lowered or "公寓" in text or "آپارتمان" in text or "অ্যাপার্টমেন্ট" in text or "அபார்ட்மெண்ட்" in text) and ptype == "apartment" or \
+               ("فيلا" in text or "villa" in lowered or "chalet" in lowered or "别墅" in text or "ویلا" in text or "বাড়ি" in text or "வீடு" in text) and ptype == "villa":
                 session.slots.property_type = ptype
 
         # Check for general "other property" requests to broaden search
@@ -338,6 +401,19 @@ class ConversationOrchestrator:
                 messages = [{"role": "system", "content": system_prompt}]
                 for m in session.messages[-8:]:
                     messages.append({"role": m.role, "content": m.content})
+
+                if lang != "en":
+                    locales = LanguageDetector.get_supported_locales()
+                    lang_info = locales.get(lang, {"name": lang, "native": lang})
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            f"MANDATORY LANGUAGE DIRECTIVE: The user has selected {lang_info.get('name', lang)} ({lang_info.get('native', lang)}). "
+                            f"You MUST generate your entire response 100% in {lang_info.get('name', lang)} using its native script ({lang_info.get('native', lang)}). "
+                            f"Under NO circumstances should you reply in English or claim you can only speak English. "
+                            f"Proceed enthusiastically in {lang_info.get('name', lang)}."
+                        )
+                    })
 
                 tool_choice = "auto"
                 comp_data = None
@@ -1096,6 +1172,17 @@ class ConversationOrchestrator:
                 "ar": "أهلاً بك! بكل سرور، يسعدني جداً التحدث معك باللغة العربية! 🎉 كيف يمكنني مساعدتك اليوم بخصوص عقارات دبي أو حساب التمويل العقاري؟",
                 "hi": "नमस्ते! मुझे आपके साथ हिंदी में बातचीत करने में बहुत खुशी होगी! 🎉 आज मैं आपकी क्या सहायता कर सकता हूँ?",
                 "ur": "خوش آمدید! مجھے آپ سے اردو میں بات چیت کر کے بہت خوشی ہو رہی ہے! 🎉 آج میں دبئی میں پراپرٹیز یا مارگیج کے حوالے سے آپ کی کیا مدد کر سکتا ہوں؟",
+                "fr": "Bienvenue ! Je suis ravi d'échanger avec vous en français ! 🎉 Comment puis-je vous aider aujourd'hui concernant l'immobilier ou les prêts aux Émirats ?",
+                "es": "¡Bienvenido! ¡Me encanta hablar contigo en español! 🎉 ¿Cómo puedo ayudarte hoy con propiedades o hipotecas en los EAU?",
+                "de": "Herzlich willkommen! Ich freue mich sehr, mich auf Deutsch mit Ihnen zu unterhalten! 🎉 Wie kann ich Ihnen heute bei Immobilien oder Hypotheken in den VAE helfen?",
+                "zh": "欢迎！非常高兴用中文与您交流！🎉 今天我可以在阿联酋房产或房贷方面为您提供什么帮助？",
+                "tl": "Maligayang pagdating! Masaya akong makipag-usap sa iyo sa Tagalog! 🎉 Paano kita matutulungan ngayon tungkol sa mga ari-arian o mortgage sa UAE?",
+                "ta": "வணக்கம்! உங்களுடன் தமிழில் உரையாடுவதில் மிக்க மகிழ்ச்சி! 🎉 யுஏஇ சொத்துக்கள் அல்லது வீட்டுக் கடன் தொடர்பாக இன்று நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?",
+                "fa": "خوش آمدید! بسیار خوشحالم که می‌توانم با شما به زبان فارسی گفتگو کنم! 🎉 امروز چگونه می‌توانم در زمینه املاک یا وام مسکن در امارات به شما کمک کنم؟",
+                "bn": "স্বাগতম! আপনার সাথে বাংলায় কথা বলতে পেরে আমি আনন্দিত! 🎉 সংযুক্ত আরব আমিরাতের প্রপার্টি বা মর্টগেজ বিষয়ে আজ আপনাকে কীভাবে সাহায্য করতে পারি?",
+                "pa": "ਜੀ ਆਇਆਂ ਨੂੰ! ਤੁਹਾਡੇ ਨਾਲ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲ ਕਰਕੇ ਬਹੁਤ ਖੁਸ਼ੀ ਹੋਈ! 🎉 ਅੱਜ ਮੈਂ ਯੂਏਈ ਵਿੱਚ ਜਾਇਦਾਦ ਜਾਂ ਮੌਰਗੇਜ ਸੰਬੰਧੀ ਤੁਹਾਡੀ ਕੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?",
+                "ml": "സ്വാഗതം! നിങ്ങളുമായി മലയാളത്തിൽ സംസാരിക്കുന്നതിൽ എനിക്ക് അതിയായ സന്തോഷമുണ്ട്! 🎉 യുഎഇ പ്രോപ്പർട്ടികൾ അല്ലെങ്കിൽ മോർട്ട്ഗേജ് സംബന്ധിച്ച് ഇന്ന് ഞാൻ നിങ്ങളെ എങ്ങനെ സഹായിക്കണം?",
+                "or": "ସ୍ଵାଗତ! ଆପଣଙ୍କ ସହିତ ଓଡ଼ିଆରେ କଥାବାର୍ତ୍ତା କରିବାକୁ ପାଇ ମୁଁ ବହୁତ ଖୁସି! 🎉 ଆଜି ମୁଁ ୟୁଏଇ ପ୍ରପର୍ଟି କିମ୍ବା ମର୍ଗେଜ୍ ସମ୍ବନ୍ଧରେ ଆପଣଙ୍କୁ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?",
                 "en": "Welcome! I'm thrilled to chat with you in English! 🎉 How can I assist you today with premier UAE properties or mortgage financing?"
             }
             return {
@@ -1527,6 +1614,17 @@ class ConversationOrchestrator:
                 "ar": "لا توجد حالياً بطاقات عقارات معروضة على الشاشة للمقارنة. يرجى البحث عن عقارات أولاً (مثال: 'ابحث عن شقة غرفتين في دبي هيلز').",
                 "hi": "तुलना करने के लिए स्क्रीन पर कोई प्रॉपर्टी कार्ड उपलब्ध नहीं है। कृपया पहले प्रॉपर्टी सर्च करें (उदा. 'दुबई हिल्स में 2 BHK दिखाओ')।",
                 "ur": "موازنہ کرنے کے لیے اسکرین پر کوئی پراپرٹی کارڈ موجود نہیں ہے۔ براہ کرم پہلے سرچ کریں (مثال: 'دبئی ہلز میں 2 بی ایچ کے دکھائیں')۔",
+                "fr": "Aucune carte de propriété n'est actuellement affichée à l'écran pour comparaison. Veuillez d'abord rechercher un bien.",
+                "es": "Actualmente no hay fichas de propiedades en pantalla para comparar. Por favor, busque propiedades primero.",
+                "de": "Derzeit werden keine Immobilienkarten zum Vergleich angezeigt. Bitte suchen Sie zuerst nach Immobilien.",
+                "zh": "当前屏幕上没有可供对比的房产卡片。请先搜索房产（例如：'搜索迪拜山庄的两居室'）。",
+                "tl": "Kasalukuyang walang mga property card sa screen para ihambing. Mangyaring maghanap muna ng ari-arian.",
+                "fa": "در حال حاضر هیچ کارت ملکی برای مقایسه روی صفحه نمایش وجود ندارد. لطفاً ابتدا ملکی را جستجو کنید.",
+                "bn": "তুলনা করার জন্য স্ক্রিনে বর্তমানে কোনো প্রপার্টি কার্ড নেই। দয়া করে প্রথমে প্রপার্টি অনুসন্ধান করুন।",
+                "ta": "ஒப்பிடுவதற்கு திரையில் சொத்து அட்டைகள் எதுவும் இல்லை. முதலில் சொத்தைத் தேடுங்கள்.",
+                "pa": "ਮੁਕਾਬਲੇ ਲਈ ਸਕ੍ਰੀਨ 'ਤੇ ਕੋਈ ਪ੍ਰਾਪਰਟੀ ਕਾਰਡ ਨਹੀਂ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਪਹਿਲਾਂ ਪ੍ਰਾਪਰਟੀ ਖੋਜੋ।",
+                "ml": "താരതമ്യം ചെയ്യാൻ സ്ക്രീനിൽ നിലവിൽ പ്രോപ്പർട്ടി കാർഡുകളൊന്നുമില്ല. ആദ്യം ഒരു പ്രോപ്പർട്ടി തിരയുക.",
+                "or": "ତୁଳନା କରିବାକୁ ସ୍କ୍ରିନରେ ବର୍ତ୍ତମାନ କୌଣସି ପ୍ରପର୍ଟି କାର୍ଡ ନାହିଁ। ଦୟାକରି ପ୍ରଥମେ ପ୍ରପର୍ଟି ଖୋଜନ୍ତୁ।",
                 "en": "There are currently no active property cards on screen to compare. Please search for a community or property first (e.g. 'Show 2 BHK in Dubai Hills'), and I will gladly evaluate them for you."
             }
             return empty_msgs.get(lang, empty_msgs["en"])
@@ -1535,6 +1633,17 @@ class ConversationOrchestrator:
             "ar": "\n\n*(مقارنة سوقية استرشادية فقط؛ وليست استشارة مالية ملزمة)*",
             "hi": "\n\n*(केवल सांकेतिक बाज़ार तुलना; कोई बाध्यकारी वित्तीय सलाह नहीं)*",
             "ur": "\n\n*(صرف اشارے کے طور پر مارکیٹ کا موازنہ؛ کوئی قانونی یا مالی مشورہ نہیں)*",
+            "fr": "\n\n*(Comparaison indicative du marché uniquement ; aucun conseil financier contraignant)*",
+            "es": "\n\n*(Solo comparación indicativa de mercado; no es asesoramiento financiero vinculante)*",
+            "de": "\n\n*(Nur indikativer Marktvergleich; keine verbindliche Finanzberatung)*",
+            "zh": "\n\n*（仅供参考的市场对比；不构成具有约束力的财务建议）*",
+            "tl": "\n\n*(Pahiwatig lamang na paghahambing sa merkado; hindi nagbubuklod na payo sa pananalapi)*",
+            "fa": "\n\n*(صرفاً مقایسه بازار به صورت تقریبی؛ هیچ‌گونه مشاوره مالی الزام‌آور نیست)*",
+            "bn": "\n\n*(केवल নির্দেশক বাজার তুলনা; কোন বাধ্যতামূলক আর্থিক পরামর্শ নয়)*",
+            "ta": "\n\n*(சுட்டிக்காட்டும் சந்தை ஒப்பீடு மட்டுமே; பிணைப்பு நிதி ஆலோசனை அல்ல)*",
+            "pa": "\n\n*(ਸਿਰਫ਼ ਸੰਕੇਤਕ ਮਾਰਕੀਟ ਤੁਲਨਾ; ਕੋਈ ਪਾਬੰਦ ਵਿੱਤੀ ਸਲਾਹ ਨਹੀਂ)*",
+            "ml": "\n\n*(സൂചകമായ മാർക്കറ്റ് താരതമ്യം മാത്രം; ബാധ്യസ്ഥമായ സാമ്പത്തിക ഉപദേശമല്ല)*",
+            "or": "\n\n*(କେବଳ ସୂଚକ ବଜାର ତୁଳନା; କୌଣସି ବାଧ୍ୟତାମୂଳକ ଆର୍ଥିକ ପରାମର୍ଶ ନୁହେଁ)*",
             "en": "\n\n*(Indicative market comparison only; not binding financial advice)*"
         }
         disc = disclaimers.get(lang, disclaimers["en"])

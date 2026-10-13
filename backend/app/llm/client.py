@@ -255,9 +255,11 @@ CRITICAL OPERATIONAL RULES:
 3. FINANCIAL OUTPUT DISCLAIMERS (Rule 10): All calculator outputs are strictly "estimates, not offers". Whenever presenting financial results, you MUST include the statement: "estimate only, subject to lender approval".
 4. NO PAYMENT SCOPE (Rule 8): You NEVER request, collect, or process payment details (credit cards, IBANs, bank accounts). If asked, state that payments are outside XO's scope.
 5. NO BINDING LEGAL OR FINANCIAL ADVICE (FR-6): Provide guidance and indicative information only; never give binding legal or financial advice.
-6. SLOT FILLING (FR-4): If information is missing (e.g. beds, budget, income), ask polite, guided clarifying questions instead of guessing.
-7. LANGUAGE CONSISTENCY & OVERRIDE (FR-1): The user's active session language is MANDATORY: {language}. You MUST ALWAYS generate your reply strictly in {language}, even if the user typed their message in a different language. If {language} is Arabic, respond in Arabic. If Hindi, respond in Hindi. If Urdu, respond in Urdu.
-8. MIXED INTENTS (FR-3): Seamlessly transition between property discovery and mortgage affordability without restarting the conversation.
+7. MULTILINGUAL MASTERY & CONSISTENCY (FR-1):
+   - You natively and fluently support 15 languages: English, Arabic (العربية), Hindi (हिन्दी), Urdu (اردو), French (Français), Spanish (Español), German (Deutsch), Simplified Chinese (简体中文), Tagalog (Filipino), Persian (فارسی), Bengali (বাংলা), Tamil (தமிழ்), Punjabi (ਪੰਜਾਬੀ), Malayalam (മലയാളം), and Odia (ଓଡ଼ିଆ).
+   - The user's active session language is MANDATORY: {language}.
+   - You MUST ALWAYS generate your reply strictly and natively in {language}, using its native script and natural colloquial flow.
+   - If the user asks to speak or switch to {language} (or any of the 15 supported languages), warmly acknowledge and immediately proceed 100% in {language}. NEVER claim that you must stay in English, that you cannot speak {language}, or that {language} is unsupported.
 9. OUT-OF-SCOPE REDIRECTION (FR-6): Gracefully decline non-business or out-of-scope inquiries and redirect back to properties, mortgages, or Xoto services.
 10. HUMAN HANDOFF (FR-5): If the user requests a human, or if you cannot resolve their question, offer an immediate handoff to our specialist team.
 11. PROPERTY COMPARISON & EVALUATION (FR-9): When the user asks to compare, evaluate, or choose between properties already displayed on their screen (e.g. 'which one should I buy?', 'which is better for investment?'), do NOT re-search the database. Evaluate the on-screen properties side-by-side using the provided deterministic metrics (price, sq.ft, price/sq.ft, monthly EMI, rental yields). Highlight the trade-offs between cash-flow rental yield and long-term capital appreciation, and include the disclaimer: '(Indicative market comparison only; not binding financial advice)'.
@@ -281,7 +283,23 @@ PERSONALITY & VIBE (CHEERLEADER & CUTE PERSONA):
 class LLMService:
     @classmethod
     def get_system_prompt(cls, language: str = "en") -> str:
-        lang_names = {"en": "English", "ar": "Arabic (العربية)", "hi": "Hindi (हिन्दी)", "ur": "Urdu (اردو)"}
+        lang_names = {
+            "en": "English",
+            "ar": "Arabic (العربية)",
+            "hi": "Hindi (हिन्दी)",
+            "ur": "Urdu (اردو)",
+            "fr": "French (Français)",
+            "es": "Spanish (Español)",
+            "de": "German (Deutsch)",
+            "zh": "Simplified Chinese / Mandarin (简体中文)",
+            "tl": "Tagalog / Filipino",
+            "ta": "Tamil (தமிழ்)",
+            "fa": "Persian / Farsi (فارسی)",
+            "bn": "Bengali (বাংলা)",
+            "pa": "Punjabi (ਪੰਜਾਬੀ)",
+            "ml": "Malayalam (മലയാളം)",
+            "or": "Odia (ଓଡ଼ିଆ)"
+        }
         return SYSTEM_PROMPT_TEMPLATE.format(language=lang_names.get(language, "English"))
 
     @classmethod

@@ -38,8 +38,12 @@ class AppSettings(BaseModel):
     VAULT_API_URL: str = Field(default_factory=lambda: os.getenv("VAULT_API_URL", ""))
     VAULT_API_KEY: str = Field(default_factory=lambda: os.getenv("VAULT_API_KEY", ""))
 
-    # Launch Languages
-    LAUNCH_LANGUAGES: List[str] = ["en", "ar", "hi", "ur"]
+    # Launch Languages (Expanded 15 Locales)
+    LAUNCH_LANGUAGES: List[str] = [
+        "en", "ar", "hi", "ur",
+        "bn", "ml", "tl", "fa", "ta", "pa", "or",
+        "fr", "es", "de", "zh"
+    ]
 
     # Latency Targets (PRD Section 7)
     PERCEIVED_LATENCY_TARGET_SEC: float = 2.0

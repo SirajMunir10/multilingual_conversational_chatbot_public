@@ -10,7 +10,7 @@
           </span>
           <h2 class="hero-title">Experience Smarter Property Discovery &amp; Instant Mortgages</h2>
           <p class="hero-desc">
-            Meet XO, your dedicated futuristic AI companion for discovering premier luxury properties, calculating real-time mortgage affordability, and navigating UAE Central Bank regulations in English, Arabic, Hindi, and Urdu.
+            Meet XO, your dedicated futuristic AI companion for discovering premier luxury properties, calculating real-time mortgage affordability, and navigating UAE Central Bank regulations across 15 global and regional languages.
           </p>
           
           <div class="hero-actions">
@@ -56,7 +56,7 @@
         <div class="feature-card">
           <div class="feature-icon">🎙️</div>
           <h3>Voice &amp; Multilingual</h3>
-          <p>Seamless voice-to-voice with native speech synthesis across English, Arabic (العربية), Hindi, and Urdu.</p>
+          <p>Seamless voice-to-voice with native speech synthesis across 15 languages including English, Arabic, Hindi, Urdu, and French.</p>
         </div>
       </div>
     </div>

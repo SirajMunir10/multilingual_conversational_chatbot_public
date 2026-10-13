@@ -20,7 +20,7 @@
         <span class="tip-icon">🎙️</span>
         <div>
           <strong>Voice Interaction:</strong>
-          <p>Tap the microphone to speak naturally in English, Arabic, Hindi, or Urdu.</p>
+          <p>Tap the microphone to speak naturally in any of the 15 supported languages.</p>
         </div>
       </div>
 

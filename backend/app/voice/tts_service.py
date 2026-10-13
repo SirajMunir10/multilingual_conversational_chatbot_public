@@ -16,10 +16,21 @@ class TTSService:
     # Curated Voice IDs for ElevenLabs Flash v2.5
     # Default is Horatius (qXpMhyvQqiRxWQs4qSSB) - Energetic Character voice
     VOICE_PROFILES = {
-        "en": "qXpMhyvQqiRxWQs4qSSB",  # Horatius (Energetic, confident character voice)
-        "ar": "qXpMhyvQqiRxWQs4qSSB",  # Multilingual Flash v2.5 native Arabic
-        "hi": "qXpMhyvQqiRxWQs4qSSB",  # Multilingual Flash v2.5 native Hindi
-        "ur": "qXpMhyvQqiRxWQs4qSSB"   # Multilingual Flash v2.5 native Urdu
+        "en": "qXpMhyvQqiRxWQs4qSSB",  # English
+        "ar": "qXpMhyvQqiRxWQs4qSSB",  # Arabic
+        "hi": "qXpMhyvQqiRxWQs4qSSB",  # Hindi
+        "ur": "qXpMhyvQqiRxWQs4qSSB",  # Urdu
+        "fr": "qXpMhyvQqiRxWQs4qSSB",  # French
+        "es": "qXpMhyvQqiRxWQs4qSSB",  # Spanish
+        "de": "qXpMhyvQqiRxWQs4qSSB",  # German
+        "zh": "qXpMhyvQqiRxWQs4qSSB",  # Chinese (Mandarin)
+        "tl": "qXpMhyvQqiRxWQs4qSSB",  # Tagalog / Filipino
+        "ta": "qXpMhyvQqiRxWQs4qSSB",  # Tamil
+        "fa": "qXpMhyvQqiRxWQs4qSSB",  # Persian / Farsi
+        "bn": "qXpMhyvQqiRxWQs4qSSB",  # Bengali
+        "pa": "qXpMhyvQqiRxWQs4qSSB",  # Punjabi
+        "ml": "qXpMhyvQqiRxWQs4qSSB",  # Malayalam
+        "or": "qXpMhyvQqiRxWQs4qSSB"   # Odia
     }
 
     @classmethod

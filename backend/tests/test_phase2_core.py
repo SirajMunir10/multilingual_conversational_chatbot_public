@@ -123,7 +123,7 @@ class TestPhase2ConversationalCore(unittest.TestCase):
         data = res.json()
         self.assertIn("transcribed_user_text", data)
         self.assertIn("reply_text", data)
-        self.assertTrue(data["audio_base64"].startswith("data:audio/mp3;base64,") or data["audio_base64"].startswith("data:audio/wav;base64,"))
+        self.assertTrue(data["audio_base64"].startswith("data:audio/mp3;base64,") or data["audio_base64"].startswith("data:audio/mpeg;base64,") or data["audio_base64"].startswith("data:audio/wav;base64,"))
         self.assertEqual(data["pipeline"], "gpt-live-transcribe -> gpt-5-mini -> eleven_flash_v2_5")
 
 if __name__ == "__main__":

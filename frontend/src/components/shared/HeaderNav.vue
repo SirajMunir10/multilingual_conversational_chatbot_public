@@ -109,6 +109,17 @@
           <option value="ar">🇦🇪 العربية (AR)</option>
           <option value="hi">🇮🇳 हिन्दी (HI)</option>
           <option value="ur">🇵🇰 اردو (UR)</option>
+          <option value="fr">🇫🇷 Français (FR)</option>
+          <option value="es">🇪🇸 Español (ES)</option>
+          <option value="de">🇩🇪 Deutsch (DE)</option>
+          <option value="zh">🇨🇳 简体中文 (ZH)</option>
+          <option value="tl">🇵🇭 Tagalog (TL)</option>
+          <option value="fa">🇮🇷 فارسی (FA)</option>
+          <option value="bn">🇧🇩 বাংলা (BN)</option>
+          <option value="ta">🇮🇳 தமிழ் (TA)</option>
+          <option value="pa">🇮🇳 ਪੰਜਾਬੀ (PA)</option>
+          <option value="ml">🇮🇳 മലയാളം (ML)</option>
+          <option value="or">🇮🇳 ଓଡ଼ିଆ (OR)</option>
         </select>
       </div>
     </div>

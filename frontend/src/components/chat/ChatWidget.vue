@@ -195,7 +195,7 @@
             How can I assist your UAE investment journey today?
           </h3>
           <p class="hero-greeting-sub">
-            Speak or message naturally in English, Arabic, Hindi, or Urdu.
+            Speak or message naturally across 15 global &amp; regional languages.
           </p>
         </div>
 
@@ -494,7 +494,23 @@ const toggleTheme = () => {
 }
 
 const activeLanguageLabel = computed(() => {
-  const map = { en: 'English', ar: 'العربية', hi: 'हिन्दी', ur: 'اردو' }
+  const map = {
+    en: 'English',
+    ar: 'العربية',
+    hi: 'हिन्दी',
+    ur: 'اردو',
+    fr: 'Français',
+    es: 'Español',
+    de: 'Deutsch',
+    zh: '简体中文',
+    tl: 'Tagalog',
+    fa: 'فارسی',
+    bn: 'বাংলা',
+    ta: 'தமிழ்',
+    pa: 'ਪੰਜਾਬੀ',
+    ml: 'മലയാളം',
+    or: 'ଓଡ଼ିଆ'
+  }
   return map[props.currentLanguage] || 'English'
 })
 
@@ -503,6 +519,17 @@ const inputPlaceholder = computed(() => {
     ar: 'اسأل عن عقار في دبي، أو احسب قسط التمويل...',
     hi: 'दुबई में प्रॉपर्टी खोजें या मॉर्गेज EMI की गणना करें...',
     ur: 'دبئی میں پراپرٹی سرچ کریں یا مارگیج قسط معلوم کریں...',
+    fr: 'Rechercher un bien à Dubaï ou calculer un prêt...',
+    es: 'Buscar propiedades en Dubái o calcular hipoteca...',
+    de: 'Immobilien in Dubai suchen oder Hypothek berechnen...',
+    zh: '搜索迪拜房产或计算房贷月供...',
+    tl: 'Maghanap ng ari-arian sa Dubai o kalkulahin ang mortgage...',
+    fa: 'جستجوی ملک در دبی یا محاسبه اقساط وام...',
+    bn: 'দুবাইয়ে সম্পত্তি খুঁজুন বা মর্টগেজ ইএমআই গণনা করুন...',
+    ta: 'துபாயில் சொத்துக்களைத் தேடுங்கள் அல்லது வீட்டுக் கடனைக் கணக்கிடுங்கள்...',
+    pa: 'ਦੁਬਈ ਵਿੱਚ ਜਾਇਦਾਦ ਲੱਭੋ ਜਾਂ ਮੌਰਗੇਜ ਕਿਸ਼ਤ ਜਾਣੋ...',
+    ml: 'ദുബായിൽ പ്രോപ്പർട്ടി തിരയുക അല്ലെങ്കിൽ മോർട്ട്ഗേജ് കണക്കാക്കുക...',
+    or: 'ଦୁବାଇରେ ସମ୍ପତ୍ତି ଖୋଜନ୍ତୁ କିମ୍ବା ମର୍ଟଗେଜ୍ ହିସାବ କରନ୍ତୁ...',
     en: 'Ask about properties, mortgage eligibility, or market analysis...'
   }
   return map[props.currentLanguage] || map.en
@@ -514,6 +541,17 @@ const initializeWelcomeMessage = () => {
     ar: 'أهلاً بك في XO! أنا مساعدك الذكي للعقارات والتمويل العقاري في الإمارات. كيف يمكنني مساعدتك اليوم؟',
     hi: 'नमस्ते! मैं XO हूँ, यूएई में प्रॉपर्टी और होम लोन के लिए आपका एआई सहायक। आज मैं आपकी क्या सहायता कर सकता हूँ?',
     ur: 'خوش آمدید! میں XO ہوں، متحدہ عرب امارات میں پراپرٹی اور مارگیج کے لیے آپ کا AI اسسٹنٹ۔ میں آپ کی کیا مدد کر سکتا ہوں؟',
+    fr: 'Bienvenue chez XO ! Je suis votre assistant IA pour l\'immobilier de luxe et le financement aux Émirats arabes unis. Comment puis-je vous aider aujourd\'hui ?',
+    es: '¡Bienvenido a XO! Soy su asistente de IA para propiedades de lujo y préstamos hipotecarios en los EAU. ¿Cómo puedo ayudarle hoy?',
+    de: 'Willkommen bei XO! Ich bin Ihr KI-Assistent für Luxusimmobilien und Baufinanzierungen in den VAE. Wie kann ich Ihnen heute helfen?',
+    zh: '欢迎来到 XO！我是您的阿联酋豪华房产与按揭贷款智能助手。今天有什么我可以帮您的？',
+    tl: 'Maligayang pagdating sa XO! Ako ang iyong AI assistant para sa marangyang ari-arian at mortgage sa UAE. Paano kita matutulungan ngayon?',
+    fa: 'به XO خوش آمدید! من دستیار هوش مصنوعی شما برای املاک لوکس و وام مسکن در امارات هستم. امروز چگونه می‌توانم به شما کمک کنم؟',
+    bn: 'XO-তে স্বাগতম! আমি সংযুক্ত আরব আমিরাতে প্রিমিয়ার সম্পত্তি ও মর্টগেজের জন্য আপনার এআই সহকারী। আজ আমি আপনাকে কীভাবে সাহায্য করতে পারি?',
+    ta: 'XO-விற்கு வரவேற்கிறோம்! யுஏஇ-ல் பிரீமியம் சொத்துக்கள் மற்றும் வீட்டுக் கடன்களுக்கான உங்கள் AI உதவியாளர் நான். இன்று நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?',
+    pa: 'XO ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ! ਮੈਂ UAE ਵਿੱਚ ਪ੍ਰੀਮੀਅਰ ਸੰਪਤੀਆਂ ਅਤੇ ਮੌਰਗੇਜ ਲਈ ਤੁਹਾਡਾ AI ਸਹਾਇਕ ਹਾਂ। ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?',
+    ml: 'XO-ലേക്ക് സ്വാഗതം! യുഎഇയിലെ പ്രീമിയർ പ്രോപ്പർട്ടികൾക്കും മോർട്ട്ഗേജിനുമുള്ള നിങ്ങളുടെ AI അസിസ്റ്റന്റാണ് ഞാൻ. ഇന്ന് ഞാൻ നിങ്ങളെ എങ്ങനെ സഹായിക്കണം?',
+    or: 'XO କୁ ସ୍ୱାଗତ! ମୁଁ UAE ରେ ପ୍ରିମିୟର ସମ୍ପତ୍ତି ଏବଂ ମର୍ଟଗେଜ୍ ପାଇଁ ଆପଣଙ୍କର AI ସହାୟକ। ଆଜି ମୁଁ ଆପଣଙ୍କୁ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?',
     en: 'Welcome to XO! I am your AI assistant for premier properties, mortgage affordability, and instant guidance across the UAE. How can I help you today?'
   }
 
@@ -903,6 +941,17 @@ const playVoiceGreeting = async () => {
     ar: 'أهلاً بك في XO! أنا مساعدك الذكي للعقارات والتمويل العقاري في الإمارات. كيف يمكنني مساعدتك اليوم؟',
     hi: 'नमस्ते! मैं XO हूँ, यूएई में प्रॉपर्टी और होम लोन के लिए आपका एआई सहायक। आज मैं आपकी क्या सहायता कर सकता हूँ?',
     ur: 'خوش آمدید! میں XO ہوں، متحدہ عرب امارات میں پراپرٹی اور مارگیج کے لیے آپ کا AI اسسٹنٹ۔ میں آپ کی کیا مدد کر سکتا ہوں؟',
+    fr: 'Bienvenue chez XO ! Je suis votre assistant IA pour l\'immobilier de luxe et le financement aux Émirats arabes unis. Comment puis-je vous aider aujourd\'hui ?',
+    es: '¡Bienvenido a XO! Soy su asistente de IA para propiedades de lujo y préstamos hipotecarios en los EAU. ¿Cómo puedo ayudarle hoy?',
+    de: 'Willkommen bei XO! Ich bin Ihr KI-Assistent für Luxusimmobilien und Baufinanzierungen in den VAE. Wie kann ich Ihnen heute helfen?',
+    zh: '欢迎来到 XO！我是您的阿联酋豪华房产与按揭贷款智能助手。今天有什么我可以帮您的？',
+    tl: 'Maligayang pagdating sa XO! Ako ang iyong AI assistant para sa marangyang ari-arian at mortgage sa UAE. Paano kita matutulungan ngayon?',
+    fa: 'به XO خوش آمدید! من دستیار هوش مصنوعی شما برای املاک لوکس و وام مسکن در امارات هستم. امروز چگونه می‌توانم به شما کمک کنم؟',
+    bn: 'XO-তে স্বাগতম! আমি সংযুক্ত আরব আমিরাতে প্রিমিয়ার সম্পত্তি ও মর্টগেজের জন্য আপনার এআই সহকারী। আজ আমি আপনাকে কীভাবে সাহায্য করতে পারি?',
+    ta: 'XO-விற்கு வரவேற்கிறோம்! யுஏஇ-ல் பிரீமியம் சொத்துக்கள் மற்றும் வீட்டுக் கடன்களுக்கான உங்கள் AI உதவியாளர் நான். இன்று நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?',
+    pa: 'XO ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ! ਮੈਂ UAE ਵਿੱਚ ਪ੍ਰੀਮੀਅਰ ਸੰਪਤੀਆਂ ਅਤੇ ਮੌਰਗੇਜ ਲਈ ਤੁਹਾਡਾ AI ਸਹਾਇਕ ਹਾਂ। ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?',
+    ml: 'XO-ലേക്ക് സ്വാഗതം! യുഎഇയിലെ പ്രീമിയർ പ്രോപ്പർട്ടികൾക്കും മോർട്ട്ഗേജിനുമുള്ള നിങ്ങളുടെ AI അസിസ്റ്റന്റാണ് ഞാൻ. ഇന്ന് ഞാൻ നിങ്ങളെ എങ്ങനെ സഹായിക്കണം?',
+    or: 'XO କୁ ସ୍ୱାଗତ! ମୁଁ UAE ରେ ପ୍ରିମିୟର ସମ୍ପତ୍ତି ଏବଂ ମର୍ଟଗେଜ୍ ପାଇଁ ଆପଣଙ୍କର AI ସହାୟକ। ଆଜି ମୁଁ ଆପଣଙ୍କୁ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?',
     en: 'Welcome to XO! I am your AI assistant for premier properties, mortgage affordability, and instant guidance across the UAE. How can I help you today?'
   }
   const text = welcomeTexts[props.currentLanguage] || welcomeTexts.en
@@ -1018,7 +1067,23 @@ const startVoiceRecording = async () => {
       speechRecognition = new SpeechRecognition()
       speechRecognition.continuous = true
       speechRecognition.interimResults = true
-      const langMap = { en: 'en-US', ar: 'ar-AE', hi: 'hi-IN', ur: 'ur-PK' }
+      const langMap = {
+        en: 'en-US',
+        ar: 'ar-AE',
+        hi: 'hi-IN',
+        ur: 'ur-PK',
+        fr: 'fr-FR',
+        es: 'es-ES',
+        de: 'de-DE',
+        zh: 'zh-CN',
+        tl: 'fil-PH',
+        fa: 'fa-IR',
+        bn: 'bn-IN',
+        ta: 'ta-IN',
+        pa: 'pa-IN',
+        ml: 'ml-IN',
+        or: 'or-IN'
+      }
       speechRecognition.lang = langMap[props.currentLanguage] || 'en-US'
 
       speechRecognition.onresult = (event) => {

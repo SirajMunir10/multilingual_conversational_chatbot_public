@@ -2,6 +2,7 @@ from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, HTTPException, Header, Depends
 from fastapi.responses import StreamingResponse
+from app.core.config import settings
 from app.orchestrator.orchestrator import ConversationOrchestrator
 from app.orchestrator.session_store import SessionStore
 
@@ -10,10 +11,10 @@ router = APIRouter(prefix="/api/chat", tags=["Conversational Chat Core"])
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="User message text")
     session_id: Optional[str] = None
-    language: Optional[str] = Field(None, description="Optional manual language override ('en', 'ar', 'hi', 'ur')")
+    language: Optional[str] = Field(None, description="Optional manual language override across all supported launch languages")
 
 class LanguageOverrideRequest(BaseModel):
-    language: str = Field(..., description="Target language code: 'en', 'ar', 'hi', or 'ur'")
+    language: str = Field(..., description="Target language code from supported launch languages")
 
 @router.post("/message")
 async def send_chat_message(
@@ -84,7 +85,10 @@ def set_session_language(session_id: str, payload: LanguageOverrideRequest):
     Manual language override toggle (FR-1c).
     Persists for the remainder of the session.
     """
-    if payload.language not in ["en", "ar", "hi", "ur"]:
-        raise HTTPException(status_code=400, detail="Unsupported language. Launch languages: 'en', 'ar', 'hi', 'ur'.")
+    if payload.language not in settings.LAUNCH_LANGUAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported language '{payload.language}'. Supported languages: {', '.join(settings.LAUNCH_LANGUAGES)}."
+        )
     SessionStore.set_language_override(session_id, payload.language)
     return {"status": "updated", "session_id": session_id, "language": payload.language}

@@ -60,9 +60,9 @@ onMounted(() => {
   applyTheme(currentTheme.value)
 })
 
-// Arabic (ar) and Urdu (ur) use Right-to-Left (RTL) text direction
+// Arabic (ar), Urdu (ur), and Persian (fa) use Right-to-Left (RTL) text direction
 const isRTL = computed(() => {
-  return currentLanguage.value === 'ar' || currentLanguage.value === 'ur'
+  return currentLanguage.value === 'ar' || currentLanguage.value === 'ur' || currentLanguage.value === 'fa'
 })
 </script>
 
