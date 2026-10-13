@@ -2747,9 +2747,126 @@ onUnmounted(() => {
   border: 0;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
+  .chat-widget-wrapper {
+    height: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .chat-widget-wrapper.is-expanded {
+    height: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+
+  /* Hide expand/collapse and feature tips buttons on mobile */
+  .resize-toggle-btn,
+  .tips-toggle-btn {
+    display: none !important;
+  }
+
+  .chat-header {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .header-brand-info {
+    gap: 2px;
+  }
+
+  .header-status {
+    display: none;
+  }
+
+  .header-pills-group .pill-label {
+    display: none;
+  }
+
+  .header-actions {
+    gap: 4px;
+  }
+
+  .header-tools-group {
+    gap: 4px;
+  }
+
+  .handoff-btn,
+  .auth-toggle-btn {
+    padding: 4px 7px;
+  }
+
+  .clear-chat-btn,
+  .close-widget-btn,
+  .theme-toggle-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 0.85rem;
+  }
+
+  .chat-feed {
+    padding: 10px 8px;
+    gap: 10px;
+  }
+
+  .chat-footer {
+    margin: 4px 8px env(safe-area-inset-bottom, 8px);
+    padding: 4px 8px;
+  }
+
+  .chat-input-field {
+    font-size: 16px !important;
+    padding: 8px 6px;
+  }
+
+  .input-disclaimer {
+    font-size: 0.62rem;
+    padding: 2px 8px 6px;
+    line-height: 1.3;
+  }
+
   .quick-prompts-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+    gap: 6px;
+  }
+
+  .quick-prompt-chip {
+    padding: 8px 10px;
+    font-size: 0.78rem;
+  }
+
+  .advisor-standby-banner {
+    padding: 6px 10px;
+    margin: 4px 8px;
+    font-size: 0.72rem;
+  }
+
+  .btn-standby-connect {
+    padding: 3px 8px;
+    font-size: 0.70rem;
+  }
+
+  .pplx-voice-stage {
+    padding: 16px 12px;
+    max-width: 100%;
+  }
+
+  .pplx-orb-container {
+    width: 170px;
+    height: 170px;
+    top: 34%;
+  }
+
+  .pplx-text-zone {
+    width: 95%;
+  }
+
+  .pplx-actions-row {
+    bottom: 24px;
+    gap: 36px;
   }
 }
 </style>

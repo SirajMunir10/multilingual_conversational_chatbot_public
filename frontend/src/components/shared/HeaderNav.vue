@@ -381,10 +381,81 @@ const handleSpeakWithAdvisor = () => {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
+    padding: 10px 14px;
+    margin: 8px 10px 16px;
   }
 
   .header-left, .header-center, .header-right {
     justify-content: center;
+  }
+}
+
+@media (max-width: 600px) {
+  .app-header {
+    margin: 6px 6px 12px;
+    padding: 8px 10px;
+    gap: 10px;
+    border-radius: var(--radius-md);
+  }
+
+  .brand-container {
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .brand-avatar-wrap {
+    width: 36px;
+    height: 36px;
+  }
+
+  .brand-title {
+    font-size: 1.1rem;
+  }
+
+  .brand-subtitle {
+    font-size: 0.68rem;
+    text-align: center;
+  }
+
+  .nav-tabs {
+    width: 100%;
+    display: flex;
+  }
+
+  .nav-tab {
+    flex: 1;
+    justify-content: center;
+    padding: 6px 8px;
+    font-size: 0.75rem;
+    gap: 4px;
+    white-space: nowrap;
+  }
+
+  .header-right {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .theme-btn .theme-text {
+    display: none;
+  }
+
+  .theme-btn {
+    padding: 5px 8px;
+  }
+
+  .btn-advisor-top {
+    padding: 5px 10px;
+    font-size: 0.75rem;
+  }
+
+  .lang-dropdown {
+    padding: 4px 6px;
+    font-size: 0.75rem;
   }
 }
 </style>

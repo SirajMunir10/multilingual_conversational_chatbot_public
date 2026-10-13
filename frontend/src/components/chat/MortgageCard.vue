@@ -831,7 +831,8 @@ const formatNumber = (num) => {
   }
   
   .spotlight-submetrics {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
   
   .dbr-readouts {
@@ -849,6 +850,17 @@ const formatNumber = (num) => {
   
   .btn-jump-properties span:first-child {
     white-space: normal;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .badge-estimates-not-offers {
+    align-self: flex-start;
+    font-size: 0.65rem;
   }
 }
 </style>

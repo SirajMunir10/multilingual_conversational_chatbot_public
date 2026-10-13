@@ -6,6 +6,12 @@
   padding: 0;
 }
 
+html {
+  overflow-x: hidden;
+  width: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: var(--font-body);
   background-color: var(--bg-primary);
@@ -14,7 +20,11 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
   overflow-x: hidden;
+  position: relative;
+  touch-action: manipulation;
   background-image: 
     radial-gradient(circle at 10% 15%, rgba(92, 3, 155, 0.05), transparent 40%),
     radial-gradient(circle at 90% 85%, rgba(3, 164, 244, 0.04), transparent 45%);
@@ -354,5 +364,23 @@ body {
   color: #FFFFFF;
   border-color: rgba(92, 3, 155, 0.45);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+/* Touch & Mobile Optimizations: Disable hovering pseudo-tooltips on touch devices */
+@media (hover: none), (pointer: coarse), (max-width: 768px) {
+  [data-tooltip]::before,
+  [data-tooltip]::after {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}
+
+/* Enforce 16px min font size on inputs for Android and iOS to prevent auto-zooming */
+@media (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
 }
 

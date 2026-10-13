@@ -309,4 +309,44 @@ const currentNav = computed(() => navItems.find(item => item.id === activeSectio
   color: var(--text-secondary);
   line-height: 1.6;
 }
+
+@media (max-width: 768px) {
+  .admin-view-container {
+    flex-direction: column;
+    margin: 8px;
+    border-radius: var(--radius-md);
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 16px 12px;
+  }
+
+  .admin-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .admin-nav-item {
+    flex: 1 1 45%;
+    padding: 8px 10px;
+    font-size: 0.80rem;
+  }
+
+  .admin-content {
+    padding: 16px 12px;
+  }
+
+  .content-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

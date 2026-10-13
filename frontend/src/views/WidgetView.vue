@@ -460,4 +460,120 @@ const openWidget = () => {
     display: none;
   }
 }
+
+@media (max-width: 600px) {
+  .widget-view-container {
+    padding: 0 4px;
+  }
+
+  .demo-website-surface {
+    padding: 16px 12px;
+    margin-bottom: 16px;
+    border-radius: var(--radius-md);
+  }
+
+  .brand-eyebrow {
+    font-size: 0.70rem;
+    padding: 4px 10px;
+    margin-bottom: 12px;
+  }
+
+  .hero-title {
+    font-size: 1.55rem;
+    line-height: 1.25;
+    margin-bottom: 12px;
+  }
+
+  .hero-desc {
+    font-size: 0.88rem;
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .btn-luxury-purple {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 18px;
+  }
+
+  .compliance-badge {
+    border-left: none;
+    border-top: 1px solid var(--border-subtle);
+    padding: 8px 0 0;
+    text-align: center;
+    font-size: 0.72rem;
+  }
+
+  .feature-highlights {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 24px;
+  }
+
+  .feature-card {
+    padding: 16px 14px;
+  }
+
+  .feature-card h3 {
+    font-size: 1rem;
+  }
+
+  .feature-card p {
+    font-size: 0.82rem;
+  }
+
+  /* Full-bleed mobile sheet for embedded widget */
+  .embedded-widget-shell.open {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    z-index: 999999 !important;
+  }
+
+  .floating-launcher-btn {
+    bottom: 14px;
+    right: 14px;
+    padding: 6px 14px 6px 6px;
+    max-width: calc(100vw - 28px);
+  }
+
+  [dir="rtl"] .floating-launcher-btn {
+    right: auto;
+    left: 14px;
+  }
+
+  .launcher-mascot-wrapper {
+    width: 38px;
+    height: 38px;
+  }
+
+  .launcher-mascot-img {
+    width: 32px;
+    height: 32px;
+  }
+
+  .launcher-title {
+    font-size: 0.84rem;
+  }
+
+  .launcher-subtitle {
+    font-size: 0.65rem;
+  }
+}
 </style>

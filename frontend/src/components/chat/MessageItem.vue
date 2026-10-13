@@ -1215,4 +1215,43 @@ const formatTime = (isoString) => {
 .handoff-btn.call-btn:hover {
   transform: translateY(-1px);
 }
+
+@media (max-width: 480px) {
+  .message-bubble-container {
+    max-width: 95%;
+  }
+
+  .message-bubble {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+
+  .prop-thumb-wrap {
+    width: 52px;
+    height: 52px;
+  }
+
+  .prop-compact-bar {
+    gap: 8px;
+    padding: 6px 8px;
+  }
+
+  .prop-compact-title {
+    font-size: 0.78rem;
+  }
+
+  .prop-compact-price {
+    font-size: 0.74rem;
+  }
+
+  .compact-heart,
+  .prop-expand-btn {
+    width: 26px !important;
+    height: 26px !important;
+  }
+
+  .handoff-actions-row {
+    flex-direction: column;
+  }
+}
 </style>
