@@ -85,6 +85,8 @@ class ConversationOrchestrator:
         # 5. Intent Routing & Slot Filling (FR-3, FR-4)
         intent = cls._classify_intent(sanitized_input, session)
         session.active_intent = intent
+        if intent == "human_handoff":
+            session.handoff_requested = True
         cls._extract_slots(sanitized_input, session)
 
         # 6. Generate Response via LLM / Function Calling
@@ -163,7 +165,13 @@ class ConversationOrchestrator:
             "ഏജന്റ്", "ഉപദേശകൻ", "മനുഷ്യൻ", "സംസാരിക്കണം",
             "ପରାମର୍ଶଦାତା", "ମଣିଷ ସହିତ କଥା"
         ]
-        if any(kw in lowered for kw in handoff_kw):
+        # Human Handoff intent keywords or continuing callback registration
+        has_phone_number = bool(re.search(r'(\+?\d{1,4}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{3,9})', text))
+        has_contact_terms = any(w in lowered for w in ["phone", "name", "call me", "reach out", "yes", "sure", "language", "رقم", "اسم", "फोन", "नाम", "فون", "نام"])
+        if any(kw in lowered for kw in handoff_kw) or (
+            (session.handoff_requested or session.active_intent == "human_handoff")
+            and (has_phone_number or session.slots.customer_consent_given or has_contact_terms)
+        ):
             return "human_handoff"
 
         # Account intent keywords (strictly scoped to user profile/vault access)
@@ -384,6 +392,31 @@ class ConversationOrchestrator:
             if "Balcony" not in session.slots.property_amenities:
                 session.slots.property_amenities.append("Balcony")
 
+        # Extract customer contact details (phone, name, language)
+        phone_match = re.search(r'(\+?\d{1,4}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{3,9})', text)
+        if phone_match:
+            candidate_phone = phone_match.group(1).strip()
+            digits = re.sub(r'\D', '', candidate_phone)
+            # Avoid matching property prices, budgets, or areas (must be 7-15 digits)
+            is_financial_number = any(w in lowered for w in ["aed", "dirham", "price", "budget", "salary", "income", "sqft", "sq.ft", "million", "k"])
+            if len(digits) >= 7 and not (len(digits) <= 8 and is_financial_number):
+                session.slots.customer_phone = candidate_phone
+                session.slots.customer_consent_given = True
+
+        name_match = re.search(r'(?:my name is|i am|name is|call me|name[:\s]+)\s*([A-Za-z\u0600-\u06FF\u0900-\u097F\u0B00-\u0B7F\s]{2,30})', lowered)
+        if name_match:
+            cand_name = name_match.group(1).strip()
+            session.slots.customer_name = cand_name.title()
+
+        # Extract preferred language if explicitly stated
+        for lang_k, lang_meta in LanguageDetector.get_supported_locales().items():
+            l_name = lang_meta["name"].lower()
+            l_native = lang_meta["native"].lower()
+            if l_name in lowered or l_native in lowered:
+                if any(w in lowered for w in ["language", "speak in", "comfortable in", "contact in", "talk in", "باللغة", "भाषा", "ਭਾਸ਼ਾ", "ഭാഷ"]):
+                    session.slots.customer_preferred_language = lang_meta["name"]
+                    break
+
     @classmethod
     async def _generate_reply(cls, session: SessionContext, user_text: str) -> Dict[str, Any]:
         """
@@ -417,8 +450,41 @@ class ConversationOrchestrator:
 
                 tool_choice = "auto"
                 comp_data = None
+                has_contact_info = bool(session.slots.customer_phone)
+
                 if session.active_intent == "human_handoff":
-                    tool_choice = {"type": "function", "function": {"name": "request_human_handoff"}}
+                    if has_contact_info:
+                        tool_choice = {"type": "function", "function": {"name": "request_human_handoff"}}
+                        c_name = session.slots.customer_name or "Client"
+                        c_phone = session.slots.customer_phone
+                        c_lang = session.slots.customer_preferred_language or lang
+                        messages.append({
+                            "role": "system",
+                            "content": (
+                                f"CONFIRM CALLBACK PROTOCOL: The user has provided their contact details "
+                                f"(Name: {c_name}, Phone: {c_phone}, Preferred Language: {c_lang}). "
+                                f"You MUST call `request_human_handoff` with applicant_name='{c_name}', "
+                                f"applicant_phone='{c_phone}', and preferred_language='{c_lang}'. "
+                                f"In your response, confirm that our specialist advisor will contact them directly at {c_phone} in {c_lang}. "
+                                f"DO NOT provide any fake or placeholder phone numbers or WhatsApp links!"
+                            )
+                        })
+                    else:
+                        tool_choice = "none"
+                        locales = LanguageDetector.get_supported_locales()
+                        cur_lang = locales.get(lang, {}).get("name", "English")
+                        messages.append({
+                            "role": "system",
+                            "content": (
+                                f"MANDATORY ADVISOR PERMISSION PROTOCOL (Rule 10): "
+                                f"The user is asking to speak with or be advised by a human specialist. "
+                                f"DO NOT invent, generate, or provide phone numbers or WhatsApp links! "
+                                f"You MUST first ask for permission in {cur_lang}: "
+                                f"1. Ask if they are willing to provide their contact details so our specialist advisor can reach out directly. "
+                                f"2. Ask them to share their Full Name, Phone Number (with country code), and Preferred Language they are comfortable communicating in. "
+                                f"Do NOT call request_human_handoff until they share their phone number and name."
+                            )
+                        })
                 elif session.active_intent == "account":
                     if any(w in user_text.lower() for w in ["application", "status", "طلب", "स्थिति", "صورتحال"]):
                         tool_choice = {"type": "function", "function": {"name": "get_my_application_status"}}
@@ -579,17 +645,27 @@ class ConversationOrchestrator:
                     }
 
                 if session.active_intent == "human_handoff":
-                    from app.services.handoff_service import HandoffService
-                    handoff_res = HandoffService.initiate_handoff(
-                        session_id=session.session_id,
-                        reason="explicit_request",
-                        user_id=session.user_id
-                    )
-                    return {
-                        "text": reply_message.content or "",
-                        "handoff_data": handoff_res,
-                        "handoff_offered": True
-                    }
+                    if has_contact_info:
+                        from app.services.handoff_service import HandoffService
+                        handoff_res = HandoffService.initiate_handoff(
+                            session_id=session.session_id,
+                            applicant_name=session.slots.customer_name,
+                            applicant_phone=session.slots.customer_phone,
+                            preferred_language=session.slots.customer_preferred_language or session.language,
+                            reason="explicit_request",
+                            user_id=session.user_id
+                        )
+                        return {
+                            "text": reply_message.content or "",
+                            "handoff_data": handoff_res,
+                            "handoff_offered": True
+                        }
+                    else:
+                        # User has not provided contact details yet; return conversational permission request without card
+                        return {
+                            "text": reply_message.content or "",
+                            "handoff_offered": False
+                        }
 
                 if session.active_intent == "account" and session.user_id:
                     from app.services.account_service import AccountService
@@ -884,8 +960,14 @@ class ConversationOrchestrator:
             reason = fn_args.get("reason", "explicit_request")
             preferred_team = fn_args.get("preferred_team")
             notes = fn_args.get("notes")
+            app_name = fn_args.get("applicant_name") or session.slots.customer_name
+            app_phone = fn_args.get("applicant_phone") or session.slots.customer_phone
+            pref_lang = fn_args.get("preferred_language") or session.slots.customer_preferred_language or session.language
             handoff_res = HandoffService.initiate_handoff(
                 session_id=session.session_id,
+                applicant_name=app_name,
+                applicant_phone=app_phone,
+                preferred_language=pref_lang,
                 reason=reason,
                 preferred_team=preferred_team,
                 notes=notes,
@@ -1116,11 +1198,14 @@ class ConversationOrchestrator:
             handoff_res = raw_res.get("handoff_result", {})
             advisor = handoff_res.get("assigned_advisor", {})
             ticket_id = handoff_res.get("ticket_id", "XO-HD")
+            c_phone = handoff_res.get("applicant_phone") or session.slots.customer_phone or "your registered number"
+            c_name = handoff_res.get("applicant_name") or session.slots.customer_name or "Valued Client"
+            c_lang = handoff_res.get("preferred_language") or session.slots.customer_preferred_language or session.language
             narratives = {
-                "ar": f"يسعدني تحويلك إلى مستشارنا المتخصص: {advisor.get('name', 'المستشار')} ({advisor.get('title', 'مستشار XOTO')}). تم إرفاق كامل تفاصيل المحادثة (تذكرة: {ticket_id}).",
-                "hi": f"मुझे आपको हमारे विशेषज्ञ सलाहकार {advisor.get('name', 'Advisor')} ({advisor.get('title', '')}) से जोड़ते हुए खुशी हो रही है। बातचीत का पूरा विवरण शेयर कर दिया गया है (टिकट: {ticket_id})।",
-                "ur": f"مجھے آپ کو ہمارے سینیئر مشیر {advisor.get('name', 'Advisor')} ({advisor.get('title', '')}) سے منسلک کرتے ہوئے خوشی ہے۔ آپ کی گفتگو کا مکمل ریکارڈ فراہم کر دیا گیا ہے (ٹکٹ: {ticket_id})۔",
-                "en": f"I am pleased to connect you directly with our licensed specialist: {advisor.get('name', 'Advisor')} ({advisor.get('title', 'Senior Advisor')}). Your complete conversation transcript has been forwarded (Ticket: {ticket_id})."
+                "ar": f"تم تسجيل طلب التواصل بنجاح! سيتواصل معك مستشارنا ({advisor.get('title', 'مستشار XOTO')} - {advisor.get('name')}) مباشرة على رقمك ({c_phone}) باللغة {c_lang}. تذكرة المتابعة الخاصة بك هي: {ticket_id}.",
+                "hi": f"धन्यवाद {c_name}! आपका कॉलबैक अनुरोध हमारे {advisor.get('title', 'Advisor')} ({advisor.get('name')}) के साथ शेड्यूल कर दिया गया है। हमारे सलाहकार आपसे {c_phone} पर {c_lang} में सीधे संपर्क करेंगे। संदर्भ टिकट: {ticket_id}।",
+                "ur": f"شکریہ {c_name}! آپ کی کال بیک کی درخواست ہمارے {advisor.get('title', 'Advisor')} ({advisor.get('name')}) کے ساتھ درج کر لی گئی ہے۔ ہمارے مشیر آپ سے {c_phone} پر {c_lang} میں براہ راست رابطہ کریں گے۔ ریفرنس ٹکٹ: {ticket_id}۔",
+                "en": f"Thank you, {c_name}! Your callback request has been scheduled with our {advisor.get('title', 'Specialist')} ({advisor.get('name')}). An advisor will reach out to you directly at {c_phone} in {c_lang}. Your reference ticket is {ticket_id}."
             }
             return {
                 "text": narratives.get(lang, narratives["en"]),
@@ -1440,27 +1525,95 @@ class ConversationOrchestrator:
 
         # 3. HUMAN HANDOFF INTENT (FR-5, FR-20)
         elif intent == "human_handoff":
+            has_phone = bool(session.slots.customer_phone)
+
+            if not has_phone:
+                dept = "Prime & Ultra-Luxury Property Consultant"
+                if session.slots.mortgage_income or "mortgage" in user_text.lower():
+                    dept = "Senior UAE Mortgage Specialist"
+                elif "support" in user_text.lower() or "concierge" in user_text.lower():
+                    dept = "Client Concierge & Advisory Manager"
+
+                permission_prompts = {
+                    "en": (
+                        f"Our {dept} would be delighted to assist you directly! 🎉\n\n"
+                        f"Are you willing to provide your contact details so our advisor can reach out to you directly?\n\n"
+                        f"If so, please share:\n"
+                        f"1. **Full Name**\n"
+                        f"2. **Phone Number** (with country code)\n"
+                        f"3. **Preferred Language** (the language you are most comfortable communicating in)\n\n"
+                        f"Once provided, our licensed specialist will contact you directly."
+                    ),
+                    "ar": (
+                        f"يسعد مستشارنا المختص ({dept}) بالتواصل معك مباشرة! 🎉\n\n"
+                        f"هل توافق على تزويدنا ببيانات الاتصال الخاصة بك حتى يتمكن مستشارنا من التواصل معك مباشرة؟\n\n"
+                        f"إذا كنت توافق، يرجى التكرم بمشاركتنا:\n"
+                        f"1. **الاسم الكامل**\n"
+                        f"2. **رقم الهاتف** (مع رمز الدولة)\n"
+                        f"3. **اللغة المفضلة** التي تفضل التحدث بها\n\n"
+                        f"وسيقوم فريقنا بالتواصل معك فوراً."
+                    ),
+                    "hi": (
+                        f"हमारे {dept} को आपसे सीधे संपर्क करने में बेहद खुशी होगी! 🎉\n\n"
+                        f"क्या आप अपना फोन नंबर और संपर्क विवरण साझा करने के लिए सहमत हैं ताकि हमारे सलाहकार आपसे सीधे संपर्क कर सकें?\n\n"
+                        f"कृपया निम्नलिखित विवरण प्रदान करें:\n"
+                        f"1. **पूरा नाम (Full Name)**\n"
+                        f"2. **फोन नंबर (Phone Number)** (कंट्री कोड के साथ)\n"
+                        f"3. **पसंदीदा भाषा (Preferred Language)** जिसमें आप बातचीत करना पसंद करते हैं\n\n"
+                        f"विवरण मिलते ही हमारे लाइसेंस प्राप्त सलाहकार आपसे संपर्क करेंगे।"
+                    ),
+                    "ur": (
+                        f"ہمارے {dept} کو آپ سے براہ راست رابطہ کرنے میں خوشی ہوگی! 🎉\n\n"
+                        f"کیا آپ اپنا فون نمبر اور تفصیلات فراہم کرنے کے لیے رضامند ہیں تاکہ ہمارے مشیر آپ سے براہ راست رابطہ کر سکیں؟\n\n"
+                        f"براہ کرم درج ذیل تفصیلات فراہم کریں:\n"
+                        f"1. **پورا نام (Full Name)**\n"
+                        f"2. **فون نمبر (Phone Number)** (کنٹری کوڈ کے ساتھ)\n"
+                        f"3. **پسندیدہ زبان (Preferred Language)** جس میں آپ گفتگو کرنا پسند کرتے ہیں\n\n"
+                        f"تفصیلات موصول ہوتے ہی ہماری ٹیم آپ سے رابطہ کرے گی۔"
+                    ),
+                    "or": (
+                        f"ଆମର {dept} ଆପଣଙ୍କ ସହିତ ସିଧାସଳଖ ଯୋଗାଯୋଗ କରିବାକୁ ଆନନ୍ଦିତ ହେବେ! 🎉\n\n"
+                        f"ଆମର ପରାମର୍ଶଦାତା ଆପଣଙ୍କୁ ସିଧାସଳଖ ଯୋଗାଯୋଗ କରିବା ପାଇଁ ଆପଣ ଆପଣଙ୍କ ଫୋନ୍ ନମ୍ବର ଏବଂ ବିବରଣୀ ପ୍ରଦାନ କରିବାକୁ ଇଚ୍ଛୁକ କି?\n\n"
+                        f"ଦୟାକରି ନିମ୍ନଲିଖିତ ବିବରଣୀ ଦିଅନ୍ତୁ:\n"
+                        f"1. **ସମ୍ପୂର୍ଣ୍ଣ ନାମ (Full Name)**\n"
+                        f"2. **ଫୋନ୍ ନମ୍ବର (Phone Number)** (କଣ୍ଟ୍ରି କୋଡ୍ ସହିତ)\n"
+                        f"3. **ପସନ୍ଦର ଭାଷା (Preferred Language)** ଯେଉଁଥିରେ ଆପଣ କଥାବାର୍ତ୍ତା କରିବାକୁ ସହଜ ମନେ କରନ୍ତି\n\n"
+                        f"ଏହା ପ୍ରଦାନ କଲା ପରେ ଆମର ଲାଇସେନ୍ସପ୍ରାପ୍ତ ଟିମ୍ ଆପଣଙ୍କ ସହିତ ସିଧାସଳଖ ଯୋଗାଯୋଗ କରିବେ।"
+                    )
+                }
+                return {
+                    "text": permission_prompts.get(lang, permission_prompts["en"]),
+                    "handoff_offered": False
+                }
+
             from app.services.handoff_service import HandoffService
+            c_name = session.slots.customer_name or "Valued Client"
+            c_phone = session.slots.customer_phone or ""
+            c_lang = session.slots.customer_preferred_language or lang
             handoff_res = HandoffService.initiate_handoff(
                 session_id=session.session_id,
+                applicant_name=c_name,
+                applicant_phone=c_phone,
+                preferred_language=c_lang,
                 reason="explicit_request",
                 user_id=session.user_id
             )
             advisor = handoff_res.get("assigned_advisor", {})
             ticket_id = handoff_res.get("ticket_id", "XO-HD")
 
-            responses = {
-                "ar": f"يسعدني تحويلك مباشرة إلى مستشارنا المرخص: {advisor.get('name')} ({advisor.get('title')}). تم إرفاق ملخص تفضيلاتك وتفاصيل محادثتنا كاملة (تذكرة رقم: {ticket_id}). كيف تفضل التواصل، عبر الواتساب أم الاتصال المباشر؟",
-                "hi": f"मुझे आपको हमारे लाइसेंस प्राप्त विशेषज्ञ {advisor.get('name')} ({advisor.get('title')}) से कनेक्ट करते हुए खुशी हो रही है। बातचीत का पूरा ब्योरा भेज दिया गया है (टिकट: {ticket_id})। क्या आप व्हाट्सऐप या फोन कॉल पसंद करेंगे?",
-                "ur": f"مجھے آپ کو ہمارے مجاز مشیر {advisor.get('name')} ({advisor.get('title')}) سے براہ راست منسلک کرتے ہوئے خوشی ہے۔ گفتگو کا مکمل احوال پہنچا دیا گیا ہے (ٹکٹ نمبر: {ticket_id})۔ کیا آپ واٹس ایپ یا فون پر بات کرنا پسند کریں گے؟",
-                "en": f"I am delighted to connect you with our licensed specialist: {advisor.get('name')} ({advisor.get('title')}). Your full conversation transcript and financial profile have been transferred (Ticket: {ticket_id}). Would you like to continue via WhatsApp or a direct phone call?"
+            confirmations = {
+                "en": f"Thank you, {c_name}! Your callback request has been scheduled with our {advisor.get('title', 'Specialist')} ({advisor.get('name')}). An advisor will reach out to you directly at {c_phone} in {c_lang}. Your reference ticket is {ticket_id}.",
+                "ar": f"شكراً لك يا {c_name}! تم جدولة طلب التواصل مع مستشارنا ({advisor.get('title')} - {advisor.get('name')}). سيتواصل معك فريقنا مباشرة على الرقم {c_phone} باللغة {c_lang}. تذكرة المتابعة الخاصة بك هي: {ticket_id}.",
+                "hi": f"धन्यवाद {c_name}! आपका कॉलबैक अनुरोध हमारे {advisor.get('title')} ({advisor.get('name')}) के साथ शेड्यूल कर दिया गया है। हमारे सलाहकार आपसे {c_phone} पर {c_lang} में सीधे संपर्क करेंगे। आपका संदर्भ टिकट नंबर है: {ticket_id}।",
+                "ur": f"شکریہ {c_name}! آپ کی کال بیک کی درخواست ہمارے {advisor.get('title')} ({advisor.get('name')}) کے ساتھ درج کر لی گئی ہے۔ ہمارے مشیر آپ سے {c_phone} پر {c_lang} میں براہ راست رابطہ کریں گے۔ آپ کا ریفرنس ٹکٹ نمبر ہے: {ticket_id}۔",
+                "or": f"ଧନ୍ୟବାଦ {c_name}! ଆପଣଙ୍କ କଲବ୍ୟାକ୍ ଅନୁରୋଧ ଆମର {advisor.get('title')} ({advisor.get('name')}) ଙ୍କ ସହିତ ସିଡ୍ୟୁଲ୍ ହୋଇଛି। ଆମର ପରାମର୍ଶଦାତା {c_phone} ରେ {c_lang} ରେ ଆପଣଙ୍କୁ ସିଧାସଳଖ ଯୋଗାଯୋଗ କରିବେ। ରେଫରେନ୍ସ ଟିକେଟ୍: {ticket_id}।"
             }
 
             return {
-                "text": responses.get(lang, responses["en"]),
+                "text": confirmations.get(lang, confirmations["en"]),
                 "handoff_data": handoff_res,
                 "handoff_offered": True,
-                "tool_calls": [{"function": "request_human_handoff", "args": {"reason": "explicit_request"}}]
+                "tool_calls": [{"function": "request_human_handoff", "args": {"applicant_name": c_name, "applicant_phone": c_phone, "preferred_language": c_lang}}]
             }
 
         # 4. ACCOUNT INTENT (FR-21, FR-22)

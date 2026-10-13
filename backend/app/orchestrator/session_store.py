@@ -37,6 +37,12 @@ class SlotState(BaseModel):
     mortgage_employment_type: Optional[str] = None
     mortgage_nationality: Optional[str] = None
 
+    # Customer contact & advisor callback slots
+    customer_name: Optional[str] = None
+    customer_phone: Optional[str] = None
+    customer_preferred_language: Optional[str] = None
+    customer_consent_given: bool = False
+
 class SessionContext(BaseModel):
     session_id: str
     user_id: Optional[str] = None  # Populated when authenticated

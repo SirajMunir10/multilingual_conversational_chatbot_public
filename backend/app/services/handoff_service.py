@@ -13,10 +13,13 @@ class HandoffTicket(BaseModel):
     ticket_id: str
     session_id: str
     user_id: Optional[str] = None
+    applicant_name: Optional[str] = None
+    applicant_phone: Optional[str] = None
+    preferred_language: Optional[str] = None
     target_queue: str  # "sales", "mortgage", "support"
     priority: str = "normal"  # "vip", "high", "normal"
     reason: str  # "explicit_request", "high_value_lead", "negative_sentiment", "low_confidence_fallback"
-    assigned_advisor: Dict[str, str]
+    assigned_advisor: Dict[str, Any]
     customer_summary: Dict[str, Any]
     transcript_turns_count: int
     full_transcript: List[Dict[str, Any]]
@@ -37,31 +40,28 @@ class HandoffService:
 
     _handoff_queue: List[Dict[str, Any]] = []
 
-    # Advisor roster by queue
+    # Advisor roster by queue (No personal mobile or direct WhatsApp numbers)
     ADVISORS = {
         "mortgage": {
             "name": "Sarah Al-Maktoum",
             "title": "Senior UAE Mortgage Specialist",
             "license": "CBUAE / XOTO M-942",
-            "avatar": "/advisors/sarah.jpg",
-            "phone": "+971 4 800 9686",
-            "whatsapp": "+971 50 123 4567"
+            "department": "Mortgage Advisory",
+            "avatar": "/advisors/sarah.jpg"
         },
         "sales": {
             "name": "Omar Farooq",
             "title": "Prime & Ultra-Luxury Property Consultant",
             "license": "RERA Broker #48291",
-            "avatar": "/advisors/omar.jpg",
-            "phone": "+971 4 800 9686",
-            "whatsapp": "+971 50 789 4321"
+            "department": "Prime & Ultra-Luxury Sales",
+            "avatar": "/advisors/omar.jpg"
         },
         "support": {
             "name": "Rashid Bin Zayed",
             "title": "Client Concierge & Advisory Manager",
             "license": "XOTO CS-104",
-            "avatar": "/advisors/rashid.jpg",
-            "phone": "+971 4 800 9686",
-            "whatsapp": "+971 50 999 8888"
+            "department": "Client Concierge & Advisory",
+            "avatar": "/advisors/rashid.jpg"
         }
     }
 
@@ -138,17 +138,32 @@ class HandoffService:
     def initiate_handoff(
         cls,
         session_id: str,
+        applicant_name: Optional[str] = None,
+        applicant_phone: Optional[str] = None,
+        preferred_language: Optional[str] = None,
         reason: str = "explicit_request",
         preferred_team: Optional[str] = None,
         notes: Optional[str] = None,
         user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Executes a persistent, low-friction warm human handoff (FR-5).
-        Serializes full transcript, logs compliance audit record, and returns assigned advisor.
+        Executes a persistent, low-friction warm human handoff callback registration (FR-5, FR-20).
+        Serializes full transcript, logs compliance audit record, and schedules advisor contact.
         """
         session = SessionStore.get_or_create_session(session_id, user_id=user_id)
         session.handoff_requested = True
+
+        # Save details on session slots if provided
+        if applicant_name:
+            session.slots.customer_name = applicant_name
+        if applicant_phone:
+            session.slots.customer_phone = applicant_phone
+        if preferred_language:
+            session.slots.customer_preferred_language = preferred_language
+
+        client_name = applicant_name or session.slots.customer_name or "Valued Client"
+        client_phone = applicant_phone or session.slots.customer_phone or ""
+        contact_lang = preferred_language or session.slots.customer_preferred_language or session.language
 
         queue = preferred_team if preferred_team in ["sales", "mortgage", "support"] else cls.determine_target_queue(session)
         advisor = cls.ADVISORS.get(queue, cls.ADVISORS["support"])
@@ -170,6 +185,9 @@ class HandoffService:
         customer_summary = {
             "session_id": session_id,
             "user_id": session.user_id,
+            "applicant_name": client_name,
+            "applicant_phone": client_phone,
+            "preferred_language": contact_lang,
             "language": session.language,
             "active_intent": session.active_intent,
             "property_criteria": {
@@ -192,6 +210,9 @@ class HandoffService:
             ticket_id=ticket_id,
             session_id=session_id,
             user_id=session.user_id,
+            applicant_name=client_name,
+            applicant_phone=client_phone,
+            preferred_language=contact_lang,
             target_queue=queue,
             priority=priority,
             reason=reason,
@@ -217,12 +238,15 @@ class HandoffService:
                 "queue": queue,
                 "priority": priority,
                 "reason": reason,
+                "applicant_name": client_name,
+                "applicant_phone": client_phone,
+                "preferred_language": contact_lang,
                 "advisor": advisor["name"],
                 "transcript_turns": len(transcript)
             }
         )
 
-        logger.info(f"Handoff ticket created: {ticket_id} for queue {queue} (priority: {priority})")
+        logger.info(f"Handoff ticket created: {ticket_id} for queue {queue} (client: {client_name})")
 
         return {
             "status": "handoff_initiated",
@@ -230,10 +254,13 @@ class HandoffService:
             "queue": queue,
             "priority": priority,
             "estimated_wait_minutes": 1 if priority == "vip" else 2,
+            "applicant_name": client_name,
+            "applicant_phone": client_phone,
+            "preferred_language": contact_lang,
             "assigned_advisor": advisor,
             "customer_summary": customer_summary,
             "created_at": ticket.created_at,
-            "message": f"You have been connected with {advisor['name']} ({advisor['title']}). Full conversation details have been shared."
+            "message": f"Your callback request has been scheduled with our {advisor['title']}, {advisor['name']}. Our team will contact you directly at {client_phone} in {contact_lang}."
         }
 
     @classmethod

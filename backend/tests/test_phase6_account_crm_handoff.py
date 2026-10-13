@@ -227,17 +227,30 @@ class TestPhase6AccountCRMAndHandoff(unittest.TestCase):
         self.assertTrue("sign in" in data["text"].lower() or "log in" in data["text"].lower() or "protected" in data["text"].lower())
 
     def test_16_e2e_human_handoff_via_chat(self):
-        """End-to-end: User asking to speak with an advisor via /api/chat/message."""
-        resp = self.client.post(
+        """End-to-end: User asking to speak with an advisor requests permission/details in turn 1, registers callback in turn 2."""
+        # Turn 1: User asks for advisor without contact details -> bot asks for permission and contact info
+        resp1 = self.client.post(
             "/api/chat/message",
             json={"message": "Speak with advisor"},
             headers={"X-User-ID": "user_siraj_vip", "X-Session-ID": "sess_e2e_handoff"}
         )
-        self.assertEqual(resp.status_code, 200)
-        data = resp.json()
-        self.assertTrue(data.get("handoff_offered"))
-        self.assertIsNotNone(data.get("handoff_data"))
-        self.assertTrue(data["handoff_data"]["ticket_id"].startswith("XO-HD-"))
+        self.assertEqual(resp1.status_code, 200)
+        data1 = resp1.json()
+        self.assertFalse(data1.get("handoff_offered"))
+        self.assertIn("reach out", data1["text"].lower())
+
+        # Turn 2: User provides name, phone number, and preferred language -> bot registers callback and creates ticket
+        resp2 = self.client.post(
+            "/api/chat/message",
+            json={"message": "Yes, my name is Siraj Munir, phone +971501234567, language English"},
+            headers={"X-User-ID": "user_siraj_vip", "X-Session-ID": "sess_e2e_handoff"}
+        )
+        self.assertEqual(resp2.status_code, 200)
+        data2 = resp2.json()
+        self.assertTrue(data2.get("handoff_offered"))
+        self.assertIsNotNone(data2.get("handoff_data"))
+        self.assertTrue(data2["handoff_data"]["ticket_id"].startswith("XO-HD-"))
+        self.assertEqual(data2["handoff_data"]["applicant_phone"], "+971501234567")
 
     def test_17_http_gateway_account_endpoints(self):
         """HTTP API test for GET /api/gateways/account/saved-properties and /applications."""

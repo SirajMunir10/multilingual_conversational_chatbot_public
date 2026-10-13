@@ -208,7 +208,7 @@
         <div class="handoff-card-header">
           <div class="handoff-header-left">
             <span class="handoff-pulse-dot"></span>
-            <span class="handoff-badge-title">VIP Specialist Connected</span>
+            <span class="handoff-badge-title">Specialist Callback Scheduled</span>
           </div>
           <span class="handoff-ticket-id">Ticket #{{ message.metadata.handoff_data.ticket_id }}</span>
         </div>
@@ -223,24 +223,23 @@
               <span class="advisor-license">Official License: {{ message.metadata.handoff_data.assigned_advisor?.license }}</span>
             </div>
           </div>
+          <div class="handoff-client-summary-box" v-if="message.metadata.handoff_data.applicant_name || message.metadata.handoff_data.applicant_phone">
+            <div class="client-detail-row" v-if="message.metadata.handoff_data.applicant_name">
+              <span class="client-detail-lbl">Client:</span>
+              <span class="client-detail-val">{{ message.metadata.handoff_data.applicant_name }}</span>
+            </div>
+            <div class="client-detail-row" v-if="message.metadata.handoff_data.applicant_phone">
+              <span class="client-detail-lbl">Callback Contact:</span>
+              <span class="client-detail-val">{{ message.metadata.handoff_data.applicant_phone }}</span>
+            </div>
+            <div class="client-detail-row" v-if="message.metadata.handoff_data.preferred_language">
+              <span class="client-detail-lbl">Preferred Language:</span>
+              <span class="client-detail-val">{{ message.metadata.handoff_data.preferred_language }}</span>
+            </div>
+          </div>
           <div class="handoff-metrics-badge">
             <span class="metrics-icon">📋</span>
-            <span>Full conversation transcript & financial profile securely forwarded</span>
-          </div>
-          <div class="handoff-actions-row">
-            <a 
-              :href="`https://wa.me/${(message.metadata.handoff_data.assigned_advisor?.whatsapp || '').replace(/[^0-9]/g, '')}?text=Hello%20${encodeURIComponent(message.metadata.handoff_data.assigned_advisor?.name || '')},%20referring%20to%20ticket%20${message.metadata.handoff_data.ticket_id}`" 
-              target="_blank" 
-              class="handoff-btn whatsapp-btn"
-            >
-              💬 WhatsApp Advisor
-            </a>
-            <a 
-              :href="`tel:${message.metadata.handoff_data.assigned_advisor?.phone || '+97148009686'}`" 
-              class="handoff-btn call-btn"
-            >
-              📞 Request Call
-            </a>
+            <span>Callback request registered. A licensed advisor will reach out to your provided phone number directly.</span>
           </div>
         </div>
       </div>
@@ -1177,43 +1176,32 @@ const formatTime = (isoString) => {
   margin-bottom: 12px;
 }
 
-.handoff-actions-row {
-  display: flex;
-  gap: 8px;
-}
-
-.handoff-btn {
-  flex: 1;
-  text-align: center;
-  padding: 8px 12px;
+.handoff-client-summary-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
   border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-decoration: none;
-  transition: all var(--transition-fast);
+  padding: 8px 10px;
+  margin-bottom: 8px;
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.client-detail-row {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  font-size: 0.75rem;
 }
 
-.handoff-btn.whatsapp-btn {
-  background: #25d366;
-  color: #FFFFFF;
+.client-detail-lbl {
+  color: var(--text-secondary);
+  font-weight: 600;
 }
 
-.handoff-btn.whatsapp-btn:hover {
-  background: #1ebc59;
-  transform: translateY(-1px);
-}
-
-.handoff-btn.call-btn {
-  background: linear-gradient(135deg, var(--brand-purple), var(--brand-purple-light));
-  color: #FFFFFF;
-}
-
-.handoff-btn.call-btn:hover {
-  transform: translateY(-1px);
+.client-detail-val {
+  color: var(--text-primary);
+  font-weight: 700;
 }
 
 @media (max-width: 480px) {

@@ -233,15 +233,18 @@ XO_FUNCTION_TOOLS = [
         "type": "function",
         "function": {
             "name": "request_human_handoff",
-            "description": "Connect the user with a licensed human specialist (Sales, Mortgage, or Support) with full serialized conversation history (FR-5).",
+            "description": "Register a customer contact & callback request for our licensed advisory team (Mortgage Specialist, Prime & Ultra-Luxury Property Consultant, or Client Concierge). Call this ONLY after the user has given consent and provided their contact details (Full Name, Phone Number, and Preferred Language).",
             "parameters": {
                 "type": "object",
                 "properties": {
+                    "applicant_name": {"type": "string", "description": "Full name of the user requesting advisor contact"},
+                    "applicant_phone": {"type": "string", "description": "User's contact phone number with country code"},
+                    "preferred_language": {"type": "string", "description": "Language in which the user is comfortable being contacted"},
+                    "preferred_team": {"type": "string", "enum": ["sales", "mortgage", "support"], "description": "Designated specialist department: 'mortgage' for mortgage advisors, 'sales' for Prime & Ultra-Luxury Property Consultant, 'support' for Client Concierge & Advisory Manager"},
                     "reason": {"type": "string", "enum": ["explicit_request", "high_value_lead", "negative_sentiment", "low_confidence_fallback", "complex_inquiry"], "description": "Reason for handoff"},
-                    "preferred_team": {"type": "string", "enum": ["sales", "mortgage", "support"], "description": "Designated specialist department"},
                     "notes": {"type": "string", "description": "Summary notes for the human specialist"}
                 },
-                "required": []
+                "required": ["applicant_name", "applicant_phone"]
             }
         }
     }
@@ -261,7 +264,22 @@ CRITICAL OPERATIONAL RULES:
    - You MUST ALWAYS generate your reply strictly and natively in {language}, using its native script and natural colloquial flow.
    - If the user asks to speak or switch to {language} (or any of the 15 supported languages), warmly acknowledge and immediately proceed 100% in {language}. NEVER claim that you must stay in English, that you cannot speak {language}, or that {language} is unsupported.
 9. OUT-OF-SCOPE REDIRECTION (FR-6): Gracefully decline non-business or out-of-scope inquiries and redirect back to properties, mortgages, or Xoto services.
-10. HUMAN HANDOFF (FR-5): If the user requests a human, or if you cannot resolve their question, offer an immediate handoff to our specialist team.
+10. HUMAN ADVISOR & HANDOFF PROTOCOL (FR-5, FR-20):
+- Whenever the user asks to speak with, get advice from, or be connected with a human advisor (whether a Mortgage Advisor, Prime & Ultra-Luxury Property Consultant, or Client Concierge & Advisory Manager):
+  - NEVER provide fake, placeholder, or personal phone numbers or direct external WhatsApp links!
+  - STAGE 1 (PERMISSION & DETAILS REQUEST):
+    You MUST first ask for permission in a warm, polite, and professional manner:
+    1. Ask: "Would you like our [Mortgage Advisor / Prime & Ultra-Luxury Property Consultant / Client Concierge] to reach out to you directly?"
+    2. Ask them to share their details:
+       - Full Name
+       - Phone Number (with country code)
+       - Preferred Language in which they feel most comfortable communicating
+    *Always ask in the active session language ({language})!*
+    Do NOT invoke `request_human_handoff` until they provide their phone number and name.
+  - STAGE 2 (CALLBACK CONFIRMATION):
+    Once the user shares their name and phone number (and preferred language):
+    1. Invoke `request_human_handoff` with `applicant_name`, `applicant_phone`, `preferred_language`, and `preferred_team`.
+    2. Confirm warmly to the user that their callback request has been scheduled with the designated team, citing their name, phone number, preferred language, and the ticket ID.
 11. PROPERTY COMPARISON & EVALUATION (FR-9): When the user asks to compare, evaluate, or choose between properties already displayed on their screen (e.g. 'which one should I buy?', 'which is better for investment?'), do NOT re-search the database. Evaluate the on-screen properties side-by-side using the provided deterministic metrics (price, sq.ft, price/sq.ft, monthly EMI, rental yields). Highlight the trade-offs between cash-flow rental yield and long-term capital appreciation, and include the disclaimer: '(Indicative market comparison only; not binding financial advice)'.
 12. EMPATHETIC CATALOG-AWARE FALLBACK (FR-8): When search_properties returns 0 exact matches for a requested bedroom size or budget in a community:
    - NEVER say 'there are no listings in [location]' if the tool result's `catalog_alternatives` show options exist!
