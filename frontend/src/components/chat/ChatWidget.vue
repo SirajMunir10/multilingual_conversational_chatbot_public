@@ -245,6 +245,13 @@
         <button type="button" class="btn-stop-playback" @click.stop="stopVoicePlayback" aria-label="Stop audio">⏹</button>
       </div>
 
+      <!-- Autoplay Fallback Bar (if browser blocks auto-play) -->
+      <div v-if="!isPlayingVoice && autoplayBlockedAudioUrl" class="voice-playback-bar tap-to-play" @click="playAudioUrl(autoplayBlockedAudioUrl)" title="Tap to listen to XO's voice response">
+        <span class="playback-dot" style="background: #a855f7;"></span>
+        <span class="playback-text">🔊 Tap to listen to XO's voice response</span>
+        <button type="button" class="btn-stop-playback" style="background: #a855f7;" aria-label="Play audio">▶</button>
+      </div>
+
       <!-- Advisor Standby Notification Bar -->
       <div class="advisor-standby-bar">
         <div class="standby-status">
@@ -824,19 +831,70 @@ const sendMessage = async () => {
 // Composed Voice-to-Voice (V2V) Interaction
 const mediaRecorder = ref(null)
 const audioChunks = ref([])
+let currentVoiceBlobUrl = null
+const autoplayBlockedAudioUrl = ref(null)
 
 const stopVoicePlayback = () => {
   if (audioPlayerRef.value) {
     try {
       audioPlayerRef.value.pause()
       audioPlayerRef.value.currentTime = 0
-      audioPlayerRef.value.removeAttribute('src')
-      audioPlayerRef.value.load()
     } catch (e) {
       console.warn('Error pausing audio playback:', e)
     }
   }
+  if (currentVoiceBlobUrl) {
+    try { URL.revokeObjectURL(currentVoiceBlobUrl) } catch (e) {}
+    currentVoiceBlobUrl = null
+  }
   isPlayingVoice.value = false
+}
+
+const base64ToAudioUrl = (base64String) => {
+  try {
+    if (currentVoiceBlobUrl) {
+      try { URL.revokeObjectURL(currentVoiceBlobUrl) } catch (e) {}
+      currentVoiceBlobUrl = null
+    }
+    const cleanB64 = base64String.includes(',') ? base64String.split(',')[1] : base64String
+    const binary = atob(cleanB64)
+    const len = binary.length
+    const buffer = new Uint8Array(len)
+    for (let i = 0; i < len; i++) {
+      buffer[i] = binary.charCodeAt(i)
+    }
+    const blob = new Blob([buffer], { type: 'audio/mpeg' })
+    currentVoiceBlobUrl = URL.createObjectURL(blob)
+    return currentVoiceBlobUrl
+  } catch (e) {
+    console.warn('Error converting base64 to audio Blob URL:', e)
+    return base64String
+  }
+}
+
+const playAudioUrl = async (audioUrl) => {
+  if (!audioPlayerRef.value || !audioUrl) return
+
+  try {
+    audioPlayerRef.value.pause()
+    audioPlayerRef.value.currentTime = 0
+    audioPlayerRef.value.src = audioUrl
+    audioPlayerRef.value.onended = () => {
+      stopVoicePlayback()
+    }
+    audioPlayerRef.value.onerror = (e) => {
+      console.warn('Audio playback error event:', e)
+      isPlayingVoice.value = false
+    }
+
+    isPlayingVoice.value = true
+    await audioPlayerRef.value.play()
+    autoplayBlockedAudioUrl.value = null
+  } catch (err) {
+    console.warn('Voice auto-play blocked or failed:', err)
+    isPlayingVoice.value = false
+    autoplayBlockedAudioUrl.value = audioUrl
+  }
 }
 
 // 1. Voice Session Greeting (Requirement 1)
@@ -1097,6 +1155,15 @@ const stopVoiceRecording = () => {
 }
 
 const toggleVoiceRecording = async () => {
+  // Prime audio player on direct user gesture to ensure browser grants playback permission
+  if (audioPlayerRef.value) {
+    try {
+      audioPlayerRef.value.play().then(() => {
+        audioPlayerRef.value.pause()
+      }).catch(() => {})
+    } catch (e) {}
+  }
+
   // If XO is currently speaking, clicking mic interrupts audio and starts recording
   if (isPlayingVoice.value) {
     stopVoicePlayback()
@@ -1177,6 +1244,15 @@ const cancelVoiceInput = () => {
 const confirmVoiceInput = async () => {
   if (isVoiceInFlight.value) return
   resetSilenceTimer()
+
+  // Prime audio player on direct user gesture
+  if (audioPlayerRef.value) {
+    try {
+      audioPlayerRef.value.play().then(() => {
+        audioPlayerRef.value.pause()
+      }).catch(() => {})
+    } catch (e) {}
+  }
   if (audioAnalysisInterval) {
     clearInterval(audioAnalysisInterval)
     audioAnalysisInterval = null
@@ -1304,12 +1380,8 @@ const executeVoicePipeline = async (recordedBlob = null, textOverride = null) =>
     })
 
     if (data.audio_base64 && audioPlayerRef.value) {
-      stopVoicePlayback()
-      isPlayingVoice.value = true
-      audioPlayerRef.value.src = data.audio_base64
-      audioPlayerRef.value.play().catch(() => {
-        isPlayingVoice.value = false
-      })
+      const audioUrl = base64ToAudioUrl(data.audio_base64)
+      await playAudioUrl(audioUrl)
     }
   } catch (err) {
     let errMsg = err.message

@@ -122,6 +122,6 @@ async def voice_interaction_pipeline(
         "application_status": orchestration_result.get("application_status"),
         "handoff_data": orchestration_result.get("handoff_data"),
         "handoff_offered": orchestration_result.get("handoff_offered", False),
-        "audio_base64": f"data:audio/mp3;base64,{audio_base64}",
+        "audio_base64": f"data:audio/mpeg;base64,{audio_base64}",
         "pipeline": f"{settings.STT_MODEL} -> {settings.LLM_MODEL} -> {settings.TTS_MODEL}"
     }
