@@ -14,24 +14,12 @@ class TTSService:
     """
 
     # Curated Voice IDs for ElevenLabs Flash v2.5
-    # Horatius (qXpMhyvQqiRxWQs4qSSB) - High-clarity, high-energy multilingual voice
+    # Default is Horatius (qXpMhyvQqiRxWQs4qSSB) - Energetic Character voice
     VOICE_PROFILES = {
-        "en": "qXpMhyvQqiRxWQs4qSSB",  # Horatius (English)
-        "ar": "qXpMhyvQqiRxWQs4qSSB",  # Arabic
-        "hi": "qXpMhyvQqiRxWQs4qSSB",  # Hindi
-        "ur": "qXpMhyvQqiRxWQs4qSSB",  # Urdu
-        "ru": "qXpMhyvQqiRxWQs4qSSB",  # Russian
-        "fr": "qXpMhyvQqiRxWQs4qSSB",  # French
-        "de": "qXpMhyvQqiRxWQs4qSSB",  # German
-        "es": "qXpMhyvQqiRxWQs4qSSB",  # Spanish
-        "tr": "qXpMhyvQqiRxWQs4qSSB",  # Turkish
-        "ta": "qXpMhyvQqiRxWQs4qSSB",  # Tamil
-        "te": "qXpMhyvQqiRxWQs4qSSB",  # Telugu
-        "bn": "qXpMhyvQqiRxWQs4qSSB",  # Bengali
-        "pa": "qXpMhyvQqiRxWQs4qSSB",  # Punjabi
-        "gu": "qXpMhyvQqiRxWQs4qSSB",  # Gujarati
-        "mwr": "qXpMhyvQqiRxWQs4qSSB", # Marwadi
-        "or": "qXpMhyvQqiRxWQs4qSSB"   # Odia
+        "en": "qXpMhyvQqiRxWQs4qSSB",  # Horatius (Energetic, confident character voice)
+        "ar": "qXpMhyvQqiRxWQs4qSSB",  # Multilingual Flash v2.5 native Arabic
+        "hi": "qXpMhyvQqiRxWQs4qSSB",  # Multilingual Flash v2.5 native Hindi
+        "ur": "qXpMhyvQqiRxWQs4qSSB"   # Multilingual Flash v2.5 native Urdu
     }
 
     @classmethod
@@ -39,11 +27,14 @@ class TTSService:
         cls,
         text: str,
         language: str = "en",
-        voice: Optional[str] = None
+        voice: Optional[str] = None,
+        session_id: Optional[str] = None
     ) -> bytes:
         """
         Synthesizes text into audio bytes (MP3 format) using ElevenLabs Flash v2.5.
         """
+        from app.core.usage_tracker import UsageTracker
+
         voice_id = voice or getattr(settings, "ELEVENLABS_VOICE_ID", "") or cls.VOICE_PROFILES.get(language, "qXpMhyvQqiRxWQs4qSSB")
         api_key = settings.ELEVENLABS_API_KEY
         model_id = settings.TTS_MODEL or "eleven_flash_v2_5"
@@ -72,9 +63,22 @@ class TTSService:
                     response = await client.post(url, headers=headers, params=params, json=payload)
                     if response.status_code == 200:
                         audio_bytes = response.content
+                        char_cost_hdr = response.headers.get("character-cost")
+                        provider_char_cost = int(char_cost_hdr) if char_cost_hdr and char_cost_hdr.isdigit() else None
+
+                        UsageTracker.record_tts(
+                            session_id=session_id,
+                            model=model_id,
+                            voice_id=voice_id,
+                            character_count=len(text),
+                            provider_character_cost=provider_char_cost,
+                            audio_bytes=len(audio_bytes),
+                            status="success"
+                        )
+
                         logger.info(
                             f"ElevenLabs Flash v2.5 synthesized {len(text)} chars in [{language}] "
-                            f"(voice={voice_id}, size={len(audio_bytes)} bytes)"
+                            f"(voice={voice_id}, size={len(audio_bytes)} bytes, credits={provider_char_cost})"
                         )
                         return audio_bytes
                     else:
@@ -82,8 +86,22 @@ class TTSService:
                             f"ElevenLabs API returned status {response.status_code}: {response.text}. "
                             f"Falling back to mock audio."
                         )
+                        UsageTracker.record_tts(
+                            session_id=session_id,
+                            model=model_id,
+                            voice_id=voice_id,
+                            character_count=len(text),
+                            status=f"error_{response.status_code}"
+                        )
             except Exception as e:
                 logger.warning(f"Live ElevenLabs TTS ({model_id}) error: {e}. Generating prototype audio fallback.")
+                UsageTracker.record_tts(
+                    session_id=session_id,
+                    model=model_id,
+                    voice_id=voice_id,
+                    character_count=len(text),
+                    status=f"exception_{e}"
+                )
 
         # Valid minimal audio fallback (for offline development/test runs)
         return cls._generate_mock_wav_audio()

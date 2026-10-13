@@ -281,24 +281,7 @@ PERSONALITY & VIBE (CHEERLEADER & CUTE PERSONA):
 class LLMService:
     @classmethod
     def get_system_prompt(cls, language: str = "en") -> str:
-        lang_names = {
-            "en": "English",
-            "ar": "Arabic (العربية)",
-            "hi": "Hindi (हिन्दी)",
-            "ur": "Urdu (اردو)",
-            "ru": "Russian (Русский)",
-            "fr": "French (Français)",
-            "de": "German (Deutsch)",
-            "es": "Spanish (Español)",
-            "tr": "Turkish (Türkçe)",
-            "ta": "Tamil (தமிழ்)",
-            "te": "Telugu (తెలుగు)",
-            "bn": "Bengali (বাংলা)",
-            "pa": "Punjabi (ਪੰਜਾਬੀ)",
-            "gu": "Gujarati (ગુજરાતી)",
-            "mwr": "Marwadi (मारवाड़ी)",
-            "or": "Odia (ଓଡ଼ିଆ)"
-        }
+        lang_names = {"en": "English", "ar": "Arabic (العربية)", "hi": "Hindi (हिन्दी)", "ur": "Urdu (اردو)"}
         return SYSTEM_PROMPT_TEMPLATE.format(language=lang_names.get(language, "English"))
 
     @classmethod

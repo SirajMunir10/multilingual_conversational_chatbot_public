@@ -35,3 +35,21 @@ def get_system_health():
         },
         "launch_languages": settings.LAUNCH_LANGUAGES
     }
+
+@router.get("/admin/usage/latest")
+def get_latest_usage_summary():
+    """
+    Read-only diagnostic endpoint retrieving the API usage and cost summary
+    for the most recent conversation session.
+    """
+    from app.core.usage_tracker import UsageTracker
+    return UsageTracker.get_session_summary()
+
+@router.get("/admin/usage/{session_id}")
+def get_session_usage_summary(session_id: str):
+    """
+    Read-only diagnostic endpoint retrieving the API usage and cost summary
+    for a specific conversation session.
+    """
+    from app.core.usage_tracker import UsageTracker
+    return UsageTracker.get_session_summary(session_id=session_id)

@@ -71,7 +71,7 @@ class RAGService:
         return sanitized.strip()
 
     @classmethod
-    def _generate_query_embedding(cls, text: str) -> np.ndarray:
+    def _generate_query_embedding(cls, text: str, session_id: Optional[str] = None) -> np.ndarray:
         """
         PRD Step: Embeddings
         Generates 1536-dimensional unit-normalized embedding using text-embedding-3-small.
@@ -81,6 +81,18 @@ class RAGService:
             model=settings.EMBEDDING_MODEL,
             input=text
         )
+        if session_id and hasattr(response, "usage") and response.usage:
+            try:
+                from app.core.usage_tracker import UsageTracker
+                toks = getattr(response.usage, "prompt_tokens", 0) or getattr(response.usage, "total_tokens", 0) or 0
+                UsageTracker.record_embedding(
+                    session_id=session_id,
+                    model=settings.EMBEDDING_MODEL,
+                    prompt_tokens=toks
+                )
+            except Exception as e_track:
+                logger.debug(f"Could not record embedding usage: {e_track}")
+
         vec = np.array(response.data[0].embedding, dtype=np.float32)
         norm = np.linalg.norm(vec)
         if norm > 0:
@@ -88,7 +100,7 @@ class RAGService:
         return vec
 
     @classmethod
-    def retrieve_candidates(cls, query: str, top_k: int = 8) -> List[Dict[str, Any]]:
+    def retrieve_candidates(cls, query: str, top_k: int = 8, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         PRD Step: Retriever
         Embeds the query and queries the Vector Database for top candidates.
@@ -99,7 +111,7 @@ class RAGService:
         if not clean_query:
             return []
 
-        query_vector = cls._generate_query_embedding(clean_query)
+        query_vector = cls._generate_query_embedding(clean_query, session_id=session_id)
         candidates = VectorDatabase.search(
             query_vector=query_vector,
             top_k=top_k,
@@ -248,6 +260,6 @@ class RAGService:
                 "message": "Query cannot be empty."
             }
 
-        candidates = cls.retrieve_candidates(query, top_k=8)
+        candidates = cls.retrieve_candidates(query, top_k=8, session_id=session_id)
         result = cls.rerank_and_filter(candidates, query)
         return result

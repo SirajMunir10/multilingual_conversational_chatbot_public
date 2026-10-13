@@ -21,6 +21,7 @@ from app.services.mortgage_service import (
     EligibilityInput
 )
 from app.services.property_service import PropertyDiscoveryService, PropertySearchFilter
+from app.core.usage_tracker import UsageTracker
 
 logger = logging.getLogger("xo.orchestrator")
 
@@ -79,6 +80,7 @@ class ConversationOrchestrator:
             content=sanitized_input,
             language=session.language
         )
+        UsageTracker.record_turn(session.session_id, role="user")
 
         # 5. Intent Routing & Slot Filling (FR-3, FR-4)
         intent = cls._classify_intent(sanitized_input, session)
@@ -96,6 +98,7 @@ class ConversationOrchestrator:
             language=session.language,
             metadata=response_data.get("metadata", {})
         )
+        UsageTracker.record_turn(session.session_id, role="assistant")
 
         # Audit Log Event
         AuditService.log_event(
@@ -409,6 +412,23 @@ class ConversationOrchestrator:
                     tool_choice=tool_choice
                 )
 
+                if hasattr(response, "usage") and response.usage:
+                    u = response.usage
+                    cached_t = 0
+                    if hasattr(u, "prompt_tokens_details") and u.prompt_tokens_details:
+                        cached_t = getattr(u.prompt_tokens_details, "cached_tokens", 0) or 0
+                    elif isinstance(u, dict) and "prompt_tokens_details" in u:
+                        cached_t = u["prompt_tokens_details"].get("cached_tokens", 0)
+                    UsageTracker.record_llm(
+                        session_id=session.session_id,
+                        model=settings.LLM_MODEL,
+                        prompt_tokens=getattr(u, "prompt_tokens", 0),
+                        cached_tokens=cached_t,
+                        completion_tokens=getattr(u, "completion_tokens", 0),
+                        total_tokens=getattr(u, "total_tokens", 0),
+                        tool_call_step="primary"
+                    )
+
                 choice = response.choices[0]
                 reply_message = choice.message
 
@@ -446,6 +466,22 @@ class ConversationOrchestrator:
                             model=settings.LLM_MODEL,
                             messages=messages
                         )
+                        if hasattr(second_response, "usage") and second_response.usage:
+                            u2 = second_response.usage
+                            cached_t2 = 0
+                            if hasattr(u2, "prompt_tokens_details") and u2.prompt_tokens_details:
+                                cached_t2 = getattr(u2.prompt_tokens_details, "cached_tokens", 0) or 0
+                            elif isinstance(u2, dict) and "prompt_tokens_details" in u2:
+                                cached_t2 = u2["prompt_tokens_details"].get("cached_tokens", 0)
+                            UsageTracker.record_llm(
+                                session_id=session.session_id,
+                                model=settings.LLM_MODEL,
+                                prompt_tokens=getattr(u2, "prompt_tokens", 0),
+                                cached_tokens=cached_t2,
+                                completion_tokens=getattr(u2, "completion_tokens", 0),
+                                total_tokens=getattr(u2, "total_tokens", 0),
+                                tool_call_step="tool_followup"
+                            )
                         final_text = second_response.choices[0].message.content or ""
                     except Exception as e2:
                         logger.warning(f"Error in second LLM completion after tool call: {e2}")
@@ -817,19 +853,7 @@ class ConversationOrchestrator:
                 "ar": f"بناءً على ضوابط مصرف الإمارات المركزي (سقف 50% لعبء الدين)، بدخل شهري {income:,.0f} درهم، فإن القسط الشهري الأقصى التقديري هو {summary['max_allowable_monthly_emi_aed']:,.0f} درهم، مما يتيح لك تمويلاً أقصى يصل إلى {summary['max_borrowing_capacity_aed']:,.0f} درهم وميزانية شراء حتى {summary['max_property_price_aed']:,.0f} درهم ({afford_res['disclaimer']}).",
                 "hi": f"यूएई सेंट्रल बैंक के 50% डीबीआर कैप के अनुसार, {income:,.0f} AED मासिक आय पर आपकी अधिकतम मासिक ईएमआई {summary['max_allowable_monthly_emi_aed']:,.0f} AED बनती है, जिससे {summary['max_borrowing_capacity_aed']:,.0f} AED का अधिकतम लोन और {summary['max_property_price_aed']:,.0f} AED तक की प्रॉपर्टी खरीदी जा सकती है ({afford_res['disclaimer']})।",
                 "ur": f"یو اے ای سنٹرل بینک کے 50% DBR ضابطے کے تحت، {income:,.0f} درہم ماہانہ آمدنی پر آپ کی زیادہ سے زیادہ متوقع ماہانہ قسط {summary['max_allowable_monthly_emi_aed']:,.0f} درہم ہے، جس سے آپ کو {summary['max_borrowing_capacity_aed']:,.0f} درہم تک کا قرض اور {summary['max_property_price_aed']:,.0f} درہم تک کی پراپرٹی بجٹ حاصل ہو سکتی ہے ({afford_res['disclaimer']})۔",
-                "en": f"Based on UAE Central Bank rules (50% DBR cap), for a monthly income of AED {income:,.0f}, your maximum estimated monthly installment is AED {summary['max_allowable_monthly_emi_aed']:,.0f}, giving an estimated borrowing capacity of AED {summary['max_borrowing_capacity_aed']:,.0f} and an affordable property purchase price of up to AED {summary['max_property_price_aed']:,.0f} ({afford_res['disclaimer']}).",
-                "ru": f"Согласно правилам ЦБ ОАЭ (лимит DBR 50%), при ежемесячном доходе {income:,.0f} AED, максимальный расчетный ежемесячный платеж составляет {summary['max_allowable_monthly_emi_aed']:,.0f} AED, что дает кредитный лимит до {summary['max_borrowing_capacity_aed']:,.0f} AED и бюджет покупки до {summary['max_property_price_aed']:,.0f} AED ({afford_res['disclaimer']}).",
-                "fr": f"Selon les directives de la Banque Centrale des EAU (plafond de 50% DBR), pour un revenu mensuel de {income:,.0f} AED, votre mensualité maximale estimée est de {summary['max_allowable_monthly_emi_aed']:,.0f} AED, offrant une capacité d'emprunt de {summary['max_borrowing_capacity_aed']:,.0f} AED et un prix d'achat jusqu'à {summary['max_property_price_aed']:,.0f} AED ({afford_res['disclaimer']}).",
-                "de": f"Gemäß den Richtlinien der VAE-Zentralbank (50% DBR-Obergrenze) beträgt Ihre geschätzte maximale monatliche Rate bei einem Einkommen von {income:,.0f} AED {summary['max_allowable_monthly_emi_aed']:,.0f} AED, was eine Kreditkapazität von bis zu {summary['max_borrowing_capacity_aed']:,.0f} AED und einen Kaufpreis von bis zu {summary['max_property_price_aed']:,.0f} AED ermöglicht ({afford_res['disclaimer']}).",
-                "es": f"Según las normas del Banco Central de los EAU (límite del 50% de DBR), para un ingreso mensual de {income:,.0f} AED, su cuota mensual máxima estimada es de {summary['max_allowable_monthly_emi_aed']:,.0f} AED, lo que permite una capacidad de préstamo de {summary['max_borrowing_capacity_aed']:,.0f} AED y un precio de compra de hasta {summary['max_property_price_aed']:,.0f} AED ({afford_res['disclaimer']}).",
-                "tr": f"BAE Merkez Bankası kurallarına göre (%50 DBR sınırı), {income:,.0f} AED aylık gelir için tahmini azami aylık taksitiniz {summary['max_allowable_monthly_emi_aed']:,.0f} AED'dir; bu da {summary['max_borrowing_capacity_aed']:,.0f} AED tutarında kredi kapasitesi ve {summary['max_property_price_aed']:,.0f} AED'ye kadar bütçe sağlar ({afford_res['disclaimer']}).",
-                "ta": f"யுஏஇ மத்திய வங்கியின் விதிமுறைகளின்படி (50% DBR வரம்பு), மாத வருமானம் {income:,.0f} AED-க்கு, உங்கள் அதிகபட்ச மதிப்பிடப்பட்ட மாதத் தவணை {summary['max_allowable_monthly_emi_aed']:,.0f} AED ஆகும். இதன் மூலம் கடன் திறன் {summary['max_borrowing_capacity_aed']:,.0f} AED மற்றும் சொத்து பட்ஜெட் {summary['max_property_price_aed']:,.0f} AED வரை பெறலாம் ({afford_res['disclaimer']}).",
-                "te": f"యూఏఈ సెంట్రల్ బ్యాంక్ నిబంధనల ప్రకారం (50% DBR పరిమితి), నెలకు {income:,.0f} AED ఆదాయానికి, మీ గరిష్ట అంచనా నెలవారీ వాయిదా {summary['max_allowable_monthly_emi_aed']:,.0f} AED. దీని ద్వారా గరిష్ట లోన్ సామర్థ్యం {summary['max_borrowing_capacity_aed']:,.0f} AED మరియు కొనుగోలు బడ్జెట్ {summary['max_property_price_aed']:,.0f} AED లభిస్తుంది ({afford_res['disclaimer']}).",
-                "bn": f"সংযুক্ত আরব আমিরাত কেন্দ্রীয় ব্যাংকের নিয়ম অনুসারে (৫০% DBR ক্যাপ), মাসিক {income:,.0f} AED আয়ের জন্য আপনার সর্বোচ্চ আনুমানিক মাসিক কিস্তি {summary['max_allowable_monthly_emi_aed']:,.0f} AED, যার ফলে ঋণ ক্ষমতা {summary['max_borrowing_capacity_aed']:,.0f} AED এবং সম্পত্তি কেনার বাজেট {summary['max_property_price_aed']:,.0f} AED পর্যন্ত হতে পারে ({afford_res['disclaimer']})।",
-                "pa": f"ਯੂਏਈ ਸੈਂਟਰਲ ਬੈਂਕ ਦੇ ਨਿਯਮਾਂ ਅਨੁਸਾਰ (50% DBR ਕੈਪ), {income:,.0f} AED ਮਾਸਿਕ ਆਮਦਨ 'ਤੇ ਤੁਹਾਡੀ ਵੱਧ ਤੋਂ ਵੱਧ ਅੰਦਾਜ਼ਨ ਮਹੀਨਾਵਾਰ ਕਿਸ਼ਤ {summary['max_allowable_monthly_emi_aed']:,.0f} AED ਬਣਦੀ ਹੈ, ਜਿਸ ਨਾਲ ਲੋਨ ਸਮਰੱਥਾ {summary['max_borrowing_capacity_aed']:,.0f} AED ਅਤੇ ਪ੍ਰਾਪਰਟੀ ਬਜਟ {summary['max_property_price_aed']:,.0f} AED ਤੱਕ ਹੋ ਸਕਦਾ ਹੈ ({afford_res['disclaimer']})।",
-                "gu": f"યુએઈ સેન્ટ્રલ બેંકના નિયમો અનુસાર (50% DBR કેપ), {income:,.0f} AED માસિક આવક પર તમારો મહત્તમ અંદાજિત માસિક હપ્તો {summary['max_allowable_monthly_emi_aed']:,.0f} AED બને છે, જેનાથી લોન ક્ષમતા {summary['max_borrowing_capacity_aed']:,.0f} AED અને પ્રોપર્ટી બજેટ {summary['max_property_price_aed']:,.0f} AED સુધી થઈ શકે છે ({afford_res['disclaimer']}).",
-                "mwr": f"यूएई सेंट्रल बैंक रा 50% डीबीआर नियमां मूजब, {income:,.0f} AED महीना री कमाई माथे आपरो ज्यादा सूं ज्यादा मासिक किश्त {summary['max_allowable_monthly_emi_aed']:,.0f} AED बणे है, जिण सूं {summary['max_borrowing_capacity_aed']:,.0f} AED रो लोन अर {summary['max_property_price_aed']:,.0f} AED ताईं री प्रॉपर्टी खरीदी जा सके है ({afford_res['disclaimer']})।",
-                "or": f"ୟୁଏଇ ସେଣ୍ଟ୍ରାଲ ବ୍ୟାଙ୍କ ନିୟମ ଅନୁସାରେ (50% DBR କ୍ୟାପ୍), ମାସିକ {income:,.0f} AED ଆୟ ପାଇଁ ଆପଣଙ୍କର ସର୍ବାଧିକ ଆନୁମାନିକ ମାସିକ କିସ୍ତି {summary['max_allowable_monthly_emi_aed']:,.0f} AED ହେବ, ଯାହା ଦ୍ୱାରା ଋଣ କ୍ଷମତା {summary['max_borrowing_capacity_aed']:,.0f} AED ଏବଂ ସମ୍ପତ୍ତି କ୍ରୟ ବଜେଟ୍ {summary['max_property_price_aed']:,.0f} AED ପର୍ଯ୍ୟନ୍ତ ମିଳିପାରିବ ({afford_res['disclaimer']})।"
+                "en": f"Based on UAE Central Bank rules (50% DBR cap), for a monthly income of AED {income:,.0f}, your maximum estimated monthly installment is AED {summary['max_allowable_monthly_emi_aed']:,.0f}, giving an estimated borrowing capacity of AED {summary['max_borrowing_capacity_aed']:,.0f} and an affordable property purchase price of up to AED {summary['max_property_price_aed']:,.0f} ({afford_res['disclaimer']})."
             }
             return {
                 "text": narratives.get(lang, narratives["en"]),
@@ -846,19 +870,7 @@ class ConversationOrchestrator:
                 "ar": f"لقرض تمويلي قدره {loan:,.0f} درهم بفائدة {rate}% على مدار {tenure} سنة، فإن القسط الشهري التقديري هو {emi_res['periodic_installment_aed']:,.0f} درهم ({emi_res['disclaimer']}). إجمالي الفائدة المستحقة طوال الفترة هو {emi_res['total_interest_payable_aed']:,.0f} درهم.",
                 "hi": f"{loan:,.0f} AED लोन राशि पर {rate}% ब्याज दर और {tenure} साल की अवधि के लिए आपकी अनुमानित मासिक ईएमआई {emi_res['periodic_installment_aed']:,.0f} AED होगी ({emi_res['disclaimer']})। कुल देय ब्याज {emi_res['total_interest_payable_aed']:,.0f} AED है।",
                 "ur": f"{loan:,.0f} درہم کے قرض پر {rate}% سود اور {tenure} سال کی مدت کے لیے، متوقع ماہانہ قسط {emi_res['periodic_installment_aed']:,.0f} درہم ہوگی ({emi_res['disclaimer']})۔ کل قابلِ ادائیگی سود {emi_res['total_interest_payable_aed']:,.0f} درہم ہے۔",
-                "en": f"For a loan amount of AED {loan:,.0f} at {rate}% annual interest over {tenure} years, your estimated monthly payment is AED {emi_res['periodic_installment_aed']:,.0f} ({emi_res['disclaimer']}). Total interest payable over the term is AED {emi_res['total_interest_payable_aed']:,.0f}.",
-                "ru": f"Для суммы кредита {loan:,.0f} AED под {rate}% годовых на срок {tenure} лет ваш расчетный ежемесячный платеж составляет {emi_res['periodic_installment_aed']:,.0f} AED ({emi_res['disclaimer']}). Общая сумма процентов: {emi_res['total_interest_payable_aed']:,.0f} AED.",
-                "fr": f"Pour un prêt de {loan:,.0f} AED au taux de {rate}% sur {tenure} ans, votre mensualité estimée est de {emi_res['periodic_installment_aed']:,.0f} AED ({emi_res['disclaimer']}). Intérêts totaux payables : {emi_res['total_interest_payable_aed']:,.0f} AED.",
-                "de": f"Für einen Kreditbetrag von {loan:,.0f} AED bei {rate}% Zinsen über {tenure} Jahre beträgt Ihre geschätzte monatliche Rate {emi_res['periodic_installment_aed']:,.0f} AED ({emi_res['disclaimer']}). Gesamtzinsen: {emi_res['total_interest_payable_aed']:,.0f} AED.",
-                "es": f"Para un préstamo de {loan:,.0f} AED al {rate}% anual durante {tenure} años, su pago mensual estimado es de {emi_res['periodic_installment_aed']:,.0f} AED ({emi_res['disclaimer']}). Total de intereses a pagar: {emi_res['total_interest_payable_aed']:,.0f} AED.",
-                "tr": f"{loan:,.0f} AED kredi tutarı için %{rate} faiz ve {tenure} yıl vade ile tahmini aylık taksitiniz {emi_res['periodic_installment_aed']:,.0f} AED'dir ({emi_res['disclaimer']}). Toplam faiz: {emi_res['total_interest_payable_aed']:,.0f} AED.",
-                "ta": f"{loan:,.0f} AED கடன் தொகைக்கு, {rate}% வட்டி மற்றும் {tenure} ஆண்டுகள் காலத்திற்கு உங்கள் மதிப்பிடப்பட்ட மாதத் தவணை {emi_res['periodic_installment_aed']:,.0f} AED ஆகும் ({emi_res['disclaimer']}). மொத்த வட்டி: {emi_res['total_interest_payable_aed']:,.0f} AED.",
-                "te": f"{loan:,.0f} AED లోన్ మొత్తానికి, {rate}% వడ్డీతో {tenure} సంవత్సరాల కాలానికి మీ అంచనా నెలవారీ వాయిదా {emi_res['periodic_installment_aed']:,.0f} AED అవుతుంది ({emi_res['disclaimer']}). మొత్తం వడ్డీ: {emi_res['total_interest_payable_aed']:,.0f} AED.",
-                "bn": f"{loan:,.0f} AED ঋণের জন্য {rate}% সুদে {tenure} বছরের মেয়াদে আপনার আনুমানিক মাসিক কিস্তি হবে {emi_res['periodic_installment_aed']:,.0f} AED ({emi_res['disclaimer']})। মোট প্রদেয় সুদ: {emi_res['total_interest_payable_aed']:,.0f} AED।",
-                "pa": f"{loan:,.0f} AED ਲੋਨ ਰਕਮ ਲਈ {rate}% ਵਿਆਜ 'ਤੇ {tenure} ਸਾਲਾਂ ਦੀ ਮਿਆਦ ਲਈ ਤੁਹਾਡੀ ਅੰਦਾਜ਼ਨ ਮਹੀਨਾਵਾਰ ਕਿਸ਼ਤ {emi_res['periodic_installment_aed']:,.0f} AED ਹੋਵੇਗੀ ({emi_res['disclaimer']})। ਕੁੱਲ ਵਿਆਜ: {emi_res['total_interest_payable_aed']:,.0f} AED ਹੈ।",
-                "gu": f"{loan:,.0f} AED લોનની રકમ માટે {rate}% વ્યાજે {tenure} વર્ષની મુદત માટે તમારો અંદાજિત માસિક હપ્તો {emi_res['periodic_installment_aed']:,.0f} AED થશે ({emi_res['disclaimer']}). કુલ ચૂકવવાપાત્ર વ્યાજ: {emi_res['total_interest_payable_aed']:,.0f} AED છે।",
-                "mwr": f"{loan:,.0f} AED लोन माथे {rate}% ब्याज अर {tenure} साल री मुद्दत सारू आपरी अंदाजन मासिक किश्त {emi_res['periodic_installment_aed']:,.0f} AED होवेला ({emi_res['disclaimer']})। कुल देणो ब्याज: {emi_res['total_interest_payable_aed']:,.0f} AED है।",
-                "or": f"{loan:,.0f} AED ଋଣ ରାଶି ପାଇଁ {rate}% ସୁଧ ଏବଂ {tenure} ବର୍ଷ ଅବଧି ପାଇଁ ଆପଣଙ୍କର ଆନୁମାନିକ ମାସିକ କିସ୍ତି {emi_res['periodic_installment_aed']:,.0f} AED ହେବ ({emi_res['disclaimer']})। ମୋଟ ଦେୟ ସୁଧ: {emi_res['total_interest_payable_aed']:,.0f} AED।"
+                "en": f"For a loan amount of AED {loan:,.0f} at {rate}% annual interest over {tenure} years, your estimated monthly payment is AED {emi_res['periodic_installment_aed']:,.0f} ({emi_res['disclaimer']}). Total interest payable over the term is AED {emi_res['total_interest_payable_aed']:,.0f}."
             }
             return {
                 "text": narratives.get(lang, narratives["en"]),
@@ -1084,19 +1096,7 @@ class ConversationOrchestrator:
                 "ar": "أهلاً بك! بكل سرور، يسعدني جداً التحدث معك باللغة العربية! 🎉 كيف يمكنني مساعدتك اليوم بخصوص عقارات دبي أو حساب التمويل العقاري؟",
                 "hi": "नमस्ते! मुझे आपके साथ हिंदी में बातचीत करने में बहुत खुशी होगी! 🎉 आज मैं आपकी क्या सहायता कर सकता हूँ?",
                 "ur": "خوش آمدید! مجھے آپ سے اردو میں بات چیت کر کے بہت خوشی ہو رہی ہے! 🎉 آج میں دبئی میں پراپرٹیز یا مارگیج کے حوالے سے آپ کی کیا مدد کر سکتا ہوں؟",
-                "en": "Welcome! I'm thrilled to chat with you in English! 🎉 How can I assist you today with premier UAE properties or mortgage financing?",
-                "ru": "Добро пожаловать! С удовольствием помогу вам на русском языке! 🎉 Чем могу помочь сегодня по недвижимости в Дубае или расчету ипотеки?",
-                "fr": "Bienvenue ! C'est un réel plaisir d'échanger avec vous en français ! 🎉 Comment puis-je vous aider aujourd'hui pour votre projet immobilier ou votre prêt à Dubaï ?",
-                "de": "Herzlich willkommen! Ich freue mich sehr, auf Deutsch mit Ihnen zu sprechen! 🎉 Wie kann ich Ihnen heute bei Luxusimmobilien in Dubai oder Baufinanzierungen helfen?",
-                "es": "¡Bienvenido! ¡Será un placer atenderle en español! 🎉 ¿Cómo puedo ayudarle hoy con propiedades exclusivas en Dubái o la financiación de su hipoteca?",
-                "tr": "Hoş geldiniz! Sizinle Türkçe konuşmaktan mutluluk duyarım! 🎉 Bugün Dubai'deki lüks gayrimenkuller veya konut kredisi konusunda size nasıl yardımcı olabilirim?",
-                "ta": "வணக்கம்! உங்களுடன் தமிழில் உரையாடுவதில் மிக்க மகிழ்ச்சி! 🎉 துபாய் சொத்துக்கள் அல்லது வீட்டுக் கடன் தொடர்பாக இன்று நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?",
-                "te": "స్వాగతం! మీతో తెలుగులో మాట్లాడటం చాలా సంతోషంగా ఉంది! 🎉 దుబాయ్ ప్రాపర్టీలు లేదా హోమ్ లోన్ల విషయంలో ఈరోజు మీకు ఎలా సహాయపడగలను?",
-                "bn": "স্বাগতম! আপনার সাথে বাংলায় কথা বলতে পেরে আমি আনন্দিত! 🎉 দুবাইয়ের প্রিমিয়ার সম্পত্তি বা মর্টগেজ অর্থায়ন সম্পর্কে আজ কীভাবে সাহায্য করতে পারি?",
-                "pa": "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਤੁਹਾਡੇ ਨਾਲ ਪੰਜਾਬੀ ਵਿੱਚ ਗੱਲਬਾਤ ਕਰਕੇ ਬਹੁਤ ਖੁਸ਼ੀ ਹੋਈ! 🎉 ਅੱਜ ਦੁਬਈ ਵਿੱਚ ਪ੍ਰਾਪਰਟੀਆਂ ਜਾਂ ਮਾਰਗੇਜ ਸਬੰਧੀ ਮੈਂ ਤੁਹਾਡੀ ਕੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?",
-                "gu": "નમસ્તે! તમારી સાથે ગુજરાતીમાં વાત કરીને ખૂબ આનંદ થયો! 🎉 દુબઈમાં પ્રીમિયર પ્રોપર્ટીઝ અથવા હોમ લોન અંગે આજે હું તમને કેવી રીતે મદદ કરી શકું?",
-                "mwr": "राम राम सा! म्हाने आपरे साथे मारवाड़ी में बात कर'र घणी खुशी होवेला! 🎉 आज दुबई में चोखी प्रॉपर्टी या लोन बाबत म्हे आपरी कांई मदद कर सकूं?",
-                "or": "ନମସ୍କାର! ଆପଣଙ୍କ ସହିତ ଓଡ଼ିଆରେ କଥାବାର୍ତ୍ତା କରି ମୁଁ ବହୁତ ଖୁସି! 🎉 ଦୁବାଇ ସମ୍ପତ୍ତି କିମ୍ବା ଗୃହ ଋଣ ବିଷୟରେ ଆଜି ମୁଁ ଆପଣଙ୍କୁ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?"
+                "en": "Welcome! I'm thrilled to chat with you in English! 🎉 How can I assist you today with premier UAE properties or mortgage financing?"
             }
             return {
                 "text": greetings.get(lang, greetings["en"]),
@@ -1420,19 +1420,7 @@ class ConversationOrchestrator:
                     "ar": "مرحباً بك! أنا XO، مساعدك الذكي للعقارات والتمويل العقاري في الإمارات. يمكنني مساعدتك في البحث عن عقارات، أو احتساب قدرتك على التمويل، أو الإجابة على أي استفسار. كيف أساعدك اليوم؟ 🎉",
                     "hi": "नमस्ते! मैं XO हूँ, यूएई में प्रॉपर्टी और होम लोन के लिए आपका एआई सहायक। आप प्रॉपर्टी सर्च, मॉर्गेज ईएमआई कैलकुलेशन या किसी भी सवाल के लिए पूछ सकते हैं। 🎉",
                     "ur": "خوش آمدید! میں XO ہوں، دبئی اور متحدہ عرب امارات میں رئیل اسٹیٹ اور مارگیج کے لیے آپ کا AI اسسٹنٹ۔ میں پراپرٹی کی تلاش یا قسط کے حساب میں آپ کی مدد کر سکتا ہوں۔ 🎉",
-                    "en": "Hello! I am XO, your Conversational AI Assistant for premier real estate and mortgages in the UAE. I can help you discover luxury properties, calculate your mortgage affordability and EMI, or answer any questions about our services. How may I assist you today? 🎉",
-                    "ru": "Здравствуйте! Я XO, ваш ИИ-ассистент по элитной недвижимости и ипотеке в ОАЭ. Я помогу найти недвижимость, рассчитать ипотеку или ответить на любые вопросы. Чем могу помочь сегодня? 🎉",
-                    "fr": "Bonjour ! Je suis XO, votre assistant IA pour l'immobilier de prestige et les prêts hypothécaires aux Émirats. Je peux vous aider à trouver un bien, calculer vos mensualités ou répondre à vos questions. Comment puis-je vous aider aujourd'hui ? 🎉",
-                    "de": "Hallo! Ich bin XO, Ihr KI-Berater für Premium-Immobilien und Hypotheken in den VAE. Ich kann Ihnen bei der Immobiliensuche helfen, Finanzierungen berechnen oder Fragen beantworten. Wie kann ich heute behilflich sein? 🎉",
-                    "es": "¡Hola! Soy XO, su asistente de IA para bienes raíces exclusivos e hipotecas en los EAU. Puedo ayudarle a encontrar propiedades, calcular cuotas o resolver dudas. ¿Cómo puedo ayudarle hoy? 🎉",
-                    "tr": "Merhaba! BAE'deki lüks gayrimenkul ve konut kredisi danışmanınız XO ben. Mülk aramanıza, taksit hesaplamanıza veya sorularınızı yanıtlamanıza yardımcı olabilirim. Bugün size nasıl yardımcı olabilirim? 🎉",
-                    "ta": "வணக்கம்! நான் XO, யுஏஇ பிரீமியர் ரியல் எஸ்டேட் மற்றும் வீட்டுக் கடன்களுக்கான உங்கள் AI உதவியாளர். சொத்துக்களைக் கண்டறியவும், தவணைகளைக் கணக்கிடவும் நான் உதவ முடியும். இன்று உங்களுக்கு எவ்வாறு உதவட்டும்? 🎉",
-                    "te": "నమస్కారం! నేను XO, యూఏఈ లగ్జరీ రియల్ ఎస్టేట్ మరియు హోమ్ లోన్ల కొరకు మీ AI అసిస్టెంట్. ప్రాపర్టీలను వెతకడంలో, ఈఎంఐ గణనలో మీకు సహాయపడగలను. ఈరోజు మీకు ఎలా సహాయపడాలి? 🎉",
-                    "bn": "নমস্কার! আমি XO, সংযুক্ত আরব আমিরাতের প্রিমিয়ার রিয়েল এস্টেট এবং মর্টগেজের জন্য আপনার এআই সহকারী। আমি সম্পত্তি খোঁজা বা কিস্তি গণনায় সহায়তা করতে পারি। আজ আপনাকে কীভাবে সাহায্য করতে পারি? 🎉",
-                    "pa": "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ XO ਹਾਂ, ਯੂਏਈ ਵਿੱਚ ਪ੍ਰੀਮੀਅਮ ਰੀਅਲ ਅਸਟੇਟ ਅਤੇ ਮਾਰਗੇਜ ਲਈ ਤੁਹਾਡਾ AI ਸਹਾਇਕ। ਮੈਂ ਪ੍ਰਾਪਰਟੀ ਲੱਭਣ ਅਤੇ ਕਿਸ਼ਤਾਂ ਦੀ ਗਣਨਾ ਵਿੱਚ ਤੁਹਾਡੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ। ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕੀ ਮਦਦ ਕਰਾਂ? 🎉",
-                    "gu": "નમસ્તે! હું XO છું, યુએઈમાં પ્રીમિયર રિયલ એસ્ટેટ અને હોમ લોન માટે તમારો AI સહાયક. હું પ્રોપર્ટી શોધવામાં અથવા હપ્તા ગણતરીમાં તમારી મદદ કરી શકું છું. આજે હું તમને કેવી રીતે મદદ કરું? 🎉",
-                    "mwr": "राम राम सा! म्हे XO हां, यूएई में चोखी प्रॉपर्टी अर लोन सारू आपरो एआई साथी। म्हे प्रॉपर्टी ढूंढण में अर किश्त री गिणती में आपरी मदद कर सकूं। आज म्हे आपरी कांई सेवा करूँ? 🎉",
-                    "or": "ନମସ୍କାର! ମୁଁ XO, ୟୁଏଇରେ ପ୍ରିମିୟର ରିଅଲ ଇଷ୍ଟେଟ୍ ଏବଂ ଗୃହ ଋଣ ପାଇଁ ଆପଣଙ୍କ AI ସହାୟକ। ମୁଁ ସମ୍ପତ୍ତି ଖୋଜିବା କିମ୍ବା କିସ୍ତି ଗଣନା କରିବାରେ ଆପଣଙ୍କୁ ସାହାଯ୍ୟ କରିପାରିବି। ଆଜି ମୁଁ ଆପଣଙ୍କୁ କିପରି ସାହାଯ୍ୟ କରିବି? 🎉"
+                    "en": "Hello! I am XO, your Conversational AI Assistant for premier real estate and mortgages in the UAE. I can help you discover luxury properties, calculate your mortgage affordability and EMI, or answer any questions about our services. How may I assist you today? 🎉"
                 }
                 return {"text": greetings.get(lang, greetings["en"])}
 
