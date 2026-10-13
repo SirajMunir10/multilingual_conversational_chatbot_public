@@ -40,28 +40,22 @@ class HandoffService:
 
     _handoff_queue: List[Dict[str, Any]] = []
 
-    # Advisor roster by queue (No personal mobile or direct WhatsApp numbers)
+    # Neutral Advisory Department Roster (No personal names, numbers, or WhatsApp links)
     ADVISORS = {
         "mortgage": {
-            "name": "Sarah Al-Maktoum",
+            "name": "Mortgage Advisory Specialist",
             "title": "Senior UAE Mortgage Specialist",
-            "license": "CBUAE / XOTO M-942",
-            "department": "Mortgage Advisory",
-            "avatar": "/advisors/sarah.jpg"
+            "department": "Mortgage Advisory"
         },
         "sales": {
-            "name": "Omar Farooq",
+            "name": "Property Advisory Specialist",
             "title": "Prime & Ultra-Luxury Property Consultant",
-            "license": "RERA Broker #48291",
-            "department": "Prime & Ultra-Luxury Sales",
-            "avatar": "/advisors/omar.jpg"
+            "department": "Prime & Ultra-Luxury Sales"
         },
         "support": {
-            "name": "Rashid Bin Zayed",
+            "name": "Client Concierge Manager",
             "title": "Client Concierge & Advisory Manager",
-            "license": "XOTO CS-104",
-            "department": "Client Concierge & Advisory",
-            "avatar": "/advisors/rashid.jpg"
+            "department": "Client Concierge & Advisory"
         }
     }
 
@@ -246,7 +240,43 @@ class HandoffService:
             }
         )
 
-        logger.info(f"Handoff ticket created: {ticket_id} for queue {queue} (client: {client_name})")
+        # Persist lead to private company PostgreSQL database with deduplication
+        lead_saved = False
+        if client_phone and client_name and client_name != "Valued Client":
+            import asyncio
+            from app.db.lead_store import LeadDatabaseService
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(LeadDatabaseService.save_advisor_lead(
+                    session_id=session_id,
+                    full_name=client_name,
+                    phone_number=client_phone,
+                    preferred_language=contact_lang,
+                    advisor_type=advisor.get("department", queue),
+                    conversation_context=customer_summary
+                ))
+                lead_saved = True
+            except RuntimeError:
+                try:
+                    asyncio.run(LeadDatabaseService.save_advisor_lead(
+                        session_id=session_id,
+                        full_name=client_name,
+                        phone_number=client_phone,
+                        preferred_language=contact_lang,
+                        advisor_type=advisor.get("department", queue),
+                        conversation_context=customer_summary
+                    ))
+                    lead_saved = True
+                except Exception as ex:
+                    logger.warning(f"Error running sync lead save: {ex}")
+
+        logger.info(f"Handoff ticket created: {ticket_id} for queue {queue} (client: {client_name}, lead_saved: {lead_saved})")
+
+        dept_title = advisor.get("department", "Advisory")
+        if lead_saved:
+            confirm_msg = f"Thank you, {client_name}! Your request has been registered. An advisor from our {dept_title} team will contact you directly at {client_phone} in {contact_lang}."
+        else:
+            confirm_msg = f"We have recorded your inquiry ({ticket_id}). Please ensure your contact phone number is provided to receive an advisor callback."
 
         return {
             "status": "handoff_initiated",
@@ -258,9 +288,10 @@ class HandoffService:
             "applicant_phone": client_phone,
             "preferred_language": contact_lang,
             "assigned_advisor": advisor,
+            "lead_saved": lead_saved,
             "customer_summary": customer_summary,
             "created_at": ticket.created_at,
-            "message": f"Your callback request has been scheduled with our {advisor['title']}, {advisor['name']}. Our team will contact you directly at {client_phone} in {contact_lang}."
+            "message": confirm_msg
         }
 
     @classmethod

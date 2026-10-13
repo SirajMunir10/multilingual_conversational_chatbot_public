@@ -237,7 +237,7 @@ class TestPhase6AccountCRMAndHandoff(unittest.TestCase):
         self.assertEqual(resp1.status_code, 200)
         data1 = resp1.json()
         self.assertFalse(data1.get("handoff_offered"))
-        self.assertIn("reach out", data1["text"].lower())
+        self.assertTrue(any(term in data1["text"].lower() for term in ["reach out", "contact", "get in touch", "phone number"]))
 
         # Turn 2: User provides name, phone number, and preferred language -> bot registers callback and creates ticket
         resp2 = self.client.post(

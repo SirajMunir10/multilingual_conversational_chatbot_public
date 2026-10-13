@@ -38,6 +38,9 @@ class AppSettings(BaseModel):
     VAULT_API_URL: str = Field(default_factory=lambda: os.getenv("VAULT_API_URL", ""))
     VAULT_API_KEY: str = Field(default_factory=lambda: os.getenv("VAULT_API_KEY", ""))
 
+    # Company PostgreSQL Database Configuration (Private Advisor Lead Storage)
+    DATABASE_URL: str = Field(default_factory=lambda: os.getenv("DATABASE_URL", ""))
+
     # Launch Languages (Expanded 15 Locales)
     LAUNCH_LANGUAGES: List[str] = [
         "en", "ar", "hi", "ur",

@@ -167,7 +167,33 @@ class ConversationOrchestrator:
         ]
         # Human Handoff intent keywords or continuing callback registration
         has_phone_number = bool(re.search(r'(\+?\d{1,4}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{3,9})', text))
-        has_contact_terms = any(w in lowered for w in ["phone", "name", "call me", "reach out", "yes", "sure", "language", "رقم", "اسم", "फोन", "नाम", "فون", "نام"])
+        # Check if user declined advisor callback consent
+        decline_words = ["no", "never", "don't", "dont", "not willing", "cancel", "refuse", "stop", "i will not", "نہیں", "لا", "नहीं", "ਨਾ", "না", "விருப்பமில்லை", "வேண்டாம்", "അരുത്", "ନାହିଁ", "non", "nein", "buhay", "خیر", "نه", "不", "不用"]
+        is_declining = any(re.search(r'\b' + re.escape(w) + r'\b', lowered) for w in decline_words) or lowered.strip() in decline_words
+        if session.handoff_requested and is_declining and not has_phone_number:
+            return "handoff_declined"
+
+        # Gender / Identity inquiry
+        gender_kw = [
+            "are you a boy or a girl", "are you a boy or girl", "are you a boy", "are you a girl",
+            "are you male or female", "what is your gender", "are you male", "are you female",
+            "larka ho ya larki", "ladka ho ya ladki", "kya tum ladke ho", "kya tum larke ho",
+            "larka ho", "ladka ho", "larki ho", "ladki ho",
+            "هل أنت ولد أم بنت", "هل انت ولد ام بنت", "هل أنت ذكر أم أنثى", "هل انت ولد",
+            "tu es un garçon ou une fille", "tu es un garçon", "es-tu un garçon",
+            "eres un chico o una chica", "eres un chico", "eres un niño",
+            "bist du ein junge oder ein mädchen", "bist du ein junge",
+            "你是男生还是女生", "你是男生吗", "ikaw ba ay lalaki o babae", "lalaki ka ba",
+            "آیا شما پسر هستید یا دختر", "آیا شما پسر هستید",
+            "তুমি কি ছেলে না মেয়ে", "তুমি কি ছেলে",
+            "நீ பையனா அல்லது பெண்ணா", "நீ ஒரு பையனா",
+            "ਤੁਸੀਂ ਮੁੰਡਾ ਹੋ ਜਾਂ ਕੁੜੀ", "ਕੀ ਤੁਸੀਂ ਮੁੰਡਾ ਹੋ",
+            "നീ ആണാണോ പെണ്ണാണോ", "നീ ഒരു ആൺകുട്ടിയാണോ",
+            "ତୁମେ ପୁଅ ନା ଝିଅ", "ତୁମେ କଣ ପୁଅ"
+        ]
+        if any(kw in lowered for kw in gender_kw):
+            return "identity"
+
         if any(kw in lowered for kw in handoff_kw) or (
             (session.handoff_requested or session.active_intent == "human_handoff")
             and (has_phone_number or session.slots.customer_consent_given or has_contact_terms)
@@ -294,28 +320,48 @@ class ConversationOrchestrator:
             val = float(num_m.group(1)) * 1000000
             session.slots.property_budget_max = val
 
-        # Specific Mortgage Income slot extraction (e.g., "earn 25000 AED", "salary 30,000", "25000 per month")
-        income_match = re.search(r'(?:earn|salary|income|راتب|دخل|मासिक आय|آمدنی|salaire|sueldo|gehalt|收入|sweldo|حقوق|বেতন|வருமானம்|ਤਨਖਾਹ|ശമ്പളം|ଦରମା)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9,]+)', lowered)
+        # Specific Mortgage Income slot extraction (e.g., "earn 25000 AED", "salary 30,000", "45000 AED income")
+        income_match = re.search(r'(?:earn|salary|income|راتب|دخل|मासिक आय|آمدنی|salaire|sueldo|gehalt|收入|sweldo|حقوق|বেতন|வருமானம்|ਤਨਖਾਹ|ശമ്പളം|ଦରମା)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9][0-9,]*)', lowered)
+        if not income_match:
+            income_match = re.search(r'([0-9][0-9,]*)\s*(?:aed|dhs)?\s*(?:income|salary|earn|per month|\/mo|monthly|شهري|ماہانہ)', lowered)
         if income_match:
-            session.slots.mortgage_income = float(income_match.group(1).replace(',', ''))
-        else:
-            monthly_match = re.search(r'([0-9,]{4,})\s*(?:aed|dhs)?\s*(?:per month|\/mo|monthly|شهري|ماہانہ)', lowered)
-            if monthly_match:
-                session.slots.mortgage_income = float(monthly_match.group(1).replace(',', ''))
+            val_str = income_match.group(1).replace(',', '').strip()
+            if val_str:
+                try:
+                    session.slots.mortgage_income = float(val_str)
+                except ValueError:
+                    pass
 
-        # Specific Mortgage Debt slot extraction (e.g., "2000 AED car loan debt", "debt of 1500")
-        debt_match = re.search(r'(?:debt|car loan|loan debt|liabilities|ديون|التزامات|कर्ज|واجبات|dette|deuda|schulden|负债|utang|بدهی|ঋণ|கடன்|ਕਰਜ਼ਾ|കടം|ଋଣ)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9,]+)', lowered)
-        if debt_match:
-            session.slots.mortgage_existing_debt = float(debt_match.group(1).replace(',', ''))
+        # Specific Mortgage Debt slot extraction (e.g., "2000 AED car loan debt", "debt of 1500", "zero debt")
+        if "zero debt" in lowered or "no debt" in lowered or "0 debt" in lowered:
+            session.slots.mortgage_existing_debt = 0.0
         else:
-            debt_match_alt = re.search(r'([0-9,]{3,})\s*(?:aed|dhs)?\s*(?:car loan|loan debt|debt)', lowered)
-            if debt_match_alt:
-                session.slots.mortgage_existing_debt = float(debt_match_alt.group(1).replace(',', ''))
+            debt_match = re.search(r'(?:debt|car loan|loan debt|liabilities|ديون|التزامات|कर्ज|واجبات|dette|deuda|schulden|负债|utang|بدهی|ঋণ|கடன்|ਕਰਜ਼ਾ|കടം|ଋଣ)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9][0-9,]*)', lowered)
+            if not debt_match:
+                debt_match = re.search(r'([0-9][0-9,]*)\s*(?:aed|dhs)?\s*(?:car loan|loan debt|debt)', lowered)
+            if debt_match:
+                val_str = debt_match.group(1).replace(',', '').strip()
+                if val_str:
+                    try:
+                        session.slots.mortgage_existing_debt = float(val_str)
+                    except ValueError:
+                        pass
 
-        # Down payment extraction (e.g., "200000 down payment", "down payment 20%")
-        dp_match = re.search(r'(?:down payment|downpayment|equity|دفعة أولى|ڈاؤن پیمنٹ|apport|pago inicial|anzahlung|首付|paunang bayad|پیش پرداخت|ডাউন পেমেন্ট|முன்பணம்|ਡਾਊਨ ਪੇਮੈਂਟ|ഡൗൺ പേയ്മെന്റ്|ଅଗ୍ରୀମ)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9,]+)', lowered)
-        if dp_match:
-            session.slots.mortgage_down_payment = float(dp_match.group(1).replace(',', ''))
+        # Down payment extraction (e.g., "200000 down payment", "1 million down payment", "down payment 20%")
+        dp_m = re.search(r'(\d+(?:\.\d+)?)\s*(?:m|million|مليون|मिलियन)\s*(?:down payment|downpayment)', lowered)
+        if dp_m:
+            session.slots.mortgage_down_payment = float(dp_m.group(1)) * 1000000
+        else:
+            dp_match = re.search(r'(?:down payment|downpayment|equity|دفعة أولى|ڈاؤن پیمنٹ|apport|pago inicial|anzahlung|首付|paunang bayad|پیش پرداخت|ডাউন পেমেন্ট|முன்பணம்|ਡਾਊਨ ਪੇਮੈਂਟ|ഡൗൺ പേയ്മെന്റ്|ଅଗ୍ରୀମ)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9][0-9,]*)', lowered)
+            if not dp_match:
+                dp_match = re.search(r'([0-9][0-9,]*)\s*(?:aed|dhs)?\s*(?:down payment|downpayment)', lowered)
+            if dp_match:
+                val_str = dp_match.group(1).replace(',', '').strip()
+                if val_str:
+                    try:
+                        session.slots.mortgage_down_payment = float(val_str)
+                    except ValueError:
+                        pass
 
         # Extract property type
         for ptype in ["apartment", "villa", "townhouse", "penthouse"]:
@@ -393,13 +439,13 @@ class ConversationOrchestrator:
                 session.slots.property_amenities.append("Balcony")
 
         # Extract customer contact details (phone, name, language)
-        phone_match = re.search(r'(\+?\d{1,4}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{3,9})', text)
+        phone_match = re.search(r'(?:phone|number|mobile|tel|contact|call|whatsapp)?[:\s]*(\+?\d{1,4}(?:[-.\s]?\d{1,9}){1,4})', text, re.IGNORECASE)
         if phone_match:
             candidate_phone = phone_match.group(1).strip()
             digits = re.sub(r'\D', '', candidate_phone)
             # Avoid matching property prices, budgets, or areas (must be 7-15 digits)
             is_financial_number = any(w in lowered for w in ["aed", "dirham", "price", "budget", "salary", "income", "sqft", "sq.ft", "million", "k"])
-            if len(digits) >= 7 and not (len(digits) <= 8 and is_financial_number):
+            if 7 <= len(digits) <= 15 and not (len(digits) <= 8 and is_financial_number):
                 session.slots.customer_phone = candidate_phone
                 session.slots.customer_consent_given = True
 
@@ -465,8 +511,8 @@ class ConversationOrchestrator:
                                 f"(Name: {c_name}, Phone: {c_phone}, Preferred Language: {c_lang}). "
                                 f"You MUST call `request_human_handoff` with applicant_name='{c_name}', "
                                 f"applicant_phone='{c_phone}', and preferred_language='{c_lang}'. "
-                                f"In your response, confirm that our specialist advisor will contact them directly at {c_phone} in {c_lang}. "
-                                f"DO NOT provide any fake or placeholder phone numbers or WhatsApp links!"
+                                f"In your response, confirm concisely that our advisory team will contact them directly at {c_phone} in {c_lang}. "
+                                f"DO NOT list or display any individual advisor names, licenses, phone numbers, or WhatsApp links."
                             )
                         })
                     else:
@@ -476,15 +522,36 @@ class ConversationOrchestrator:
                         messages.append({
                             "role": "system",
                             "content": (
-                                f"MANDATORY ADVISOR PERMISSION PROTOCOL (Rule 10): "
-                                f"The user is asking to speak with or be advised by a human specialist. "
-                                f"DO NOT invent, generate, or provide phone numbers or WhatsApp links! "
-                                f"You MUST first ask for permission in {cur_lang}: "
-                                f"1. Ask if they are willing to provide their contact details so our specialist advisor can reach out directly. "
-                                f"2. Ask them to share their Full Name, Phone Number (with country code), and Preferred Language they are comfortable communicating in. "
+                                f"MANDATORY ADVISOR CONSENT PROTOCOL: "
+                                f"The user is asking to speak with or be advised by an advisor. "
+                                f"DO NOT invent, generate, or provide phone numbers or WhatsApp links, and DO NOT list individual advisor names! "
+                                f"You MUST first ask for consent concisely in {cur_lang}: "
+                                f"1. Ask if they are willing to share their contact details so our advisory team can reach out directly. "
+                                f"2. Ask them to share their Full Name, Phone Number (with country code), and Preferred Language. "
                                 f"Do NOT call request_human_handoff until they share their phone number and name."
                             )
                         })
+                elif session.active_intent == "handoff_declined":
+                    tool_choice = "none"
+                    session.handoff_requested = False
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            f"The user has declined to share contact details for an advisor callback. "
+                            f"Acknowledge their decision politely and concisely in {lang}. "
+                            f"Explicitly confirm that no contact details will be collected or saved, and ask how else you can help with properties or mortgages."
+                        )
+                    })
+                elif session.active_intent == "identity":
+                    tool_choice = "none"
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            f"The user is asking about your gender or identity. "
+                            f"Respond naturally, directly, and concisely in {lang} that you are XO, a young boy assistant. "
+                            f"Ask how you can assist them with UAE properties or mortgage calculations today."
+                        )
+                    })
                 elif session.active_intent == "account":
                     if any(w in user_text.lower() for w in ["application", "status", "طلب", "स्थिति", "صورتحال"]):
                         tool_choice = {"type": "function", "function": {"name": "get_my_application_status"}}
@@ -1201,12 +1268,22 @@ class ConversationOrchestrator:
             c_phone = handoff_res.get("applicant_phone") or session.slots.customer_phone or "your registered number"
             c_name = handoff_res.get("applicant_name") or session.slots.customer_name or "Valued Client"
             c_lang = handoff_res.get("preferred_language") or session.slots.customer_preferred_language or session.language
-            narratives = {
-                "ar": f"تم تسجيل طلب التواصل بنجاح! سيتواصل معك مستشارنا ({advisor.get('title', 'مستشار XOTO')} - {advisor.get('name')}) مباشرة على رقمك ({c_phone}) باللغة {c_lang}. تذكرة المتابعة الخاصة بك هي: {ticket_id}.",
-                "hi": f"धन्यवाद {c_name}! आपका कॉलबैक अनुरोध हमारे {advisor.get('title', 'Advisor')} ({advisor.get('name')}) के साथ शेड्यूल कर दिया गया है। हमारे सलाहकार आपसे {c_phone} पर {c_lang} में सीधे संपर्क करेंगे। संदर्भ टिकट: {ticket_id}।",
-                "ur": f"شکریہ {c_name}! آپ کی کال بیک کی درخواست ہمارے {advisor.get('title', 'Advisor')} ({advisor.get('name')}) کے ساتھ درج کر لی گئی ہے۔ ہمارے مشیر آپ سے {c_phone} پر {c_lang} میں براہ راست رابطہ کریں گے۔ ریفرنس ٹکٹ: {ticket_id}۔",
-                "en": f"Thank you, {c_name}! Your callback request has been scheduled with our {advisor.get('title', 'Specialist')} ({advisor.get('name')}). An advisor will reach out to you directly at {c_phone} in {c_lang}. Your reference ticket is {ticket_id}."
-            }
+            dept = advisor.get("department", "Advisory")
+            lead_saved = handoff_res.get("lead_saved", True)
+            if lead_saved:
+                narratives = {
+                    "ar": f"شكراً لك يا {c_name}! تم تسجيل طلبك بنجاح. سيتواصل معك مستشار من فريق {dept} مباشرة على رقمك ({c_phone}) باللغة {c_lang}. تذكرة المتابعة الخاصة بك هي: {ticket_id}.",
+                    "hi": f"धन्यवाद {c_name}! आपका अनुरोध दर्ज कर लिया गया है। हमारे {dept} विभाग के सलाहकार आपसे {c_phone} पर {c_lang} में सीधे संपर्क करेंगे। संदर्भ टिकट: {ticket_id}।",
+                    "ur": f"شکریہ {c_name}! آپ کی درخواست کامیابی سے درج کر لی گئی ہے۔ ہماری {dept} ٹیم کے مشیر آپ سے {c_phone} پر {c_lang} میں براہ راست رابطہ کریں گے۔ ریفرنس ٹکٹ: {ticket_id}۔",
+                    "en": f"Thank you, {c_name}! Your request has been registered. An advisor from our {dept} team will reach out directly at {c_phone} in {c_lang}. Your reference ticket is {ticket_id}."
+                }
+            else:
+                narratives = {
+                    "ar": f"تم تسجيل استفسارك ({ticket_id}). يرجى التأكد من تزويدنا برقم هاتفك حتى يتمكن مستشارنا من التواصل معك.",
+                    "hi": f"आपकी पूछताछ ({ticket_id}) दर्ज कर ली गई है। कृपया सलाहकार से संपर्क के लिए अपना फोन नंबर प्रदान करें।",
+                    "ur": f"آپ کی انکوائری ({ticket_id}) درج کر لی گئی ہے۔ مشیر سے رابطے کے لیے اپنا فون نمبر فراہم کریں۔",
+                    "en": f"We have recorded your inquiry ({ticket_id}). Please provide your contact phone number to receive an advisor callback."
+                }
             return {
                 "text": narratives.get(lang, narratives["en"]),
                 "handoff_data": handoff_res,
@@ -1273,6 +1350,55 @@ class ConversationOrchestrator:
             return {
                 "text": greetings.get(lang, greetings["en"]),
                 "property_results": []
+            }
+
+        # Identity / Gender inquiry (Young male boy assistant)
+        if intent == "identity":
+            boy_answers = {
+                "en": "I am XO, a young boy assistant! I am here to help you find premier properties and guide you through mortgages across the UAE.",
+                "ar": "أنا XO، فتى ومساعدك الذكي! أنا هنا لمساعدتك في استكشاف عقارات الإمارات وحسابات التمويل العقاري.",
+                "hi": "मैं XO हूँ, एक लड़का असिस्टेंट! मैं यूएई में प्रॉपर्टीज खोजने और होम लोन की गणना में आपकी सहायता करने के लिए यहाँ हूँ।",
+                "ur": "میں XO ہوں، ایک نوجوان لڑکا اسسٹنٹ! میں یو اے ای میں پراپرٹیز تلاش کرنے اور مارگیج میں آپ کی رہنمائی کے لیے حاضر ہوں۔",
+                "fr": "Je suis XO, un jeune garçon assistant ! Je suis là pour vous aider à explorer l'immobilier et les prêts aux Émirats.",
+                "es": "¡Soy XO, un chico asistente! Estoy aquí para ayudarte a explorar propiedades e hipotecas en los EAU.",
+                "de": "Ich bin XO, ein junger Assistent (Junge)! Ich bin hier, um Ihnen bei Immobilien und Hypotheken in den VAE zu helfen.",
+                "zh": "我是 XO，一名年轻的男生助手！我在这里协助您探索阿联酋房产和按揭贷款。",
+                "tl": "Ako si XO, isang batang lalaking assistant! Nandito ako para tulungan ka sa mga ari-arian at mortgage sa UAE.",
+                "fa": "من XO هستم، یک دستیار پسر جوان! من اینجا هستم تا در زمینه املاک و وام مسکن در امارات به شما کمک کنم.",
+                "bn": "আমি XO, একজন তরুণ ছেলে সহকারী! সংযুক্ত আরব আমিরাতের প্রপার্টি ও মর্টগেজে আপনাকে সাহায্য করতে আমি এখানে আছি।",
+                "pa": "ਮੈਂ XO ਹਾਂ, ਇੱਕ ਮੁੰਡਾ ਸਹਾਇਕ! ਮੈਂ UAE ਵਿੱਚ ਪ੍ਰਾਪਰਟੀ ਅਤੇ ਮੌਰਗੇਜ ਵਿੱਚ ਤੁਹਾਡੀ ਮਦਦ ਕਰਨ ਲਈ ਇੱਥੇ ਹਾਂ।",
+                "ta": "நான் XO, ஒரு பையன் உதவியாளர்! யுஏஇ ரியல் எஸ்டேட் மற்றும் வீட்டுக் கடன்களில் உங்களுக்கு உதவ நான் இங்கே இருக்கிறேன்.",
+                "ml": "ഞാൻ XO, ഒരു ആൺകുട്ടി അസിസ്റ്റന്റ്! യുഎഇയിലെ പ്രോപ്പർട്ടികളും മോർട്ട്ഗേജുകളും കണ്ടെത്താൻ നിങ്ങളെ സഹായിക്കാൻ ഞാൻ ഇവിടെയുണ്ട്.",
+                "or": "ମୁଁ XO, ଜଣେ ପୁଅ ଆସିଷ୍ଟାଣ୍ଟ! UAE ରେ ପ୍ରପର୍ଟି ଏବଂ ମର୍ଗେଜ୍ ରେ ଆପଣଙ୍କୁ ସାହାଯ୍ୟ କରିବା ପାଇଁ ମୁଁ ଏଠାରେ ଅଛି।"
+            }
+            return {
+                "text": boy_answers.get(lang, boy_answers["en"]),
+                "property_results": []
+            }
+
+        # User declined consent for advisor callback
+        if intent == "handoff_declined":
+            session.handoff_requested = False
+            decline_responses = {
+                "en": "Understood! I will not collect or store your contact details. How else can I assist you with properties or mortgages today?",
+                "ar": "مفهوم تماماً! لن يتم جمع أو حفظ أي بيانات اتصال خاصة بك. كيف يمكنني مساعدتك أكثر في عقارات أو تمويل الإمارات اليوم؟",
+                "hi": "समझ गया! आपका कोई संपर्क विवरण सुरक्षित नहीं किया जाएगा। मैं प्रॉपर्टीज या होम लोन में आपकी और क्या मदद कर सकता हूँ?",
+                "ur": "سمجھ گیا۔ آپ کی کوئی رابطہ تفصیلات محفوظ نہیں کی جائیں گی۔ میں پراپرٹیز یا مارگیج میں آپ کی مزید کیا مدد کر سکتا ہوں؟",
+                "fr": "C'est bien noté ! Aucune coordonnée ne sera enregistrée. Comment puis-je vous aider autrement concernant les biens ou les prêts ?",
+                "es": "¡Entendido! No se guardará ningún dato de contacto. ¿Cómo más puedo ayudarte con propiedades o hipotecas hoy?",
+                "de": "Verstanden! Ihre Kontaktdaten werden weder erfasst noch gespeichert. Wie kann ich Ihnen heute sonst bei Immobilien oder Hypotheken helfen?",
+                "zh": "明白了！我们不会收集或保存您的任何联系方式。今天我还能在房产或贷款方面为您提供什么帮助？",
+                "tl": "Naintindihan ko! Hindi namin kokolektahin o ise-save ang iyong impormasyon. Paano pa kita matutulungan ngayon?",
+                "fa": "متوجه شدم! هیچ اطلاعات تماسی از شما ذخیره نخواهد شد. چگونه می‌توانم در زمینه املاک یا وام به شما کمک کنم؟",
+                "bn": "বুঝতে পেরেছি! আপনার কোনো যোগাযোগের তথ্য সংরক্ষণ করা হবে না। আজ আপনাকে আর কীভাবে সাহায্য করতে পারি?",
+                "pa": "ਸਮਝ ਗਿਆ! ਤੁਹਾਡਾ ਕੋਈ ਸੰਪਰਕ ਵੇਰਵਾ ਸੁਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾਵੇਗਾ। ਮੈਂ ਜਾਇਦਾਦ ਜਾਂ ਮੌਰਗੇਜ ਵਿੱਚ ਤੁਹਾਡੀ ਹੋਰ ਕੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?",
+                "ta": "புரிந்துகொண்டேன்! உங்கள் தொடர்பு விவரங்கள் எதுவும் சேமிக்கப்படாது. இன்று நான் உங்களுக்கு வேறு எவ்வாறு உதவ முடியும்?",
+                "ml": "മനസ്സിലായി! നിങ്ങളുടെ വിവരങ്ങളൊന്നും സൂക്ഷിക്കില്ല. ഞാൻ നിങ്ങളെ എങ്ങനെ സഹായിക്കണം?",
+                "or": "ବୁଝିପାରିଲି! ଆପଣଙ୍କ କୌଣସି ଯୋଗାଯୋଗ ବିବରଣୀ ସଂରକ୍ଷଣ କରାଯିବ ନାହିଁ। ଆଜି ମୁଁ ଆପଣଙ୍କୁ ଅନ୍ୟ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?"
+            }
+            return {
+                "text": decline_responses.get(lang, decline_responses["en"]),
+                "handoff_offered": False
             }
 
         # Check for average price or size statistical inquiry
@@ -1536,49 +1662,39 @@ class ConversationOrchestrator:
 
                 permission_prompts = {
                     "en": (
-                        f"Our {dept} would be delighted to assist you directly! 🎉\n\n"
-                        f"Are you willing to provide your contact details so our advisor can reach out to you directly?\n\n"
-                        f"If so, please share:\n"
+                        f"Would you be willing to share your contact details so our advisory team can reach out to you directly?\n\n"
+                        f"If so, please provide:\n"
                         f"1. **Full Name**\n"
                         f"2. **Phone Number** (with country code)\n"
-                        f"3. **Preferred Language** (the language you are most comfortable communicating in)\n\n"
-                        f"Once provided, our licensed specialist will contact you directly."
+                        f"3. **Preferred Contact Language**"
                     ),
                     "ar": (
-                        f"يسعد مستشارنا المختص ({dept}) بالتواصل معك مباشرة! 🎉\n\n"
-                        f"هل توافق على تزويدنا ببيانات الاتصال الخاصة بك حتى يتمكن مستشارنا من التواصل معك مباشرة؟\n\n"
-                        f"إذا كنت توافق، يرجى التكرم بمشاركتنا:\n"
+                        f"هل توافق على مشاركة بيانات الاتصال الخاصة بك حتى يتمكن فريقنا الاستشاري من التواصل معك مباشرة؟\n\n"
+                        f"إذا كنت توافق، يرجى تزويدنا بـ:\n"
                         f"1. **الاسم الكامل**\n"
                         f"2. **رقم الهاتف** (مع رمز الدولة)\n"
-                        f"3. **اللغة المفضلة** التي تفضل التحدث بها\n\n"
-                        f"وسيقوم فريقنا بالتواصل معك فوراً."
+                        f"3. **اللغة المفضلة للتواصل**"
                     ),
                     "hi": (
-                        f"हमारे {dept} को आपसे सीधे संपर्क करने में बेहद खुशी होगी! 🎉\n\n"
-                        f"क्या आप अपना फोन नंबर और संपर्क विवरण साझा करने के लिए सहमत हैं ताकि हमारे सलाहकार आपसे सीधे संपर्क कर सकें?\n\n"
-                        f"कृपया निम्नलिखित विवरण प्रदान करें:\n"
-                        f"1. **पूरा नाम (Full Name)**\n"
-                        f"2. **फोन नंबर (Phone Number)** (कंट्री कोड के साथ)\n"
-                        f"3. **पसंदीदा भाषा (Preferred Language)** जिसमें आप बातचीत करना पसंद करते हैं\n\n"
-                        f"विवरण मिलते ही हमारे लाइसेंस प्राप्त सलाहकार आपसे संपर्क करेंगे।"
+                        f"क्या आप अपना संपर्क विवरण साझा करने के लिए सहमत हैं ताकि हमारी सलाहकार टीम आपसे सीधे संपर्क कर सके?\n\n"
+                        f"कृपया निम्नलिखित विवरण दें:\n"
+                        f"1. **पूरा नाम**\n"
+                        f"2. **फोन नंबर** (कंट्री कोड के साथ)\n"
+                        f"3. **पसंदीदा संपर्क भाषा**"
                     ),
                     "ur": (
-                        f"ہمارے {dept} کو آپ سے براہ راست رابطہ کرنے میں خوشی ہوگی! 🎉\n\n"
-                        f"کیا آپ اپنا فون نمبر اور تفصیلات فراہم کرنے کے لیے رضامند ہیں تاکہ ہمارے مشیر آپ سے براہ راست رابطہ کر سکیں؟\n\n"
-                        f"براہ کرم درج ذیل تفصیلات فراہم کریں:\n"
-                        f"1. **پورا نام (Full Name)**\n"
-                        f"2. **فون نمبر (Phone Number)** (کنٹری کوڈ کے ساتھ)\n"
-                        f"3. **پسندیدہ زبان (Preferred Language)** جس میں آپ گفتگو کرنا پسند کرتے ہیں\n\n"
-                        f"تفصیلات موصول ہوتے ہی ہماری ٹیم آپ سے رابطہ کرے گی۔"
+                        f"کیا آپ اپنی رابطہ تفصیلات فراہم کرنے کے لیے رضامند ہیں تاکہ ہماری مشاورتی ٹیم آپ سے براہ راست رابطہ کر سکے؟\n\n"
+                        f"اگر ہاں، تو براہ کرم درج کریں:\n"
+                        f"1. **پورا نام**\n"
+                        f"2. **فون نمبر** (کنٹری کوڈ کے ساتھ)\n"
+                        f"3. **پسندیدہ رابطہ زبان**"
                     ),
                     "or": (
-                        f"ଆମର {dept} ଆପଣଙ୍କ ସହିତ ସିଧାସଳଖ ଯୋଗାଯୋଗ କରିବାକୁ ଆନନ୍ଦିତ ହେବେ! 🎉\n\n"
-                        f"ଆମର ପରାମର୍ଶଦାତା ଆପଣଙ୍କୁ ସିଧାସଳଖ ଯୋଗାଯୋଗ କରିବା ପାଇଁ ଆପଣ ଆପଣଙ୍କ ଫୋନ୍ ନମ୍ବର ଏବଂ ବିବରଣୀ ପ୍ରଦାନ କରିବାକୁ ଇଚ୍ଛୁକ କି?\n\n"
-                        f"ଦୟାକରି ନିମ୍ନଲିଖିତ ବିବରଣୀ ଦିଅନ୍ତୁ:\n"
-                        f"1. **ସମ୍ପୂର୍ଣ୍ଣ ନାମ (Full Name)**\n"
-                        f"2. **ଫୋନ୍ ନମ୍ବର (Phone Number)** (କଣ୍ଟ୍ରି କୋଡ୍ ସହିତ)\n"
-                        f"3. **ପସନ୍ଦର ଭାଷା (Preferred Language)** ଯେଉଁଥିରେ ଆପଣ କଥାବାର୍ତ୍ତା କରିବାକୁ ସହଜ ମନେ କରନ୍ତି\n\n"
-                        f"ଏହା ପ୍ରଦାନ କଲା ପରେ ଆମର ଲାଇସେନ୍ସପ୍ରାପ୍ତ ଟିମ୍ ଆପଣଙ୍କ ସହିତ ସିଧାସଳଖ ଯୋଗାଯୋଗ କରିବେ।"
+                        f"ଆମର ପରାମର୍ଶଦାତା ଟିମ୍ ଆପଣଙ୍କୁ ସିଧାସଳଖ ଯୋଗାଯୋଗ କରିବା ପାଇଁ ଆପଣ ଆପଣଙ୍କ ବିବରଣୀ ଦେବାକୁ ଇଚ୍ଛୁକ କି?\n\n"
+                        f"ଦୟାକରି ପ୍ରଦାନ କରନ୍ତୁ:\n"
+                        f"1. **ସମ୍ପୂର୍ଣ୍ଣ ନାମ**\n"
+                        f"2. **ଫୋନ୍ ନମ୍ବର** (କଣ୍ଟ୍ରି କୋଡ୍ ସହିତ)\n"
+                        f"3. **ପସନ୍ଦର ଯୋଗାଯୋଗ ଭାଷା**"
                     )
                 }
                 return {
@@ -1600,14 +1716,25 @@ class ConversationOrchestrator:
             )
             advisor = handoff_res.get("assigned_advisor", {})
             ticket_id = handoff_res.get("ticket_id", "XO-HD")
+            dept = advisor.get("department", "Advisory")
+            lead_saved = handoff_res.get("lead_saved", True)
 
-            confirmations = {
-                "en": f"Thank you, {c_name}! Your callback request has been scheduled with our {advisor.get('title', 'Specialist')} ({advisor.get('name')}). An advisor will reach out to you directly at {c_phone} in {c_lang}. Your reference ticket is {ticket_id}.",
-                "ar": f"شكراً لك يا {c_name}! تم جدولة طلب التواصل مع مستشارنا ({advisor.get('title')} - {advisor.get('name')}). سيتواصل معك فريقنا مباشرة على الرقم {c_phone} باللغة {c_lang}. تذكرة المتابعة الخاصة بك هي: {ticket_id}.",
-                "hi": f"धन्यवाद {c_name}! आपका कॉलबैक अनुरोध हमारे {advisor.get('title')} ({advisor.get('name')}) के साथ शेड्यूल कर दिया गया है। हमारे सलाहकार आपसे {c_phone} पर {c_lang} में सीधे संपर्क करेंगे। आपका संदर्भ टिकट नंबर है: {ticket_id}।",
-                "ur": f"شکریہ {c_name}! آپ کی کال بیک کی درخواست ہمارے {advisor.get('title')} ({advisor.get('name')}) کے ساتھ درج کر لی گئی ہے۔ ہمارے مشیر آپ سے {c_phone} پر {c_lang} میں براہ راست رابطہ کریں گے۔ آپ کا ریفرنس ٹکٹ نمبر ہے: {ticket_id}۔",
-                "or": f"ଧନ୍ୟବାଦ {c_name}! ଆପଣଙ୍କ କଲବ୍ୟାକ୍ ଅନୁରୋଧ ଆମର {advisor.get('title')} ({advisor.get('name')}) ଙ୍କ ସହିତ ସିଡ୍ୟୁଲ୍ ହୋଇଛି। ଆମର ପରାମର୍ଶଦାତା {c_phone} ରେ {c_lang} ରେ ଆପଣଙ୍କୁ ସିଧାସଳଖ ଯୋଗାଯୋଗ କରିବେ। ରେଫରେନ୍ସ ଟିକେଟ୍: {ticket_id}।"
-            }
+            if lead_saved:
+                confirmations = {
+                    "en": f"Thank you, {c_name}! Your request has been registered. An advisor from our {dept} team will reach out directly at {c_phone} in {c_lang}. Reference ticket: {ticket_id}.",
+                    "ar": f"شكراً لك يا {c_name}! تم تسجيل طلبك بنجاح. سيتواصل معك مستشار من فريق {dept} مباشرة على الرقم {c_phone} باللغة {c_lang}. تذكرة المتابعة: {ticket_id}.",
+                    "hi": f"धन्यवाद {c_name}! आपका अनुरोध दर्ज कर लिया गया है। हमारे {dept} विभाग के सलाहकार आपसे {c_phone} पर {c_lang} में सीधे संपर्क करेंगे। संदर्भ टिकट: {ticket_id}।",
+                    "ur": f"شکریہ {c_name}! آپ کی درخواست کامیابی سے درج کر لی گئی ہے۔ ہماری {dept} ٹیم کے مشیر آپ سے {c_phone} پر {c_lang} میں براہ راست رابطہ کریں گے۔ ریفرنس ٹکٹ: {ticket_id}۔",
+                    "or": f"ଧନ୍ୟବାଦ {c_name}! ଆପଣଙ୍କ ଅନୁରୋଧ ପଞ୍ଜୀକୃତ ହୋଇଛି। ଆମର {dept} ଟିମ୍ ପରାମର୍ଶଦାତା {c_phone} ରେ {c_lang} ରେ ଆପଣଙ୍କୁ ସିଧାସଳଖ ଯୋଗାଯୋଗ କରିବେ। ରେଫରେନ୍ସ ଟିକେଟ୍: {ticket_id}।"
+                }
+            else:
+                confirmations = {
+                    "en": f"We have recorded your inquiry ({ticket_id}). Please ensure your contact phone number is provided to receive an advisor callback.",
+                    "ar": f"تم تسجيل استفسارك ({ticket_id}). يرجى التأكد من تزويدنا برقم هاتفك حتى يتمكن مستشارنا من التواصل معك.",
+                    "hi": f"आपकी पूछताछ ({ticket_id}) दर्ज कर ली गई है। कृपया सलाहकार से संपर्क के लिए अपना फोन नंबर प्रदान करें।",
+                    "ur": f"آپ کی انکوائری ({ticket_id}) درج کر لی گئی ہے۔ مشیر سے رابطے کے لیے اپنا فون نمبر فراہم کریں۔",
+                    "or": f"ଆପଣଙ୍କ ଅନୁରୋଧ ରେକର୍ଡ ହୋଇଛି ({ticket_id})। ପରାମର୍ଶଦାତା ଯୋଗାଯୋଗ ପାଇଁ ଦୟାକରି ଫୋନ୍ ନମ୍ବର ପ୍ରଦାନ କରନ୍ତୁ।"
+                }
 
             return {
                 "text": confirmations.get(lang, confirmations["en"]),

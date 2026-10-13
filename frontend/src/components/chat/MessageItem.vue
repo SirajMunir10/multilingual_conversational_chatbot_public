@@ -215,12 +215,11 @@
         <div class="handoff-card-body">
           <div class="advisor-profile-row">
             <div class="advisor-avatar-box">
-              <span class="advisor-icon">👩‍💼</span>
+              <span class="advisor-icon">🏛️</span>
             </div>
             <div class="advisor-info-box">
-              <h6 class="advisor-name">{{ message.metadata.handoff_data.assigned_advisor?.name }}</h6>
-              <p class="advisor-title">{{ message.metadata.handoff_data.assigned_advisor?.title }}</p>
-              <span class="advisor-license">Official License: {{ message.metadata.handoff_data.assigned_advisor?.license }}</span>
+              <h6 class="advisor-name">{{ message.metadata.handoff_data.assigned_advisor?.department || message.metadata.handoff_data.assigned_advisor?.name || 'UAE Advisory Department' }}</h6>
+              <p class="advisor-title">{{ message.metadata.handoff_data.assigned_advisor?.title || 'Licensed Advisory Team' }}</p>
             </div>
           </div>
           <div class="handoff-client-summary-box" v-if="message.metadata.handoff_data.applicant_name || message.metadata.handoff_data.applicant_phone">

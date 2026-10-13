@@ -96,7 +96,8 @@ class TestMultilingual15(unittest.TestCase):
         for lang in self.all_15:
             prompt = LLMService.get_system_prompt(lang)
             self.assertIn("CRITICAL OPERATIONAL RULES", prompt)
-            self.assertIn("CHEERLEADER & CUTE PERSONA", prompt)
+            self.assertIn("CORE PERSONA — YOUNG MALE BOY ASSISTANT", prompt)
+            self.assertIn("CONCISE, INTELLIGENT COMMUNICATION DIRECTIVE", prompt)
 
     def test_voice_profiles_tts_flash_v2_5(self):
         self.assertEqual(len(TTSService.VOICE_PROFILES), 15)
