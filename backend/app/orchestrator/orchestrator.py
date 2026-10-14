@@ -146,11 +146,22 @@ class ConversationOrchestrator:
         if LanguageDetector.check_explicit_language_switch(text):
             return "general"
 
+        # Differentiate informational questions about brokers/agents/commissions vs requests for callback
+        informational_agent_terms = [
+            "commission", "fee", "fees", "what is an agent", "what is a broker", "what does an agent do",
+            "what does a broker do", "how much commission", "agent fee", "broker fee", "brokerage fee",
+            "how much do brokers charge", "percentage", "rate of commission", "عمولة", "رسوم", "کمیشن", "दलाली"
+        ]
+        is_informational_agent_inquiry = any(t in lowered for t in informational_agent_terms)
+
         # Human Handoff intent keywords (FR-5, FR-20)
-        handoff_kw = [
-            "human", "agent", "advisor", "broker", "specialist", "consultant", "representative",
+        handoff_phrases = [
             "speak with advisor", "talk to human", "talk to agent", "connect me", "transfer me",
             "speak to human", "speak to an agent", "human please", "talk to a person", "advisor please",
+            "speak with an agent", "speak with agent", "talk to an advisor", "talk to advisor",
+            "contact advisor", "request an advisor", "request advisor", "human advisor",
+            "call me", "callback", "want to talk to someone", "need to speak", "reach out to me",
+            "human", "agent", "advisor", "broker", "specialist", "consultant", "representative",
             "مستشار", "وكيل", "تحدث مع موظف", "تحدث مع إنسان", "إنسان", "موظف",
             "एजेंट", "सलाहकार", "इंसान", "बात करनी है", "ایجنٹ", "مشیر", "انسان سے بات",
             "humain", "conseiller", "représentant", "parler à un conseiller", "parler à un humain",
@@ -165,13 +176,46 @@ class ConversationOrchestrator:
             "ഏജന്റ്", "ഉപദേശകൻ", "മനുഷ്യൻ", "സംസാരിക്കണം",
             "ପରାମର୍ଶଦାତା", "ମଣିଷ ସହିତ କଥା"
         ]
-        # Human Handoff intent keywords or continuing callback registration
+        is_explicit_handoff = not is_informational_agent_inquiry and any(
+            (re.search(r'\b' + re.escape(w) + r'\b', lowered) if w.isascii() else (w in lowered))
+            for w in handoff_phrases
+        )
+
+        # Contact information indicators
         has_phone_number = bool(re.search(r'(\+?\d{1,4}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{3,9})', text))
+        has_contact_terms = any(w in lowered for w in ["phone", "number", "mobile", "whatsapp", "call me at", "reach me at", "my name is", "email"])
+
+        # Trust, safety, and privacy inquiries (Article 53, UAE PDPL Law 45, DLD Title Deed verification)
+        trust_safety_terms = [
+            "safe", "safety", "trust", "proof", "privacy", "scam", "why", "how", "who",
+            "protect", "law", "guarantee", "legit", "legitimate", "secure", "security", "pdpl", "article 53"
+        ]
+        is_trust_safety_inquiry = any((re.search(r'\b' + re.escape(w) + r'\b', lowered) if w.isascii() else (w in lowered)) for w in trust_safety_terms) or "?" in text
+
         # Check if user declined advisor callback consent
         decline_words = ["no", "never", "don't", "dont", "not willing", "cancel", "refuse", "stop", "i will not", "نہیں", "لا", "नहीं", "ਨਾ", "না", "விருப்பமில்லை", "வேண்டாம்", "അരുത്", "ନାହିଁ", "non", "nein", "buhay", "خیر", "نه", "不", "不用"]
-        is_declining = any(re.search(r'\b' + re.escape(w) + r'\b', lowered) for w in decline_words) or lowered.strip() in decline_words
-        if session.handoff_requested and is_declining and not has_phone_number:
+        is_declining = any((re.search(r'\b' + re.escape(w) + r'\b', lowered) if w.isascii() else (w in lowered)) for w in decline_words) or lowered.strip() in decline_words
+
+        # Only treat as a decline if it is a pure refusal WITHOUT a safety/trust question and without phone number
+        if (session.handoff_requested or session.slots.advisor_consent_pending) and is_declining and not is_trust_safety_inquiry and not has_phone_number:
+            session.slots.advisor_consent_pending = False
+            session.slots.customer_consent_given = False
             return "handoff_declined"
+
+        if is_trust_safety_inquiry and any(w in lowered for w in ["safe", "safety", "trust", "proof", "privacy", "scam", "protect", "guarantee", "legit", "legal", "pdpl", "article 53"]):
+            return "trust_safety"
+
+        # Check for affirmative consent in Turn 2
+        affirmative_consent_words = [
+            "yes", "sure", "please", "connect me", "arrange that", "okay", "ok", "yep", "yeah",
+            "haan", "na'am", "naam", "agree", "proceed", "i agree", "i consent", "نعم", "हाँ", "ضرور", "جی ہاں"
+        ]
+        is_affirming_consent = any((re.search(r'\b' + re.escape(w) + r'\b', lowered) if w.isascii() else (w in lowered)) for w in affirmative_consent_words) or lowered.strip() in affirmative_consent_words
+
+        if session.slots.advisor_consent_pending and is_affirming_consent:
+            session.slots.customer_consent_given = True
+            session.slots.advisor_consent_pending = False
+            return "human_handoff"
 
         # Gender / Identity inquiry
         gender_kw = [
@@ -194,7 +238,7 @@ class ConversationOrchestrator:
         if any(kw in lowered for kw in gender_kw):
             return "identity"
 
-        if any(kw in lowered for kw in handoff_kw) or (
+        if is_explicit_handoff or (
             (session.handoff_requested or session.active_intent == "human_handoff")
             and (has_phone_number or session.slots.customer_consent_given or has_contact_terms)
         ):
@@ -332,11 +376,22 @@ class ConversationOrchestrator:
                 except ValueError:
                     pass
 
-        # Specific Mortgage Debt slot extraction (e.g., "2000 AED car loan debt", "debt of 1500", "zero debt")
-        if "zero debt" in lowered or "no debt" in lowered or "0 debt" in lowered:
+        # Comprehensive Mortgage Debt slot extraction (zero-debt phrases + explicit numeric amounts)
+        zero_debt_patterns = [
+            r"\b(zero|0|no|none|nil)\s+(debt|debts|liability|liabilities|loans?|car\s+loans?|commitments?)\b",
+            r"\b(i\s+have\s+no|i\s+don't\s+have\s+any|have\s+no|don't\s+have\s+any)\s+(debt|debts|loans?|car\s+loans?|credit\s+cards?|liabilities)\b",
+            r"\b(debt[- ]free|liability[- ]free|no\s+existing\s+debt|zero\s+existing\s+debt)\b",
+            r"^(none|zero|0|nil|no)$"
+        ]
+        zero_debt_terms = [
+            "لا توجد ديون", "بدون ديون", "صفر ديون", "لا ديون",
+            "کوئی قرض نہیں", "قرض نہیں", "صفر قرض",
+            "कोई कर्ज नहीं", "कोई ऋण नहीं", "कर्ज मुक्त", "ऋण मुक्त"
+        ]
+        if any(re.search(p, lowered) for p in zero_debt_patterns) or any(w in lowered for w in zero_debt_terms):
             session.slots.mortgage_existing_debt = 0.0
         else:
-            debt_match = re.search(r'(?:debt|car loan|loan debt|liabilities|ديون|التزامات|कर्ज|واجبات|dette|deuda|schulden|负债|utang|بدهی|ঋণ|கடன்|ਕਰਜ਼ਾ|കടം|ଋଣ)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9][0-9,]*)', lowered)
+            debt_match = re.search(r'(?:debt|car loan|loan debt|liabilities|ديون|التزامات|कर्ज|वाجبات|dette|deuda|schulden|负债|utang|بدهی|ঋণ|கடன்|ਕਰਜ਼ਾ|കടം|ଋଣ)\s*(?:of|is|:)?\s*(?:aed|dhs)?\s*([0-9][0-9,]*)', lowered)
             if not debt_match:
                 debt_match = re.search(r'([0-9][0-9,]*)\s*(?:aed|dhs)?\s*(?:car loan|loan debt|debt)', lowered)
             if debt_match:
@@ -370,6 +425,25 @@ class ConversationOrchestrator:
                ("فيلا" in text or "villa" in lowered or "chalet" in lowered or "别墅" in text or "ویلا" in text or "বাড়ি" in text or "வீடு" in text) and ptype == "villa":
                 session.slots.property_type = ptype
 
+        # Extract developer entity
+        dev_map = [
+            ("imtiyaz developments", "Imtiyaz"),
+            ("imtiyaz", "Imtiyaz"),
+            ("imtiaz", "Imtiyaz"),  # Common keyboard typo
+            ("emaar", "Emaar"),
+            ("damac", "Damac"),
+            ("nakheel", "Nakheel"),
+            ("sobha", "Sobha"),
+            ("select group", "Select Group"),
+            ("ellington", "Ellington"),
+            ("meraas", "Meraas"),
+            ("aldar", "Aldar")
+        ]
+        for pattern, canon_dev in dev_map:
+            if re.search(r'\b' + re.escape(pattern) + r'\b', lowered):
+                session.slots.property_developer = canon_dev
+                break
+
         # Check for general "other property" requests to broaden search
         if any(w in lowered for w in ["other property", "other properties", "other options", "something else", "different property", "عقارات أخرى", "خيارات أخرى", "अन्य प्रॉपर्टी", "دوسری پراپرٹی"]):
             session.slots.property_city = "Dubai"
@@ -377,10 +451,10 @@ class ConversationOrchestrator:
         elif any(w in lowered for w in ["all uae", "in uae", "across uae", "all of uae", "find in uae", "in the uae", "uae", "everywhere in uae", "anywhere in uae"]):
             session.slots.property_city = "UAE"
         elif any(w in lowered for w in ["all dubai", "across dubai", "anywhere in dubai", "in dubai"]):
-            if not any(loc in lowered for loc in ["downtown", "marina", "business bay", "dubai hills", "palm", "jvc", "creek", "jbr", "ranches"]):
+            if not any(loc in lowered for loc in ["downtown", "marina", "business bay", "dubai hills", "palm", "jvc", "creek", "jbr", "ranches", "jlt", "glt"]):
                 session.slots.property_city = "Dubai"
 
-        # Specific communities (ordered by specificity)
+        # Specific communities (ordered by specificity, with fuzzy typo resolution)
         comm_map = [
             ("palm jumeirah", "Palm Jumeirah"),
             ("palm", "Palm Jumeirah"),
@@ -388,10 +462,15 @@ class ConversationOrchestrator:
             ("dubai hills", "Dubai Hills Estate"),
             ("hills", "Dubai Hills Estate"),
             ("downtown dubai", "Downtown Dubai"),
+            ("dwon town", "Downtown Dubai"),
+            ("downtwon", "Downtown Dubai"),
             ("downtown", "Downtown Dubai"),
             ("dubai marina", "Dubai Marina"),
             ("marina", "Dubai Marina"),
             ("business bay", "Business Bay"),
+            ("jumeirah lake towers", "JLT"),
+            ("jlt", "JLT"),
+            ("glt", "JLT"),  # Common keyboard typo (G next to J)
             ("jumeirah village circle", "Jumeirah Village Circle"),
             ("jvc", "Jumeirah Village Circle"),
             ("dubai creek harbour", "Dubai Creek Harbour"),
@@ -409,12 +488,40 @@ class ConversationOrchestrator:
             ("arabian ranches", "Arabian Ranches III"),
             ("ranches", "Arabian Ranches III"),
             ("yas island", "Yas Island"),
-            ("yas", "Yas Island")
+            ("yas", "Yas Island"),
+            ("difc", "DIFC"),
+            ("meydan", "Meydan"),
+            ("majan", "Majan")
         ]
+        matched_comm = False
         for pattern, canon in comm_map:
             if re.search(r'\b' + re.escape(pattern) + r'\b', lowered):
                 session.slots.property_city = canon
+                matched_comm = True
+                if pattern in ["glt", "dwon town", "downtwon"]:
+                    session.slots.inferred_location_note = f"Assuming you mean {canon}"
+                else:
+                    session.slots.inferred_location_note = None
+                session.slots.unconfirmed_location = None
                 break
+
+        # Detect unconfirmed location pattern (e.g. "apartments in alt", "properties in alt")
+        if not matched_comm and session.active_intent in ["property", "general"]:
+            loc_match = re.search(r'\b(?:in|at|near|around|for)\s+([a-zA-Z]{2,15})\b', text)
+            if loc_match:
+                cand = loc_match.group(1).strip()
+                cand_lower = cand.lower()
+                common_non_locations = [
+                    "dubai", "uae", "abu", "dhabi", "buy", "rent", "invest", "cash", "mortgage", "aed",
+                    "budget", "apartment", "apartments", "villa", "villas", "townhouse", "sale", "ready",
+                    "offplan", "off", "plan", "terms", "english", "arabic", "hindi", "urdu", "french",
+                    "german", "spanish", "chinese", "tagalog", "bengali", "tamil", "punjabi", "malayalam",
+                    "dia", "persian", "touch", "call", "details", "contact", "person", "advisor", "agent",
+                    "broker", "specialist", "viewing", "mind", "general", "advance", "handover", "future",
+                    "month", "year", "years", "my", "our", "their", "this", "that", "these", "those"
+                ]
+                if cand_lower not in common_non_locations and not any(cand_lower in c[0] for c in comm_map):
+                    session.slots.unconfirmed_location = cand
 
         # Extract amenity / proximity preferences
         has_amenity_kw = any(w in lowered for w in ["metro", "مترو", "मेट्रो", "pool", "مسبح", "gym", "جيم", "balcony", "شرفة"])
@@ -449,17 +556,18 @@ class ConversationOrchestrator:
                 session.slots.customer_phone = candidate_phone
                 session.slots.customer_consent_given = True
 
-        name_match = re.search(r'(?:my name is|i am|name is|call me|name[:\s]+)\s*([A-Za-z\u0600-\u06FF\u0900-\u097F\u0B00-\u0B7F\s]{2,30})', lowered)
+        name_match = re.search(r'(?:my name is|i am|name is|call me|name[:\s]+)\s*([A-Za-z\u0600-\u06FF\u0900-\u097F\u0B00-\u0B7F\s\'-]+?)(?:,|\.|\bphone\b|\bnumber\b|\bmobile\b|\bcall\b|\bwhatsapp\b|$)', text, re.IGNORECASE)
         if name_match:
             cand_name = name_match.group(1).strip()
-            session.slots.customer_name = cand_name.title()
+            if cand_name and len(cand_name) >= 2:
+                session.slots.customer_name = cand_name.title()
 
-        # Extract preferred language if explicitly stated
+        # Extract preferred language if explicitly stated or provided in intake
         for lang_k, lang_meta in LanguageDetector.get_supported_locales().items():
             l_name = lang_meta["name"].lower()
             l_native = lang_meta["native"].lower()
-            if l_name in lowered or l_native in lowered:
-                if any(w in lowered for w in ["language", "speak in", "comfortable in", "contact in", "talk in", "باللغة", "भाषा", "ਭਾਸ਼ਾ", "ഭാഷ"]):
+            if re.search(r'\b' + re.escape(l_name) + r'\b', lowered) or re.search(r'\b' + re.escape(l_native) + r'\b', lowered):
+                if session.slots.customer_consent_given or session.slots.advisor_consent_pending or any(w in lowered for w in ["language", "speak in", "speak", "comfortable in", "contact in", "talk in", "in", "باللغة", "भाषा", "ਭਾਸ਼ਾ", "ഭാഷ"]):
                     session.slots.customer_preferred_language = lang_meta["name"]
                     break
 
@@ -515,20 +623,42 @@ class ConversationOrchestrator:
                                 f"DO NOT list or display any individual advisor names, licenses, phone numbers, or WhatsApp links."
                             )
                         })
-                    else:
+                    elif session.slots.customer_consent_given:
+                        # Turn 2: User explicitly agreed; ask for the 3 contact details
                         tool_choice = "none"
                         locales = LanguageDetector.get_supported_locales()
                         cur_lang = locales.get(lang, {}).get("name", "English")
                         messages.append({
                             "role": "system",
                             "content": (
-                                f"MANDATORY ADVISOR CONSENT PROTOCOL: "
-                                f"The user is asking to speak with or be advised by an advisor. "
+                                f"MANDATORY ADVISOR INTAKE PROTOCOL (TURN 2 — CONTACT DETAILS): "
+                                f"The user has explicitly agreed to have an advisor contact them directly. "
                                 f"DO NOT invent, generate, or provide phone numbers or WhatsApp links, and DO NOT list individual advisor names! "
-                                f"You MUST first ask for consent concisely in {cur_lang}: "
-                                f"1. Ask if they are willing to share their contact details so our advisory team can reach out directly. "
-                                f"2. Ask them to share their Full Name, Phone Number (with country code), and Preferred Language. "
-                                f"Do NOT call request_human_handoff until they share their phone number and name."
+                                f"In a polite, concise response in {cur_lang}, request the necessary details to arrange the callback:\n"
+                                f"1. Full Name\n"
+                                f"2. Phone Number (with country code)\n"
+                                f"3. Preferred Contact Language\n"
+                                f"Do NOT call request_human_handoff until they provide their phone number and name."
+                            )
+                        })
+                    else:
+                        # Turn 1: User requested an advisor; ask for permission ONLY
+                        tool_choice = "none"
+                        session.slots.advisor_consent_pending = True
+                        session.handoff_requested = True
+                        locales = LanguageDetector.get_supported_locales()
+                        cur_lang = locales.get(lang, {}).get("name", "English")
+                        messages.append({
+                            "role": "system",
+                            "content": (
+                                f"MANDATORY ADVISOR CONSENT PROTOCOL (TURN 1 — PERMISSION ONLY): "
+                                f"The user is asking to speak with or be advised by a human advisor. "
+                                f"DO NOT request their name, phone number, or preferred language in this response! "
+                                f"DO NOT provide any individual advisor names, phone numbers, or WhatsApp links! "
+                                f"In 1 to 2 natural, concise sentences in {cur_lang}: "
+                                f"Ask whether they consent to having our licensed advisory team reach out for a direct consultation, "
+                                f"and naturally reassure them that continuing to explore properties and calculations anonymously with you is completely fine. "
+                                f"Do NOT call request_human_handoff."
                             )
                         })
                 elif session.active_intent == "handoff_declined":
@@ -613,6 +743,41 @@ class ConversationOrchestrator:
                         f"- Do NOT trigger a redundant search_properties tool call when answering analytical questions about these active listings."
                     )
                     messages.append({"role": "system", "content": inv_summary})
+
+                if session.slots.unconfirmed_location:
+                    tool_choice = "none"
+                    unc = session.slots.unconfirmed_location
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            f"UNCONFIRMED LOCATION DIRECTIVE: The user mentioned '{unc}', which is not a recognized Dubai community or developer. "
+                            f"DO NOT invent properties, DO NOT pretend '{unc}' is a real area, and DO NOT dump a generic list of random Dubai communities! "
+                            f"In 1 to 2 polite sentences in {lang}, clarify what they meant (e.g. asking whether they meant JLT, Al Barsha, or specific projects) and ask where they would prefer to focus."
+                        )
+                    })
+
+                if session.slots.inferred_location_note:
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            f"TYPO RESOLUTION NOTE: The user typed a typo which was auto-resolved: '{session.slots.inferred_location_note}'. "
+                            f"Acknowledge this transparently and naturally in your reply in {lang} while presenting the options."
+                        )
+                    })
+
+                trust_safety_terms = ["safe", "safety", "trust", "proof", "privacy", "scam", "protect", "legal", "legit", "pdpl", "article 53", "dld", "rera"]
+                if any(w in user_text.lower() for w in trust_safety_terms):
+                    messages.append({
+                        "role": "system",
+                        "content": (
+                            f"TRUST & VERIFICATION PROTOCOL (KB Article 53 & UAE Law): "
+                            f"The user is asking about safety, privacy, trust, or verification. "
+                            f"Under UAE Federal Decree-Law No. 45 of 2021 (PDPL) and DLD regulations, explain that their data is protected under banking-grade encryption and never sold or shared with third-party telemarketers. "
+                            f"Confirm that property listings and title deeds are cross-referenced with DLD (Dubai Land Department) official records, off-plan projects are secured by Law No. 8 of 2007 Escrow accounts, and all advisors are RERA-certified. "
+                            f"Reassure them that they are completely free to explore properties and calculate mortgage affordability 100% anonymously without providing any contact details. "
+                            f"Respond directly and concisely in {lang}."
+                        )
+                    })
 
                 response = await client.chat.completions.create(
                     model=settings.LLM_MODEL,
@@ -784,6 +949,7 @@ class ConversationOrchestrator:
             b_max = None if is_broaden else fn_args.get("budget_max", session.slots.property_budget_max)
             req_amenities = fn_args.get("amenities") or (session.slots.property_amenities if session.slots.property_amenities else None)
             req_limit = fn_args.get("limit")
+            req_developer = fn_args.get("developer", session.slots.property_developer)
 
             filters = PropertySearchFilter(
                 city=city_filter,
@@ -793,6 +959,7 @@ class ConversationOrchestrator:
                 beds=fn_args.get("beds", session.slots.property_beds),
                 purpose=fn_args.get("purpose", session.slots.property_purpose),
                 status=fn_args.get("status"),
+                developer=req_developer,
                 amenities=req_amenities,
                 limit=req_limit
             )
@@ -837,7 +1004,25 @@ class ConversationOrchestrator:
                 alts = PropertyDiscoveryService.find_catalog_alternatives(filters)
                 tool_summary["catalog_alternatives"] = alts
 
-                if alts.get("has_community_properties"):
+                if filters.developer:
+                    dev_alts = alts.get("developer_alternatives", {})
+                    other_devs_in_comm = dev_alts.get("other_developers_in_community", [])
+                    dev_other_comms = dev_alts.get("developer_other_communities", [])
+                    guidance = (
+                        f"CRITICAL INSTRUCTION: Exact search for developer '{filters.developer}' in '{location_name}' returned 0 matching listings. "
+                        f"Do NOT say or pretend '{filters.developer}' has listings in '{location_name}'! "
+                        f"Politely and directly inform the user that {filters.developer} does not currently have active listings in {location_name}. "
+                    )
+                    if other_devs_in_comm:
+                        guidance += f"Mention that {location_name} has residences available by other premier developers such as {', '.join(other_devs_in_comm[:3])}. "
+                    if dev_other_comms:
+                        guidance += f"Mention that {filters.developer} offers projects in other communities such as {', '.join(dev_other_comms[:3])}. "
+                    guidance += (
+                        f"Proactively ask the user (in 1 single follow-up question) whether they would like to explore options by other developers in {location_name}, "
+                        f"or see projects by {filters.developer} in other communities."
+                    )
+                    tool_summary["guidance_for_assistant"] = guidance
+                elif alts.get("has_community_properties"):
                     tiers = [
                         f"{b['beds']}BR {b['type']} (starting from AED {b['starting_price_aed']:,.0f})"
                         for b in alts.get("available_beds_in_community", [])
@@ -1654,43 +1839,47 @@ class ConversationOrchestrator:
             has_phone = bool(session.slots.customer_phone)
 
             if not has_phone:
-                dept = "Prime & Ultra-Luxury Property Consultant"
-                if session.slots.mortgage_income or "mortgage" in user_text.lower():
-                    dept = "Senior UAE Mortgage Specialist"
-                elif "support" in user_text.lower() or "concierge" in user_text.lower():
-                    dept = "Client Concierge & Advisory Manager"
+                if not session.slots.customer_consent_given:
+                    session.slots.advisor_consent_pending = True
+                    session.handoff_requested = True
+                    turn1_prompts = {
+                        "en": "Would you like me to connect you with one of our licensed human advisors for personalized consultation? Exploring properties and calculations anonymously with me is always welcome as well.",
+                        "ar": "هل تود أن أربطك بأحد مستشارينا العقاريين المعتمدين لتقديم استشارة مخصصة؟ يمكنك دائماً متابعة البحث والحسابات بدون أي التزام وبشكل مجهول.",
+                        "hi": "क्या आप व्यक्तिगत सलाह के लिए हमारे प्रमाणित सलाहकार से जुड़ना चाहेंगे? आप मेरे साथ बिना किसी संपर्क विवरण के भी खोज जारी रख सकते हैं।",
+                        "ur": "کیا آپ ذاتی مشورے کے لیے ہمارے مستند انسانی ایڈوائزر سے رابطہ کرنا چاہیں گے؟ آپ میرے ساتھ بغیر کسی رابطہ تفصیلات کے بھی اطمینان سے سرچ جاری رکھ سکتے ہیں۔"
+                    }
+                    return {
+                        "text": turn1_prompts.get(lang, turn1_prompts["en"]),
+                        "handoff_offered": True
+                    }
 
-                permission_prompts = {
+                # Turn 2: User gave consent; request contact details
+                turn2_prompts = {
                     "en": (
-                        f"Would you be willing to share your contact details so our advisory team can reach out to you directly?\n\n"
-                        f"If so, please provide:\n"
+                        f"To arrange your direct callback, please share:\n"
                         f"1. **Full Name**\n"
                         f"2. **Phone Number** (with country code)\n"
                         f"3. **Preferred Contact Language**"
                     ),
                     "ar": (
-                        f"هل توافق على مشاركة بيانات الاتصال الخاصة بك حتى يتمكن فريقنا الاستشاري من التواصل معك مباشرة؟\n\n"
-                        f"إذا كنت توافق، يرجى تزويدنا بـ:\n"
+                        f"لترتيب اتصالك المباشر، يرجى تزويدنا بـ:\n"
                         f"1. **الاسم الكامل**\n"
                         f"2. **رقم الهاتف** (مع رمز الدولة)\n"
                         f"3. **اللغة المفضلة للتواصل**"
                     ),
                     "hi": (
-                        f"क्या आप अपना संपर्क विवरण साझा करने के लिए सहमत हैं ताकि हमारी सलाहकार टीम आपसे सीधे संपर्क कर सके?\n\n"
-                        f"कृपया निम्नलिखित विवरण दें:\n"
+                        f"सीधे संपर्क के लिए कृपया निम्नलिखित विवरण साझा करें:\n"
                         f"1. **पूरा नाम**\n"
                         f"2. **फोन नंबर** (कंट्री कोड के साथ)\n"
                         f"3. **पसंदीदा संपर्क भाषा**"
                     ),
                     "ur": (
-                        f"کیا آپ اپنی رابطہ تفصیلات فراہم کرنے کے لیے رضامند ہیں تاکہ ہماری مشاورتی ٹیم آپ سے براہ راست رابطہ کر سکے؟\n\n"
-                        f"اگر ہاں، تو براہ کرم درج کریں:\n"
+                        f"براہ راست رابطے کے لیے، برائے مہربانی درج کریں:\n"
                         f"1. **پورا نام**\n"
                         f"2. **فون نمبر** (کنٹری کوڈ کے ساتھ)\n"
                         f"3. **پسندیدہ رابطہ زبان**"
                     ),
                     "or": (
-                        f"ଆମର ପରାମର୍ଶଦାତା ଟିମ୍ ଆପଣଙ୍କୁ ସିଧାସଳଖ ଯୋଗାଯୋଗ କରିବା ପାଇଁ ଆପଣ ଆପଣଙ୍କ ବିବରଣୀ ଦେବାକୁ ଇଚ୍ଛୁକ କି?\n\n"
                         f"ଦୟାକରି ପ୍ରଦାନ କରନ୍ତୁ:\n"
                         f"1. **ସମ୍ପୂର୍ଣ୍ଣ ନାମ**\n"
                         f"2. **ଫୋନ୍ ନମ୍ବର** (କଣ୍ଟ୍ରି କୋଡ୍ ସହିତ)\n"
@@ -1698,7 +1887,7 @@ class ConversationOrchestrator:
                     )
                 }
                 return {
-                    "text": permission_prompts.get(lang, permission_prompts["en"]),
+                    "text": turn2_prompts.get(lang, turn2_prompts["en"]),
                     "handoff_offered": False
                 }
 

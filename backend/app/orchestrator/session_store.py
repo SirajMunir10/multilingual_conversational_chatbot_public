@@ -23,6 +23,9 @@ class SlotState(BaseModel):
     property_purpose: Optional[str] = None  # buy, rent, invest
     property_timeline: Optional[str] = None
     property_amenities: List[str] = Field(default_factory=list)
+    property_developer: Optional[str] = None
+    unconfirmed_location: Optional[str] = None
+    inferred_location_note: Optional[str] = None
 
     # Mortgage calculation slots
     mortgage_income: Optional[float] = None
@@ -42,6 +45,7 @@ class SlotState(BaseModel):
     customer_phone: Optional[str] = None
     customer_preferred_language: Optional[str] = None
     customer_consent_given: bool = False
+    advisor_consent_pending: bool = False
 
 class SessionContext(BaseModel):
     session_id: str

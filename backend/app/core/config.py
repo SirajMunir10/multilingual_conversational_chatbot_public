@@ -35,6 +35,7 @@ class AppSettings(BaseModel):
     # CRM Gateways Configuration (GRID & Vault)
     GRID_API_URL: str = Field(default_factory=lambda: os.getenv("GRID_API_URL", ""))
     GRID_API_KEY: str = Field(default_factory=lambda: os.getenv("GRID_API_KEY", ""))
+    GRID_OFFPLAN_API_URL: str = Field(default_factory=lambda: os.getenv("GRID_OFFPLAN_API_URL", "https://xoto.ae/api/gridoffplan/website"))
     VAULT_API_URL: str = Field(default_factory=lambda: os.getenv("VAULT_API_URL", ""))
     VAULT_API_KEY: str = Field(default_factory=lambda: os.getenv("VAULT_API_KEY", ""))
 

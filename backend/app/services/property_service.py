@@ -168,6 +168,26 @@ class PropertyDiscoveryService:
                 session_id=session_id
             )
 
+        # Phase 6: Query live GRID off-plan inventory if off-plan explicitly requested, or if developer/status search needs live projects
+        if filters.status == "off-plan" or not listings or (filters.developer and len(listings) == 0):
+            try:
+                from app.gateways.grid_gateway import GridGateway
+                grid_props = GridGateway.search_offplan_projects(
+                    search=filters.developer,
+                    district=target_city,
+                    min_price=filters.budget_min,
+                    max_price=filters.budget_max,
+                    limit=filters.limit or 5,
+                    session_id=session_id
+                )
+                if filters.status == "off-plan":
+                    listings = grid_props or listings
+                elif not listings and grid_props:
+                    listings = grid_props
+            except Exception as e:
+                import logging
+                logging.getLogger("xo.services.property").warning(f"Could not query live GRID offplan inventory: {e}")
+
         # Note: Do not silently broaden community to all Dubai here, as that bypasses FR-8 Smart Catalog Fallbacks.
         # Fallback recommendations are handled conversationally via find_catalog_alternatives().
 
@@ -671,6 +691,27 @@ class PropertyDiscoveryService:
         for comm_info in other_communities_summary:
             other_comm_same_beds.extend(other_comm_same_beds_map[comm_info["community"]])
 
+        # 3. Developer alternatives if developer was requested
+        developer_alternatives = {}
+        if filters.developer:
+            target_dev = filters.developer.lower()
+            other_devs_in_comm = sorted(list({p.developer for p in comm_props if p.developer and target_dev not in p.developer.lower()}))
+            dev_other_comms = sorted(list({p.community for p in all_props if p.developer and target_dev in p.developer.lower() and (not target_comm or target_comm not in p.community.lower())}))
+            try:
+                from app.gateways.grid_gateway import GridGateway
+                grid_offplan = GridGateway.search_offplan_projects(search=filters.developer)
+                for gp in grid_offplan:
+                    if gp.community and gp.community not in dev_other_comms:
+                        dev_other_comms.append(gp.community)
+            except Exception:
+                pass
+
+            developer_alternatives = {
+                "searched_developer": filters.developer,
+                "other_developers_in_community": other_devs_in_comm,
+                "developer_other_communities": dev_other_comms
+            }
+
         return {
             "target_community": filters.city or filters.location or "Dubai",
             "requested_beds": target_beds,
@@ -680,5 +721,7 @@ class PropertyDiscoveryService:
             "same_community_alternatives": [p.model_dump() for p in same_comm_other_beds[:4]],
             "has_other_comm_alternatives": len(other_comm_same_beds) > 0,
             "other_communities_summary": other_communities_summary[:4],
-            "other_community_alternatives": [p.model_dump() for p in other_comm_same_beds[:4]]
+            "other_community_alternatives": [p.model_dump() for p in other_comm_same_beds[:4]],
+            "developer_alternatives": developer_alternatives
         }
+
