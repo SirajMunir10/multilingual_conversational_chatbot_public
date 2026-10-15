@@ -88,8 +88,9 @@
                 
                 <div class="prop-specs">
                   <span>🛏️ {{ prop.beds }} Beds</span>
-                  <span>🚿 {{ prop.baths }} Baths</span>
-                  <span>📐 {{ prop.sq_ft }} sq.ft</span>
+                  <span v-if="prop.baths && prop.baths > 0">🚿 {{ prop.baths }} Baths</span>
+                  <span v-if="prop.sq_ft && prop.sq_ft > 0">📐 {{ prop.sq_ft }} sq.ft</span>
+                  <span v-else>📐 Area on request</span>
                 </div>
 
                 <!-- Amenities Tags -->

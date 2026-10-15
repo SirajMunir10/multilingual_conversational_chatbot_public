@@ -192,30 +192,77 @@ class ConversationOrchestrator:
         ]
         is_trust_safety_inquiry = any((re.search(r'\b' + re.escape(w) + r'\b', lowered) if w.isascii() else (w in lowered)) for w in trust_safety_terms) or "?" in text
 
-        # Check if user declined advisor callback consent
-        decline_words = ["no", "never", "don't", "dont", "not willing", "cancel", "refuse", "stop", "i will not", "نہیں", "لا", "नहीं", "ਨਾ", "না", "விருப்பமில்லை", "வேண்டாம்", "അരുത്", "ନାହିଁ", "non", "nein", "buhay", "خیر", "نه", "不", "不用"]
-        is_declining = any((re.search(r'\b' + re.escape(w) + r'\b', lowered) if w.isascii() else (w in lowered)) for w in decline_words) or lowered.strip() in decline_words
+        # Check advisor callback consent / response when consent is pending
+        if session.handoff_requested or session.slots.advisor_consent_pending:
+            # 1. Trust & Safety Priority (Article 53, UAE PDPL Law 45, DLD Title Deed verification)
+            if is_trust_safety_inquiry and any(w in lowered for w in ["safe", "safety", "trust", "proof", "privacy", "scam", "protect", "guarantee", "legit", "legal", "pdpl", "article 53"]):
+                return "trust_safety"
 
-        # Only treat as a decline if it is a pure refusal WITHOUT a safety/trust question and without phone number
-        if (session.handoff_requested or session.slots.advisor_consent_pending) and is_declining and not is_trust_safety_inquiry and not has_phone_number:
-            session.slots.advisor_consent_pending = False
-            session.slots.customer_consent_given = False
-            return "handoff_declined"
+            # 2. Connection desire (even if prefixed with "no", e.g. "No, I want to get connected", "No, connect me")
+            connection_intent_phrases = [
+                "connect me", "get connected", "want to get connected", "want to be connected",
+                "want to connect", "connect with", "connect to", "speak with advisor", "speak to advisor",
+                "speak to an advisor", "talk to advisor", "talk to an advisor", "talk to human",
+                "speak to human", "call me", "reach me", "callback", "arrange that", "arrange callback",
+                "yes connect", "yes please", "please connect", "proceed with advisor", "want an advisor",
+                "need an advisor", "speak with agent", "talk to agent"
+            ]
+            has_explicit_connection_desire = any(phrase in lowered for phrase in connection_intent_phrases)
+
+            # Adversative refusal (e.g. "sure, but stay anonymous", "yes, but no calls")
+            has_adversative_refusal = any(w in lowered for w in ["stay anonymous", "remain anonymous", "on my own", "browse myself", "don't call", "dont call", "no calls", "no phone", "without calling"])
+
+            if has_explicit_connection_desire and not has_adversative_refusal:
+                session.slots.customer_consent_given = True
+                session.slots.advisor_consent_pending = False
+                return "human_handoff"
+
+            # 3. Adversative refusal after affirmative opener
+            if has_adversative_refusal:
+                session.slots.advisor_consent_pending = False
+                session.slots.customer_consent_given = False
+                return "handoff_declined"
+
+            # 4. Pure affirmative consent
+            affirmative_consent_words = [
+                "yes", "sure", "please", "okay", "ok", "yep", "yeah", "definitely",
+                "haan", "na'am", "naam", "agree", "proceed", "i agree", "i consent",
+                "نعم", "हाँ", "ضرور", "جی ہاں", "oui", "si", "ja", "baleh", "oo", "হাঁ", "ஆம்", "ਹਾਂ", "അതെ", "ହଁ"
+            ]
+            is_pure_affirmative = any((re.search(r'\b' + re.escape(w) + r'\b', lowered) if w.isascii() else (w in lowered)) for w in affirmative_consent_words) or lowered.strip() in affirmative_consent_words
+
+            decline_words = [
+                "no", "never", "don't", "dont", "not willing", "cancel", "refuse", "stop", "i will not",
+                "not now", "prefer not", "no thanks", "nah", "نہیں", "لا", "नहीं", "ਨਾ", "না",
+                "விருப்பமில்லை", "வேண்டாம்", "അരുത്", "ନାହିଁ", "non", "nein", "buhay", "خیر", "نه", "不", "不用"
+            ]
+            is_declining = any((re.search(r'\b' + re.escape(w) + r'\b', lowered) if w.isascii() else (w in lowered)) for w in decline_words) or lowered.strip() in decline_words
+
+            # 5. Topic pivot / change of subject (user asks a mortgage or property question instead)
+            is_property_topic = any(kw in lowered for kw in ["bedroom", "bed", "apartment", "villa", "downtown", "marina", "property", "properties", "buy", "rent", "invest", "offplan", "off-plan", "off plan", "listings"])
+            is_mortgage_topic = any(kw in lowered for kw in ["emi", "monthly payment", "mortgage", "afford", "affordability", "interest rate", "loan", "down payment", "dbr", "salary", "income"])
+            if is_property_topic and not has_phone_number:
+                session.slots.advisor_consent_pending = False
+                session.handoff_requested = False
+                return "property"
+            if is_mortgage_topic and not has_phone_number:
+                session.slots.advisor_consent_pending = False
+                session.handoff_requested = False
+                return "mortgage"
+
+            # 6. Check affirmative vs decline
+            if is_pure_affirmative and not is_declining:
+                session.slots.customer_consent_given = True
+                session.slots.advisor_consent_pending = False
+                return "human_handoff"
+
+            if is_declining and not is_trust_safety_inquiry and not has_phone_number:
+                session.slots.advisor_consent_pending = False
+                session.slots.customer_consent_given = False
+                return "handoff_declined"
 
         if is_trust_safety_inquiry and any(w in lowered for w in ["safe", "safety", "trust", "proof", "privacy", "scam", "protect", "guarantee", "legit", "legal", "pdpl", "article 53"]):
             return "trust_safety"
-
-        # Check for affirmative consent in Turn 2
-        affirmative_consent_words = [
-            "yes", "sure", "please", "connect me", "arrange that", "okay", "ok", "yep", "yeah",
-            "haan", "na'am", "naam", "agree", "proceed", "i agree", "i consent", "نعم", "हाँ", "ضرور", "جی ہاں"
-        ]
-        is_affirming_consent = any((re.search(r'\b' + re.escape(w) + r'\b', lowered) if w.isascii() else (w in lowered)) for w in affirmative_consent_words) or lowered.strip() in affirmative_consent_words
-
-        if session.slots.advisor_consent_pending and is_affirming_consent:
-            session.slots.customer_consent_given = True
-            session.slots.advisor_consent_pending = False
-            return "human_handoff"
 
         # Gender / Identity inquiry
         gender_kw = [
@@ -308,9 +355,26 @@ class ConversationOrchestrator:
         if any(kw in lowered for kw in mortgage_kw):
             return "mortgage"
 
+        # Knowledge / educational inquiry check: questions about fees, taxes, laws, regulations, processes
+        is_knowledge_query = any(w in lowered for w in [
+            "fee", "fees", "cost to", "costs to", "dld", "tax", "taxes", "law", "laws", "rules", "rule",
+            "procedure", "process", "steps to", "how to buy", "how to invest", "difference between",
+            "what are the costs", "what is the cost", "what are the fees", "what fees", "رسوم", "قانون",
+            "फीस", "प्रक्रिया", "فیس", "طریقہ کار", "golden visa", "escrow"
+        ])
+        is_search_intent = any(w in lowered for w in [
+            "show", "find", "search", "list", "give me", "provide me", "listings",
+            "ابحث", "اريد", "أريد", "دیکھو", "चाहिए", "दिखाइए"
+        ])
+        if is_knowledge_query and not is_search_intent:
+            return "general"
+
         # Property intent keywords
         property_kw = [
-            "bedroom", "bed", "br", "apartment", "villa", "townhouse", "penthouse", "studio", "downtown", "marina", "hills", "property", "buy", "rent", "invest", "residence", "residences",
+            "bedroom", "bed", "br", "apartment", "apartments", "villa", "villas", "townhouse", "townhouses",
+            "penthouse", "studio", "downtown", "marina", "hills", "property", "properties", "buy", "rent",
+            "invest", "residence", "residences", "off-plan", "off plan", "offplan", "listing", "listings",
+            "project", "projects", "units", "developer",
             "شقة", "فيلا", "عقار", "شراء", "إيجار", "फ्लैट", "پراپرٹی",
             "chambre", "appartement", "propriété", "acheter", "louer", "immobilier",
             "habitación", "apartamento", "departamento", "propiedad", "comprar", "alquilar",
@@ -327,8 +391,11 @@ class ConversationOrchestrator:
         if any(kw in lowered for kw in property_kw):
             return "property"
 
-        # If previous intent was property or mortgage and user is refining (e.g. "cheaper", "how about 3 beds", "other property")
-        if session.active_intent in ["property", "mortgage"] and any(w in lowered for w in ["cheaper", "more", "less", "bigger", "smaller", "show", "near", "other"]):
+        # If previous intent was property or mortgage and user is refining (e.g. "cheaper", "how about 3 beds", "other property", "any listing", "no preferences")
+        if session.active_intent in ["property", "mortgage"] and any(w in lowered for w in [
+            "cheaper", "more", "less", "bigger", "smaller", "show", "near", "other",
+            "any", "preference", "preferences", "listing", "listings", "option", "options"
+        ]):
             return session.active_intent
 
         return "general"
@@ -342,6 +409,12 @@ class ConversationOrchestrator:
         # If user is evaluating / comparing on-screen properties, do NOT overwrite search slots
         if session.active_intent == "property_comparison":
             return
+
+        # If user switches away from property search, reset transient search flags
+        if session.active_intent != "property":
+            session.slots.preferences_waived = False
+            session.slots.unconfirmed_location = None
+            session.slots.inferred_location_note = None
 
         lowered = text.lower()
 
@@ -444,15 +517,69 @@ class ConversationOrchestrator:
                 session.slots.property_developer = canon_dev
                 break
 
-        # Check for general "other property" requests to broaden search
+        # Check if user explicitly waives or declines optional preferences
+        no_pref_patterns = [
+            r"\bi\s+don'?t\s+have\s+(?:any\s+)?preferences?\b",
+            r"\bno\s+preferences?\b",
+            r"\bany\s+(?:listing|property|properties|residence|residences|options?)\b",
+            r"\bjust\s+provide\s+(?:me\s+)?any\b",
+            r"\bjust\s+show\s+(?:me\s+)?any\b",
+            r"\banything\s+is\s+fine\b",
+            r"\bdoesn'?t\s+matter\b",
+            r"\bany\s+budget\b",
+            r"\bno\s+preference\b"
+        ]
+        is_waiving_preferences = any(re.search(p, lowered) for p in no_pref_patterns)
+        if is_waiving_preferences:
+            session.slots.preferences_waived = True
+            session.slots.property_developer = None
+            session.slots.unconfirmed_location = None
+            session.slots.inferred_location_note = None
+        else:
+            # When user begins a fresh search or specifies criteria without waiving preferences, reset preferences_waived
+            is_fresh_task = any(w in lowered for w in [
+                "show me", "find me", "provide me", "give me", "look for", "search",
+                "off-plan properties in dubai", "off-plan in dubai", "off plan in dubai", "offplan in dubai",
+                "ابحث", "اريد", "أريد", "دیکھو"
+            ]) or any(w in lowered for w in [
+                "in dubai", "across dubai", "all dubai", "anywhere in dubai", "in uae",
+                "in palm", "in downtown", "in marina", "in business bay", "in jvc", "in jlt", "in hills"
+            ])
+            if is_fresh_task:
+                session.slots.preferences_waived = False
+
+        # Check for general "other property" requests or broad Dubai searches to broaden/supersede search
+        is_broad_dubai_search = any(w in lowered for w in [
+            "in dubai", "across dubai", "all dubai", "anywhere in dubai",
+            "properties in dubai", "off-plan in dubai", "off plan in dubai", "offplan in dubai",
+            "off-plan properties in dubai", "off plan properties in dubai", "offplan properties in dubai"
+        ])
         if any(w in lowered for w in ["other property", "other properties", "other options", "something else", "different property", "عقارات أخرى", "خيارات أخرى", "अन्य प्रॉपर्टी", "دوسری پراپرٹی"]):
             session.slots.property_city = "Dubai"
             session.slots.property_budget_max = None
+            session.slots.property_developer = None
+            session.slots.unconfirmed_location = None
+            session.slots.inferred_location_note = None
         elif any(w in lowered for w in ["all uae", "in uae", "across uae", "all of uae", "find in uae", "in the uae", "uae", "everywhere in uae", "anywhere in uae"]):
             session.slots.property_city = "UAE"
-        elif any(w in lowered for w in ["all dubai", "across dubai", "anywhere in dubai", "in dubai"]):
-            if not any(loc in lowered for loc in ["downtown", "marina", "business bay", "dubai hills", "palm", "jvc", "creek", "jbr", "ranches", "jlt", "glt"]):
+            session.slots.unconfirmed_location = None
+            session.slots.inferred_location_note = None
+        elif is_broad_dubai_search:
+            has_specific_comm = any(loc in lowered for loc in ["downtown", "marina", "business bay", "dubai hills", "palm", "jvc", "creek", "jbr", "ranches", "jlt", "glt", "difc", "meydan", "majan"])
+            if not has_specific_comm:
                 session.slots.property_city = "Dubai"
+                # Supersede old narrow community developer constraint unless developer was re-specified in this message
+                has_dev_in_msg = any(d in lowered for d in ["imtiaz", "imtiyaz", "emaar", "damac", "nakheel", "sobha", "select group", "ellington", "meraas", "aldar"])
+                if not has_dev_in_msg:
+                    session.slots.property_developer = None
+                session.slots.unconfirmed_location = None
+                session.slots.inferred_location_note = None
+
+        # Extract construction timeline / status
+        if any(w in lowered for w in ["off-plan", "off plan", "offplan", "under construction", "خطة على الخارطة", "قيد الإنشاء", "ऑफ प्लान", "آف پلان"]):
+            session.slots.property_timeline = "off-plan"
+        elif any(w in lowered for w in ["ready", "ready to move", "جاهز", "جاهزة", "तैयार"]):
+            session.slots.property_timeline = "ready"
 
         # Specific communities (ordered by specificity, with fuzzy typo resolution)
         comm_map = [
@@ -506,20 +633,27 @@ class ConversationOrchestrator:
                 break
 
         # Detect unconfirmed location pattern (e.g. "apartments in alt", "properties in alt")
-        if not matched_comm and session.active_intent in ["property", "general"]:
-            loc_match = re.search(r'\b(?:in|at|near|around|for)\s+([a-zA-Z]{2,15})\b', text)
+        if not matched_comm and not is_waiving_preferences and not is_broad_dubai_search and session.active_intent in ["property", "general"]:
+            # Only match genuine location prepositions in/at/near/around (never 'for', which indicates purpose/duration/price)
+            loc_match = re.search(r'\b(?:in|at|near|around)\s+([a-zA-Z]{2,20})\b', text)
             if loc_match:
                 cand = loc_match.group(1).strip()
                 cand_lower = cand.lower()
-                common_non_locations = [
-                    "dubai", "uae", "abu", "dhabi", "buy", "rent", "invest", "cash", "mortgage", "aed",
-                    "budget", "apartment", "apartments", "villa", "villas", "townhouse", "sale", "ready",
-                    "offplan", "off", "plan", "terms", "english", "arabic", "hindi", "urdu", "french",
-                    "german", "spanish", "chinese", "tagalog", "bengali", "tamil", "punjabi", "malayalam",
-                    "dia", "persian", "touch", "call", "details", "contact", "person", "advisor", "agent",
-                    "broker", "specialist", "viewing", "mind", "general", "advance", "handover", "future",
-                    "month", "year", "years", "my", "our", "their", "this", "that", "these", "those"
-                ]
+                common_non_locations = {
+                    "dubai", "uae", "abu", "dhabi", "sharjah", "buy", "rent", "invest", "cash", "mortgage", "aed",
+                    "budget", "apartment", "apartments", "villa", "villas", "townhouse", "townhouses", "penthouse",
+                    "studio", "sale", "ready", "offplan", "off", "plan", "terms", "english", "arabic", "hindi",
+                    "urdu", "french", "german", "spanish", "chinese", "tagalog", "bengali", "tamil", "punjabi",
+                    "malayalam", "dia", "persian", "touch", "call", "details", "contact", "person", "advisor",
+                    "agent", "broker", "specialist", "viewing", "mind", "general", "advance", "handover", "future",
+                    "now", "today", "tomorrow", "present", "month", "year", "years", "my", "our", "their", "this",
+                    "that", "these", "those", "all", "any", "anything", "nothing", "sure", "fine", "ok", "please",
+                    "listing", "listings", "option", "options", "preference", "preferences", "example", "info",
+                    "information", "me", "us", "you", "them", "some", "few", "more", "less", "good", "best",
+                    "cheap", "expensive", "luxury", "affordable", "loan", "emi", "salary", "income", "dirham",
+                    "dirhams", "usd", "dollar", "dollars", "k", "m", "million", "thousand", "property", "properties",
+                    "residence", "residences", "unit", "units", "flat", "flats", "home", "homes", "house", "houses"
+                }
                 if cand_lower not in common_non_locations and not any(cand_lower in c[0] for c in comm_map):
                     session.slots.unconfirmed_location = cand
 
@@ -703,40 +837,56 @@ class ConversationOrchestrator:
                     messages.append({"role": "system", "content": comp_context})
                 elif session.active_intent == "mortgage" and session.slots.mortgage_income:
                     tool_choice = {"type": "function", "function": {"name": "calc_affordability"}}
-                elif session.active_intent == "property" and (session.slots.property_beds or session.slots.property_budget_max or session.slots.property_city):
-                    is_exploratory = any(w in user_text.lower() for w in [
-                        "where to invest", "best place", "best places", "places to invest", 
-                        "best area", "best areas", "top areas", "top places", "names of the places",
-                        "where can i invest", "where should i invest", "good place to invest", "options to invest"
+                elif session.active_intent == "property":
+                    is_waiving_preferences = session.slots.preferences_waived or any(w in user_text.lower() for w in [
+                        "no preferences", "no preference", "any listing", "any property", "provide me any", "show me any", "anything is fine"
                     ])
-                    is_analytical = any(w in user_text.lower() for w in [
-                        "average price", "average cost", "average size", "average pricing", "what is the average", "whats the average",
-                        "how much on average", "price range", "متوسط سعر", "متوسط السعر", "औसत कीमत", "اوسط قیمت"
-                    ])
-                    is_search_request = any(w in user_text.lower() for w in [
-                        "show", "find", "get", "need", "want", "search", "looking for", "provide", "give me", "list",
-                        "ابحث", "اريد", "أريد", "دیکھو", "चाहिए", "दिखाइए"
-                    ]) or (bool(session.slots.property_beds) and any(w in user_text.lower() for w in ["bhk", "bedroom", "br", "apartment", "villa", "townhouse"]))
+                    has_criteria = bool(session.slots.property_beds or session.slots.property_budget_max or session.slots.property_city or session.slots.property_developer or session.slots.property_timeline)
+                    if is_waiving_preferences or has_criteria:
+                        is_exploratory = any(w in user_text.lower() for w in [
+                            "where to invest", "best place", "best places", "places to invest", 
+                            "best area", "best areas", "top areas", "top places", "names of the places",
+                            "where can i invest", "where should i invest", "good place to invest", "options to invest"
+                        ])
+                        is_analytical = any(w in user_text.lower() for w in [
+                            "average price", "average cost", "average size", "average pricing", "what is the average", "whats the average",
+                            "how much on average", "price range", "متوسط سعر", "متوسط السعر", "औसत कीमत", "اوسط قیمت"
+                        ])
+                        is_search_request = is_waiving_preferences or any(w in user_text.lower() for w in [
+                            "show", "find", "get", "need", "want", "search", "looking for", "provide", "give me", "list",
+                            "listing", "listings", "property", "properties", "off-plan", "off plan", "offplan", "any",
+                            "ابحث", "اريد", "أريد", "دیکھو", "चाहिए", "दिखाइए"
+                        ]) or (bool(session.slots.property_beds) and any(w in user_text.lower() for w in ["bhk", "bedroom", "br", "apartment", "villa", "townhouse"]))
 
-                    if is_search_request and not is_analytical and not is_exploratory:
-                        tool_choice = {"type": "function", "function": {"name": "search_properties"}}
+                        if is_search_request and not is_analytical and not is_exploratory:
+                            tool_choice = {"type": "function", "function": {"name": "search_properties"}}
+                elif session.active_intent == "general":
+                    is_kb_query = any(w in user_text.lower() for w in [
+                        "fee", "fees", "cost to", "costs to", "dld", "tax", "taxes", "law", "laws", "rules", "rule",
+                        "procedure", "process", "steps to", "how to buy", "how to invest", "difference between",
+                        "what are the costs", "what is the cost", "what are the fees", "what fees", "رسوم", "قانون",
+                        "फीस", "प्रक्रिया", "فیس", "طریقہ کار", "golden visa", "escrow", "registration"
+                    ])
+                    if is_kb_query:
+                        tool_choice = {"type": "function", "function": {"name": "retrieve_kb"}}
 
                 # If user already searched and has active inventory in session, inject metrics context for analytical questions
                 if session.last_recommended_properties:
                     props = session.last_recommended_properties
                     total_count = len(props)
                     prices = [p.get("price", 0) for p in props if p.get("price")]
-                    areas = [p.get("sq_ft") or p.get("sqft") or 0 for p in props if (p.get("sq_ft") or p.get("sqft"))]
+                    areas = [p.get("sq_ft") or p.get("sqft") for p in props if (p.get("sq_ft") or p.get("sqft")) and (p.get("sq_ft") or p.get("sqft")) > 0]
                     avg_p = round(sum(prices) / len(prices)) if prices else 0
                     min_p = min(prices) if prices else 0
                     max_p = max(prices) if prices else 0
-                    avg_a = round(sum(areas) / len(areas)) if areas else 0
+                    avg_a = round(sum(areas) / len(areas)) if areas else None
+                    area_line = f"- Average area: {avg_a} sq.ft\n" if avg_a else "- Average area: Details on request (not specified in upstream catalog)\n"
                     inv_summary = (
                         f"ACTIVE DISPLAYED INVENTORY SUMMARY IN USER'S CURRENT SESSION:\n"
                         f"- Total active listings: {total_count}\n"
                         f"- Average price: AED {avg_p:,}\n"
                         f"- Price range: AED {min_p:,} to AED {max_p:,}\n"
-                        f"- Average area: {avg_a} sq.ft\n"
+                        f"{area_line}"
                         f"CRITICAL INSTRUCTIONS:\n"
                         f"- If the user asks analytical questions about these active listings (e.g., 'what is the average price', 'average size', 'price range', 'what do you recommend among these'), "
                         f"answer directly and enthusiastically using these exact precalculated figures in {lang}!\n"
@@ -937,8 +1087,14 @@ class ConversationOrchestrator:
         if fn_name == "search_properties":
             latest_msg = session.messages[-1].content.lower() if session.messages else ""
             is_broaden = any(w in latest_msg for w in ["other property", "other properties", "other options", "something else", "different property", "عقارات أخرى", "خيارات أخرى", "अन्य प्रॉपर्टी", "دوسری پراپرٹی"])
+            is_broad_dubai = any(w in latest_msg for w in [
+                "in dubai", "across dubai", "all dubai", "anywhere in dubai",
+                "properties in dubai", "off-plan in dubai", "off plan in dubai", "offplan in dubai",
+                "off-plan properties in dubai", "off plan properties in dubai", "offplan properties in dubai"
+            ])
+            has_dev_in_latest = any(d in latest_msg for d in ["imtiaz", "imtiyaz", "emaar", "damac", "nakheel", "sobha", "select group", "ellington", "meraas", "aldar"])
 
-            raw_city = "Dubai" if is_broaden else fn_args.get("city", session.slots.property_city)
+            raw_city = "Dubai" if (is_broaden or is_broad_dubai) else fn_args.get("city", session.slots.property_city)
             if raw_city and raw_city.upper() in ["UAE", "ALL UAE", "ANYWHERE"]:
                 city_filter = None
                 location_name = "the UAE"
@@ -946,10 +1102,17 @@ class ConversationOrchestrator:
                 city_filter = raw_city
                 location_name = raw_city or "Dubai"
 
-            b_max = None if is_broaden else fn_args.get("budget_max", session.slots.property_budget_max)
+            b_max = None if (is_broaden or is_broad_dubai) else fn_args.get("budget_max", session.slots.property_budget_max)
             req_amenities = fn_args.get("amenities") or (session.slots.property_amenities if session.slots.property_amenities else None)
             req_limit = fn_args.get("limit")
-            req_developer = fn_args.get("developer", session.slots.property_developer)
+
+            # Developer constraint: if broad Dubai search or broaden without mentioning developer, supersede old developer filter
+            if (is_broad_dubai or is_broaden) and not has_dev_in_latest:
+                req_developer = None
+            else:
+                req_developer = fn_args.get("developer", session.slots.property_developer)
+
+            req_status = fn_args.get("status") or (session.slots.property_timeline if session.slots.property_timeline else None)
 
             filters = PropertySearchFilter(
                 city=city_filter,
@@ -958,7 +1121,7 @@ class ConversationOrchestrator:
                 budget_max=b_max,
                 beds=fn_args.get("beds", session.slots.property_beds),
                 purpose=fn_args.get("purpose", session.slots.property_purpose),
-                status=fn_args.get("status"),
+                status=req_status,
                 developer=req_developer,
                 amenities=req_amenities,
                 limit=req_limit
@@ -972,11 +1135,11 @@ class ConversationOrchestrator:
 
             count = len(listings)
             prices = [p.get("price", 0) for p in listings if p.get("price")]
-            areas = [p.get("sq_ft") or p.get("sqft") or 0 for p in listings if (p.get("sq_ft") or p.get("sqft"))]
+            areas = [p.get("sq_ft") or p.get("sqft") for p in listings if (p.get("sq_ft") or p.get("sqft")) and (p.get("sq_ft") or p.get("sqft")) > 0]
             avg_p = round(sum(prices) / len(prices)) if prices else 0
             min_p = min(prices) if prices else 0
             max_p = max(prices) if prices else 0
-            avg_a = round(sum(areas) / len(areas)) if areas else 0
+            avg_a = round(sum(areas) / len(areas)) if areas else None
 
             tool_summary = {
                 "status": "success",
@@ -985,14 +1148,14 @@ class ConversationOrchestrator:
                 "average_price_aed": avg_p,
                 "min_price_aed": min_p,
                 "max_price_aed": max_p,
-                "average_area_sqft": avg_a,
+                "average_area_sqft": f"{avg_a} sq.ft" if avg_a else "Details on request",
                 "properties_sample": [
                     {
                         "id": p["id"],
                         "title": p.get("title", ""),
                         "price_aed": p.get("price", 0),
                         "beds": p.get("beds", 0),
-                        "sqft": p.get("sq_ft") or p.get("sqft") or 0,
+                        "sqft": (p.get("sq_ft") or p.get("sqft")) if (p.get("sq_ft") or p.get("sqft")) and (p.get("sq_ft") or p.get("sqft")) > 0 else "Details on request",
                         "location": p.get("location") or p.get("community", ""),
                         "amenities": p.get("amenities", [])
                     }
@@ -1599,16 +1762,18 @@ class ConversationOrchestrator:
                 props = PropertyDiscoveryService.search_and_rank(filters, session.session_id)
             if props:
                 prices = [p.get("price", 0) for p in props if p.get("price")]
-                areas = [p.get("sq_ft") or p.get("sqft") or 0 for p in props if (p.get("sq_ft") or p.get("sqft"))]
+                areas = [p.get("sq_ft") or p.get("sqft") for p in props if (p.get("sq_ft") or p.get("sqft")) and (p.get("sq_ft") or p.get("sqft")) > 0]
                 avg_p = round(sum(prices) / len(prices)) if prices else 0
                 min_p = min(prices) if prices else 0
                 max_p = max(prices) if prices else 0
-                avg_a = round(sum(areas) / len(areas)) if areas else 0
+                avg_a = round(sum(areas) / len(areas)) if areas else None
+                area_suffix = f" with an average size of {avg_a} sq.ft" if avg_a else ""
+                area_suffix_ar = f" بمتوسط مساحة {avg_a} قدم مربع" if avg_a else ""
                 narratives = {
-                    "ar": f"متوسط سعر الشقق المكونة من {session.slots.property_beds or 1} غرف في {session.slots.property_city or 'دبي مارينا'} هو {avg_p:,.0f} درهم إماراتي (تتراوح الأسعار بين {min_p:,.0f} و {max_p:,.0f} درهم بمتوسط مساحة {avg_a} قدم مربع). 🎉",
-                    "hi": f"{session.slots.property_city or 'दुबई मरीना'} में {session.slots.property_beds or 1} बीएचके अपार्टमेंट्स की औसत कीमत {avg_p:,.0f} AED है (कीमतें {min_p:,.0f} से {max_p:,.0f} AED के बीच हैं)। 🎉",
-                    "ur": f"{session.slots.property_city or 'دبئی مرینا'} میں {session.slots.property_beds or 1} بی ایچ کے اپارٹمنٹس کی اوسط قیمت {avg_p:,.0f} درہم ہے (قیمتیں {min_p:,.0f} سے {max_p:,.0f} درہم کے درمیان ہیں)۔ 🎉",
-                    "en": f"The average price for {session.slots.property_beds or 1} BHK apartments in {session.slots.property_city or 'Dubai Marina'} is AED {avg_p:,.0f} (ranging from AED {min_p:,.0f} to AED {max_p:,.0f} with an average size of {avg_a} sq.ft)! 🎉"
+                    "ar": f"متوسط سعر الشقق المكونة من {session.slots.property_beds or 1} غرف في {session.slots.property_city or 'دبي مارينا'} هو {avg_p:,.0f} درهم إماراتي (تتراوح الأسعار بين {min_p:,.0f} و {max_p:,.0f} درهم{area_suffix_ar}).",
+                    "hi": f"{session.slots.property_city or 'दुबई मरीना'} में {session.slots.property_beds or 1} बीएचके अपार्टमेंट्स की औसत कीमत {avg_p:,.0f} AED है (कीमतें {min_p:,.0f} से {max_p:,.0f} AED के बीच हैं)।",
+                    "ur": f"{session.slots.property_city or 'دبئی مرینا'} میں {session.slots.property_beds or 1} بی ایچ کے اپارٹمنٹس کی اوسط قیمت {avg_p:,.0f} درہم ہے (قیمتیں {min_p:,.0f} سے {max_p:,.0f} درہم کے درمیان ہیں)۔",
+                    "en": f"The average price for {session.slots.property_beds or 1} BHK apartments in {session.slots.property_city or 'Dubai Marina'} is AED {avg_p:,.0f} (ranging from AED {min_p:,.0f} to AED {max_p:,.0f}{area_suffix})!"
                 }
                 return {
                     "text": narratives.get(lang, narratives["en"]),
@@ -1738,13 +1903,17 @@ class ConversationOrchestrator:
 
             # Check if key filters are present or ask clarifying questions (FR-4, FR-7)
             if not beds and not budget and not city:
-                questions = {
-                    "ar": "يسعدني مساعدتك في العثور على العقار المثالي في الإمارات! هل تبحث عن شراء للسكن أم للاستثمار، وما هو نوع العقار وعدد غرف النوم والميزانية التقريبية؟",
-                    "hi": "दुबई में आपकी पसंदीदा प्रॉपर्टी खोजने में मुझे ख़ुशी होगी! आप रहने के लिए खरीद रहे हैं या निवेश के लिए, अपार्टमेंट या विला, और कितने बेडरूम?",
-                    "ur": "دبئی میں آپ کی پسندیدہ پراپرٹی تلاش کرنے میں مجھے خوشی ہوگی! آپ رہائش کے لیے خرید رہے ہیں یا سرمایہ کاری کے لیے، اور آپ کا کتنا بجٹ ہے؟",
-                    "en": "I'd be delighted to help you discover premier properties in the UAE! Are you looking for an apartment or villa, how many bedrooms, and what is your approximate budget?"
-                }
-                return {"text": questions.get(lang, questions["en"])}
+                if session.slots.preferences_waived or any(w in user_text.lower() for w in ["any listing", "any property", "no preferences", "no preference", "provide me any", "show me any", "anything is fine"]):
+                    city = "Dubai"
+                    session.slots.property_city = "Dubai"
+                else:
+                    questions = {
+                        "ar": "يسعدني مساعدتك في العثور على العقار المثالي في الإمارات! هل تبحث عن شراء للسكن أم للاستثمار، وما هو نوع العقار وعدد غرف النوم والميزانية التقريبية؟",
+                        "hi": "दुबई में आपकी पसंदीदा प्रॉपर्टी खोजने में मुझे ख़ुशी होगी! आप रहने के लिए खरीद रहे हैं या निवेश के लिए, अपार्टमेंट या विला, और कितने बेडरूम?",
+                        "ur": "دبئی میں آپ کی پسندیدہ پراپرٹی تلاش کرنے میں مجھے خوشی ہوگی! آپ رہائش کے لیے خرید رہے ہیں یا سرمایہ کاری کے لیے، اور آپ کا کتنا بجٹ ہے؟",
+                        "en": "I'd be delighted to help you discover premier properties in the UAE! Are you looking for an apartment or villa, how many bedrooms, and what is your approximate budget?"
+                    }
+                    return {"text": questions.get(lang, questions["en"])}
 
             # Handle broad UAE search vs specific city
             raw_city = city
@@ -1762,6 +1931,8 @@ class ConversationOrchestrator:
                 budget_max=budget,
                 beds=beds,
                 purpose=purpose,
+                developer=session.slots.property_developer,
+                status=session.slots.property_timeline,
                 amenities=session.slots.property_amenities or None
             )
             listings = PropertyDiscoveryService.search_and_rank(
@@ -2120,10 +2291,12 @@ class ConversationOrchestrator:
         if lang == "ar":
             lines = [f"### 📊 تحليل استثماري مقارن ({len(items)} عقارات معروضة حالياً):\n"]
             for idx, p in enumerate(items, start=1):
+                area_val = f"{p['sq_ft']} قدم مربع" if (p.get("sq_ft") and p["sq_ft"] > 0) else "عند الطلب"
+                pps_val = f"{p['price_per_sq_ft']:,.0f} درهم/قدم" if (p.get("price_per_sq_ft") and p["price_per_sq_ft"] > 0) else "عند الطلب"
                 lines.append(
                     f"**{idx}. {p['title']}** ({p['community']})\n"
-                    f"• السعر الإجمالي: {p['price']:,.0f} درهم | المساحة: {p['sq_ft']} قدم مربع\n"
-                    f"• سعر القدم المربع: {p['price_per_sq_ft']:,.0f} درهم/قدم\n"
+                    f"• السعر الإجمالي: {p['price']:,.0f} درهم | المساحة: {area_val}\n"
+                    f"• سعر القدم المربع: {pps_val}\n"
                     f"• الدفعة الأولى (20%): {p['down_payment_aed']:,.0f} درهم\n"
                     f"• القسط الشهري التقديري: ~{p['monthly_emi_aed']:,.0f} درهم/شهرياً\n"
                     f"• العائد التأجيري الإجمالي التقديري: {p['estimated_rental_yield']}\n"
@@ -2133,18 +2306,20 @@ class ConversationOrchestrator:
                 priciest = max(items, key=lambda x: x["price"])
                 lines.append(
                     "#### 💡 التوصية الاستثمارية والتقييم:\n"
-                    f"• **لتحقيق أعلى عائد تأجيري ونقطة دخول مالية أقل:** خيار **{cheapest['title']}** ({cheapest['price']:,.0f} درهم) هو الأنسب، بفضل انخفاض رأس المال المطلوب وسعر قدم يبلغ {cheapest['price_per_sq_ft']:,.0f} درهم وعائد تأجيري قوي يتراوح بين 6.5% إلى 7.0%.\n\n"
-                    f"• **لنمو رأس المال على المدى الطويل والفخامة:** خيار **{priciest['title']}** ({priciest['price']:,.0f} درهم) يتميز بإطلالة مباشرة على ملعب الغولف ومساحة أوسع ({priciest['sq_ft']} قدم) واستقطاب كبار المستأجرين."
+                    f"• **لتحقيق أعلى عائد تأجيري ونقطة دخول مالية أقل:** خيار **{cheapest['title']}** ({cheapest['price']:,.0f} درهم) هو الأنسب، بفضل انخفاض رأس المال المطلوب وعائد تأجيري قوي يتراوح بين 6.5% إلى 7.0%.\n\n"
+                    f"• **لنمو رأس المال على المدى الطويل والفخامة:** خيار **{priciest['title']}** ({priciest['price']:,.0f} درهم) يتميز بموقع استراتيجي واستقطاب كبار المستأجرين."
                 )
             return "\n".join(lines) + disc
 
         elif lang == "hi":
             lines = [f"### 📊 तुलनात्मक निवेश विश्लेषण (स्क्रीन पर उपलब्ध {len(items)} प्रॉपर्टीज):\n"]
             for idx, p in enumerate(items, start=1):
+                area_val = f"{p['sq_ft']} वर्ग फुट" if (p.get("sq_ft") and p["sq_ft"] > 0) else "अनुरोध पर उपलब्ध"
+                pps_val = f"{p['price_per_sq_ft']:,.0f} AED/वर्ग फुट" if (p.get("price_per_sq_ft") and p["price_per_sq_ft"] > 0) else "अनुरोध पर उपलब्ध"
                 lines.append(
                     f"**{idx}. {p['title']}** ({p['community']})\n"
-                    f"• कुल मूल्य: {p['price']:,.0f} AED | क्षेत्रफल: {p['sq_ft']} वर्ग फुट\n"
-                    f"• दर प्रति वर्ग फुट: {p['price_per_sq_ft']:,.0f} AED/वर्ग फुट\n"
+                    f"• कुल मूल्य: {p['price']:,.0f} AED | क्षेत्रफल: {area_val}\n"
+                    f"• दर प्रति वर्ग फुट: {pps_val}\n"
                     f"• डाउन पेमेंट (20%): {p['down_payment_aed']:,.0f} AED\n"
                     f"• अनुमानित मासिक ईएमआई: ~{p['monthly_emi_aed']:,.0f} AED/माह\n"
                     f"• अनुमानित रेंटल यील्ड: {p['estimated_rental_yield']}\n"
@@ -2155,17 +2330,19 @@ class ConversationOrchestrator:
                 lines.append(
                     "#### 💡 निवेश सिफारिश व निष्कर्ष:\n"
                     f"• **अधिक रेंटल यील्ड और कम लागत के लिए:** **{cheapest['title']}** ({cheapest['price']:,.0f} AED) अधिक कुशल विकल्प है (6.5% - 7.0% यील्ड)।\n\n"
-                    f"• **प्रीमियम कैपिटल ग्रोथ व गोल्फ व्यू के लिए:** **{priciest['title']}** ({priciest['price']:,.0f} AED) बड़ा लेआउट ({priciest['sq_ft']} वर्ग फुट) और हाई-एंड प्रोफाइल प्रदान करता है।"
+                    f"• **प्रीमियम कैपिटल ग्रोथ व गोल्फ व्यू के लिए:** **{priciest['title']}** ({priciest['price']:,.0f} AED) हाई-एंड प्रोफाइल प्रदान करता है।"
                 )
             return "\n".join(lines) + disc
 
         elif lang == "ur":
             lines = [f"### 📊 تقابلی انویسٹمنٹ تجزیہ (اسکرین پر موجود {len(items)} پراپرٹیز):\n"]
             for idx, p in enumerate(items, start=1):
+                area_val = f"{p['sq_ft']} مربع فٹ" if (p.get("sq_ft") and p["sq_ft"] > 0) else "درخواست پر دستیاب"
+                pps_val = f"{p['price_per_sq_ft']:,.0f} درہم" if (p.get("price_per_sq_ft") and p["price_per_sq_ft"] > 0) else "درخواست پر دستیاب"
                 lines.append(
                     f"**{idx}. {p['title']}** ({p['community']})\n"
-                    f"• کل قیمت: {p['price']:,.0f} درہم | رقبہ: {p['sq_ft']} مربع فٹ\n"
-                    f"• فی مربع فٹ قیمت: {p['price_per_sq_ft']:,.0f} درہم\n"
+                    f"• کل قیمت: {p['price']:,.0f} درہم | رقبہ: {area_val}\n"
+                    f"• فی مربع فٹ قیمت: {pps_val}\n"
                     f"• ڈاؤن پیمنٹ (20%): {p['down_payment_aed']:,.0f} درہم\n"
                     f"• متوقع ماہانہ قسط: ~{p['monthly_emi_aed']:,.0f} درہم/ماہانہ\n"
                     f"• متوقع کرایہ منافع (Yield): {p['estimated_rental_yield']}\n"
@@ -2176,7 +2353,7 @@ class ConversationOrchestrator:
                 lines.append(
                     "#### 💡 سرمایہ کاری کا مشورہ:\n"
                     f"• **بہترین کرایہ آمدنی اور کم لاگت کے لیے:** **{cheapest['title']}** ({cheapest['price']:,.0f} درہم) سب سے مؤثر انٹری پوائنٹ ہے (6.5% - 7.0% منافع)۔\n\n"
-                    f"• **کیپیٹل گروتھ اور پریمیم طرزِ زندگی کے لیے:** **{priciest['title']}** ({priciest['price']:,.0f} درہم) بڑا رقبہ ({priciest['sq_ft']} مربع فٹ) اور گالف ویو فراہم کرتا ہے۔"
+                    f"• **کیپیٹل گروتھ اور پریمیم طرزِ زندگی کے لیے:** **{priciest['title']}** ({priciest['price']:,.0f} درہم) پریمیم ویلیو فراہم کرتا ہے۔"
                 )
             return "\n".join(lines) + disc
 
@@ -2184,10 +2361,12 @@ class ConversationOrchestrator:
             lines = [f"### 📊 Comparative Investment Evaluation ({len(items)} On-Screen Properties)\n"]
             lines.append("Here is an objective side-by-side comparison of the residences currently displayed:\n")
             for idx, p in enumerate(items, start=1):
+                area_val = f"{p['sq_ft']} sq.ft" if (p.get("sq_ft") and p["sq_ft"] > 0) else "Details on request"
+                pps_val = f"AED {p['price_per_sq_ft']:,.0f} / sq.ft" if (p.get("price_per_sq_ft") and p["price_per_sq_ft"] > 0) else "Details on request"
                 lines.append(
                     f"**{idx}. {p['title']}** ({p['community']})\n"
-                    f"• **Purchase Price:** AED {p['price']:,.0f} | **Area:** {p['sq_ft']} sq.ft\n"
-                    f"• **Capital Rate:** AED {p['price_per_sq_ft']:,.0f} / sq.ft\n"
+                    f"• **Purchase Price:** AED {p['price']:,.0f} | **Area:** {area_val}\n"
+                    f"• **Capital Rate:** {pps_val}\n"
                     f"• **Down Payment (20%):** AED {p['down_payment_aed']:,.0f}\n"
                     f"• **Est. Monthly EMI:** ~AED {p['monthly_emi_aed']:,.0f} / mo (25-year tenure @ 4.29%)\n"
                     f"• **Benchmark Rental Yield:** {p['estimated_rental_yield']}\n"
@@ -2195,11 +2374,13 @@ class ConversationOrchestrator:
             if len(items) >= 2:
                 cheapest = min(items, key=lambda x: x["price"])
                 priciest = max(items, key=lambda x: x["price"])
+                cheap_pps = f"At AED {cheapest['price_per_sq_ft']:,.0f}/sq.ft, it" if (cheapest.get("price_per_sq_ft") and cheapest["price_per_sq_ft"] > 0) else "It"
+                priciest_layout = f" with a larger layout ({priciest['sq_ft']} sq.ft)" if (priciest.get("sq_ft") and priciest["sq_ft"] > 0) else ""
                 lines.append(
                     "#### 💡 Investment Advisory Assessment & Recommendation:\n"
                     f"• **For Pure Rental Yield & Cash-on-Cash Return:** **{cheapest['title']}** (AED {cheapest['price']:,.0f}) is the more efficient entry point. "
-                    f"At AED {cheapest['price_per_sq_ft']:,.0f}/sq.ft, it requires lower upfront equity (AED {cheapest['down_payment_aed']:,.0f}) and yields a strong 6.5% – 7.0% gross return with high family rental liquidity in Dubai Hills.\n\n"
-                    f"• **For Capital Appreciation & Executive Prestige:** **{priciest['title']}** (AED {priciest['price']:,.0f}) commands a premium position directly on the golf course with a larger layout ({priciest['sq_ft']} sq.ft). "
+                    f"{cheap_pps} requires lower upfront equity (AED {cheapest['down_payment_aed']:,.0f}) and yields a strong 6.5% – 7.0% gross return with high rental liquidity.\n\n"
+                    f"• **For Capital Appreciation & Executive Prestige:** **{priciest['title']}** (AED {priciest['price']:,.0f}) commands a premium position{priciest_layout}. "
                     f"It appeals to executive corporate tenants and offers superior long-term capital preservation and asset value growth."
                 )
             return "\n".join(lines) + disc
@@ -2219,6 +2400,40 @@ class ConversationOrchestrator:
         beds_str = f"{filters.beds}-bedroom " if filters.beds else ""
         has_same = alts.get("has_same_comm_alternatives", False)
         has_other = alts.get("has_other_comm_alternatives", False)
+
+        dev_alts = alts.get("developer_alternatives", {})
+        other_devs = dev_alts.get("other_developers_in_community", [])
+        dev_comms = dev_alts.get("developer_other_communities", [])
+
+        if filters.developer and other_devs:
+            if lang == "ar":
+                other_dev_str = "، ".join(other_devs[:3])
+                return (
+                    f"بحثتُ في قائمة العقارات، وللأسف لا تتوفر حالياً مشاريع نشطة للمطور {filters.developer} في {location_name}.\n\n"
+                    f"ومع ذلك، تتوفر في {location_name} وحدات سكنية ممتازة لمطورين بارزين آخرين مثل: {other_dev_str}.\n"
+                    f"هل ترغب في استعراض الخيارات المتاحة في {location_name} بهؤلاء المطورين؟"
+                )
+            elif lang == "hi":
+                other_dev_str = ", ".join(other_devs[:3])
+                return (
+                    f"मैंने हमारे इन्वेंट्री की जांच की, दुर्भाग्य से {location_name} में {filters.developer} की कोई सक्रिय लिस्टिंग उपलब्ध नहीं है।\n\n"
+                    f"हालाँकि, {location_name} में अन्य प्रमुख डेवलपर्स जैसे {other_dev_str} के शानदार प्रोजेक्ट्स उपलब्ध हैं।\n"
+                    f"क्या आप {location_name} में इन विकल्पों को देखना चाहेंगे?"
+                )
+            elif lang == "ur":
+                other_dev_str = "، ".join(other_devs[:3])
+                return (
+                    f"میں نے انوینٹری چیک کی ہے، بدقسمتی سے {location_name} میں {filters.developer} کے پراجیکٹس فی الوقت دستیاب نہیں ہیں۔\n\n"
+                    f"تاہم، {location_name} میں دیگر معروف ڈویلپرز جیسے {other_dev_str} کی رہائشیں دستیاب ہیں۔\n"
+                    f"کیا آپ {location_name} میں ان متبادل رہائشوں کو دیکھنا چاہیں گے؟"
+                )
+            else:
+                other_dev_str = ", ".join(other_devs[:3])
+                return (
+                    f"I checked our inventory, but unfortunately {filters.developer} does not currently have active listings in {location_name}.\n\n"
+                    f"However, {location_name} features prime residences by other premier developers such as {other_dev_str}.\n"
+                    f"Would you like me to show you the available listings in {location_name}?"
+                )
 
         if lang == "ar":
             if has_same and has_other:
