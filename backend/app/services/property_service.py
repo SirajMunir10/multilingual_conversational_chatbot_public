@@ -172,9 +172,15 @@ class PropertyDiscoveryService:
         if filters.status == "off-plan" or not listings or (filters.developer and len(listings) == 0):
             try:
                 from app.gateways.grid_gateway import GridGateway
+                is_dubai_city = bool(target_city and target_city.lower() in ["dubai", "all dubai", "uae", "all uae", "dxb"])
+                grid_city = "Dubai" if is_dubai_city else None
+                grid_district = None if is_dubai_city else target_city
                 grid_props = GridGateway.search_offplan_projects(
                     search=filters.developer,
-                    district=target_city,
+                    city=grid_city,
+                    district=grid_district,
+                    property_type=filters.type,
+                    bedrooms=filters.beds,
                     min_price=filters.budget_min,
                     max_price=filters.budget_max,
                     limit=filters.limit or 5,
@@ -188,8 +194,8 @@ class PropertyDiscoveryService:
                 import logging
                 logging.getLogger("xo.services.property").warning(f"Could not query live GRID offplan inventory: {e}")
 
-        # Note: Do not silently broaden community to all Dubai here, as that bypasses FR-8 Smart Catalog Fallbacks.
-        # Fallback recommendations are handled conversationally via find_catalog_alternatives().
+        # Note: Do not silently relax developer filter or broaden community to all Dubai here.
+        # Strict filter integrity is preserved; alternatives are offered transparently via find_catalog_alternatives().
 
         # Check session shortlist to set active heart state
         shortlisted_ids = set()
@@ -699,7 +705,8 @@ class PropertyDiscoveryService:
             dev_other_comms = sorted(list({p.community for p in all_props if p.developer and target_dev in p.developer.lower() and (not target_comm or target_comm not in p.community.lower())}))
             try:
                 from app.gateways.grid_gateway import GridGateway
-                grid_offplan = GridGateway.search_offplan_projects(search=filters.developer)
+                dev_search = "Imtiaz" if filters.developer.lower() in ["imtiyaz", "imtiaz"] else filters.developer
+                grid_offplan = GridGateway.search_offplan_projects(search=dev_search)
                 for gp in grid_offplan:
                     if gp.community and gp.community not in dev_other_comms:
                         dev_other_comms.append(gp.community)

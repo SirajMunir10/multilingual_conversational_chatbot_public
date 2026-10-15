@@ -9,8 +9,8 @@ class ScopedPropertyListing(BaseModel):
     community: str
     type: str  # apartment, villa, townhouse, penthouse
     beds: int
-    baths: int
-    sq_ft: int
+    baths: Optional[int] = None
+    sq_ft: Optional[int] = None
     price: float  # AED
     purpose: str  # buy, rent, invest
     developer: str

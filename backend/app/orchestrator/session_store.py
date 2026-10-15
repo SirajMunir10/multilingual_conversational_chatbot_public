@@ -26,6 +26,7 @@ class SlotState(BaseModel):
     property_developer: Optional[str] = None
     unconfirmed_location: Optional[str] = None
     inferred_location_note: Optional[str] = None
+    preferences_waived: bool = False
 
     # Mortgage calculation slots
     mortgage_income: Optional[float] = None

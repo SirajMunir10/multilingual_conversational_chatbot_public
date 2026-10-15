@@ -120,10 +120,14 @@ class GridGateway:
     def search_offplan_projects(
         cls,
         search: Optional[str] = None,
+        city: Optional[str] = None,
         district: Optional[str] = None,
+        property_type: Optional[str] = None,
+        bedrooms: Optional[int] = None,
         min_price: Optional[float] = None,
         max_price: Optional[float] = None,
         limit: int = 20,
+        page: int = 1,
         session_id: Optional[str] = None
     ) -> List[Any]:
         """
@@ -139,20 +143,52 @@ class GridGateway:
         url = settings.GRID_OFFPLAN_API_URL or "https://xoto.ae/api/gridoffplan/website"
         raw_items = []
 
-        params = {"limit": "100"}
-        if search:
-            params["search"] = search
+        # Ensure city-wide Dubai searches use provider's city parameter, not district parameter
+        if district and district.lower().strip() in ["dubai", "all dubai", "uae", "all uae", "dxb"]:
+            city = "Dubai"
+            district = None
+
+        params = {"limit": str(limit), "page": str(page)}
+        if city:
+            params["city"] = city
         if district:
             clean_dist = district.replace("\xa0", " ").strip()
             params["district"] = clean_dist
+        if search:
+            s_low = search.lower().strip()
+            # Handle Imtiaz / Imtiyaz spelling alignment for provider query
+            if s_low in ["imtiaz", "imtiyaz"]:
+                params["search"] = "Imtiaz"
+            else:
+                params["search"] = search
+        if property_type:
+            pt_low = property_type.lower().strip()
+            if "villa" in pt_low:
+                params["propertyType"] = "villas"
+            elif "townhouse" in pt_low:
+                params["propertyType"] = "townhouses"
+            elif "apartment" in pt_low:
+                params["propertyType"] = "apartments"
+        if bedrooms is not None:
+            params["bedrooms"] = str(bedrooms)
+        if min_price is not None:
+            params["min_price"] = str(min_price)
+        if max_price is not None:
+            params["max_price"] = str(max_price)
 
+        upstream_success = False
         try:
             import httpx
             with httpx.Client(timeout=5.0) as client:
                 resp = client.get(url, params=params)
                 if resp.is_success:
+                    upstream_success = True
                     data = resp.json()
                     raw_items = data.get("data", [])
+                else:
+                    logging.getLogger("xo.gateways.grid").warning(
+                        f"GRID offplan API returned HTTP {resp.status_code}: {resp.text[:200]}"
+                    )
         except Exception as e:
             logging.getLogger("xo.gateways.grid").warning(f"GRID offplan API query failed: {e}")
 
@@ -162,20 +198,20 @@ class GridGateway:
             name = item.get("name", "Off-Plan Project")
             loc = item.get("location") or {}
             raw_district = (loc.get("district") or item.get("address") or "Dubai").replace("\xa0", " ").strip()
-            city = loc.get("city") or "Dubai"
+            item_city = loc.get("city") or "Dubai"
 
             # Parse bedrooms integer
             beds_str = item.get("bedrooms", "1")
             bed_m = re.search(r'(\d+)', str(beds_str))
             beds = int(bed_m.group(1)) if bed_m else 1
 
-            # Extract developer
+            # Extract developer truthfully without inventing names
             if " by " in name:
                 dev = name.split(" by ")[-1].strip()
-            elif "pearl house" in name.lower():
+            elif "pearl house" in name.lower() or "imtiaz" in name.lower() or "imtiyaz" in name.lower():
                 dev = "Imtiaz"
             else:
-                dev = "Leading Developer"
+                dev = "Developer TBA"
 
             p_min = float(item.get("min_price") or 0.0)
             p_max = float(item.get("max_price") or p_min or 1000000.0)
@@ -190,15 +226,14 @@ class GridGateway:
             # District filter match if passed
             if district:
                 dist_clean = district.lower().replace("\xa0", " ").strip()
-                if dist_clean not in raw_district.lower() and dist_clean not in city.lower():
+                if dist_clean not in raw_district.lower() and dist_clean not in item_city.lower():
                     continue
 
             # Developer / search filter match if passed
             if search:
                 s_low = search.lower().strip()
-                # Handle Imtiaz / Imtiyaz spelling
                 if s_low in ["imtiaz", "imtiyaz"]:
-                    if "imtiaz" not in name.lower() and "imtiyaz" not in name.lower() and "pearl house" not in name.lower():
+                    if "imtiaz" not in name.lower() and "imtiyaz" not in name.lower() and "pearl house" not in name.lower() and "imtiaz" not in dev.lower():
                         continue
                 elif s_low not in name.lower() and s_low not in dev.lower() and s_low not in raw_district.lower():
                     continue
@@ -210,22 +245,50 @@ class GridGateway:
             elif "townhouse" in raw_type:
                 p_type = "townhouse"
 
+            # Preserve missing property fields as unknown; do not infer amenities from construction status or completion dates
+            raw_amenities = item.get("amenities") or item.get("facilities") or []
+            if isinstance(raw_amenities, list):
+                genuine_amenities = [str(a).strip() for a in raw_amenities if str(a).strip()]
+            else:
+                genuine_amenities = []
+
+            # Preserve missing sq_ft and baths as unknown (None) rather than inventing false values
+            raw_sqft = item.get("sq_ft") or item.get("sqft") or item.get("area") or item.get("size")
+            parsed_sqft = None
+            if raw_sqft is not None:
+                try:
+                    val = float(str(raw_sqft).replace(",", "").strip())
+                    if val > 0:
+                        parsed_sqft = int(val)
+                except (ValueError, TypeError):
+                    parsed_sqft = None
+
+            raw_baths = item.get("bathrooms") or item.get("baths")
+            parsed_baths = None
+            if raw_baths is not None:
+                try:
+                    b_val = int(raw_baths)
+                    if b_val > 0:
+                        parsed_baths = b_val
+                except (ValueError, TypeError):
+                    parsed_baths = None
+
             listing = ScopedPropertyListing(
                 id=f"grid-offplan-{item.get('id', item.get('_id', '0'))}",
                 title=name,
-                city=city,
+                city=item_city,
                 community=raw_district,
                 type=p_type,
                 beds=beds,
-                baths=item.get("bathrooms") or 2,
-                sq_ft=1100,
+                baths=parsed_baths,
+                sq_ft=parsed_sqft,
                 price=price,
                 purpose="buy",
                 developer=dev,
                 status="off-plan",
                 image_url=item.get("cover_image") or (item.get("images")[0] if item.get("images") else ""),
                 listing_url=f"https://xoto.ae/properties/off-plan/{item.get('slug', item.get('id', ''))}",
-                amenities=["Off-Plan Escrow Protected", "Flexible Payment Plan"]
+                amenities=genuine_amenities
             )
             normalized.append(listing)
             if len(normalized) >= limit:
@@ -239,9 +302,11 @@ class GridGateway:
             session_id=session_id,
             details={
                 "search": search,
+                "city": city,
                 "district": district,
                 "min_price": min_price,
                 "max_price": max_price,
+                "upstream_success": upstream_success,
                 "results_count": len(normalized)
             }
         )
