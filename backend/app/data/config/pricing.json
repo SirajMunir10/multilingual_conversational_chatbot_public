@@ -1,0 +1,26 @@
+{
+ "version": "2026.10.15",
+ "note": "USD list prices used for cost monitoring (PRD \u00a77). Update when vendor pricing changes.",
+ "llm": {
+  "gpt-6-luna": {
+   "input_per_1m": 0.1,
+   "cached_input_per_1m": 0.01,
+   "output_per_1m": 0.5
+  }
+ },
+ "stt": {
+  "gpt-live-transcribe": {
+   "per_minute": 0.017
+  }
+ },
+ "tts": {
+  "eleven_v4_turbo": {
+   "per_1k_chars": 0.04
+  }
+ },
+ "embedding": {
+  "text-embedding-3-small": {
+   "per_1m_tokens": 0.02
+  }
+ }
+}

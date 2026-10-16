@@ -1,5 +1,5 @@
 <template>
-  <div class="app-root" :dir="isRTL ? 'rtl' : 'ltr'" :lang="currentLanguage" :data-theme="currentTheme">
+  <div class="app-root" :data-theme="currentTheme">
     <!-- Master Header Navigation -->
     <HeaderNav 
       v-model:currentView="currentView" 
@@ -14,6 +14,7 @@
         :currentLanguage="currentLanguage" 
         :currentTheme="currentTheme"
         @language-changed="currentLanguage = $event"
+        @update:currentTheme="currentTheme = $event"
       />
       <AdminView 
         v-else-if="currentView === 'admin'" 
@@ -22,17 +23,13 @@
 
     <!-- Footer with Authoritative Compliance Reference -->
     <footer class="app-footer">
-      <p>
-        XO — Conversational AI Assistant &bull; Regulatory Scope: UAE / Dubai / DIFC &bull; 
-        Retention Reference: <code>XOTO-CORP-RETENTION-POL-2024-V3</code> &bull; 
-        All financial outputs are <em>estimates, not offers</em>.
-      </p>
+      <p>XO — UAE real estate &amp; mortgage assistant &bull; All financial outputs are <em>estimates, not offers</em>.</p>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import HeaderNav from './components/shared/HeaderNav.vue'
 import WidgetView from './views/WidgetView.vue'
 import AdminView from './views/AdminView.vue'
@@ -40,15 +37,19 @@ import AdminView from './views/AdminView.vue'
 const currentView = ref('widget')
 const currentLanguage = ref('en')
 
-// Theme management: Light Mode is strictly the default
-const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('xo_theme') : null
+// Theme management: Light Mode is strictly the default.
+// Storage can throw (private browsing, blocked cookies), so every access is guarded.
+const readTheme = () => {
+  try { return window.localStorage.getItem('xo_theme') } catch (e) { return null }
+}
+const savedTheme = typeof window !== 'undefined' ? readTheme() : null
 const currentTheme = ref(savedTheme === 'dark' ? 'dark' : 'light')
 
 // Sync data-theme attribute on document root for global CSS variables
 const applyTheme = (theme) => {
   if (typeof document !== 'undefined') {
     document.documentElement.setAttribute('data-theme', theme)
-    localStorage.setItem('xo_theme', theme)
+    try { window.localStorage.setItem('xo_theme', theme) } catch (e) {}
   }
 }
 
@@ -60,10 +61,6 @@ onMounted(() => {
   applyTheme(currentTheme.value)
 })
 
-// Arabic (ar), Urdu (ur), and Persian (fa) use Right-to-Left (RTL) text direction
-const isRTL = computed(() => {
-  return currentLanguage.value === 'ar' || currentLanguage.value === 'ur' || currentLanguage.value === 'fa'
-})
 </script>
 
 <style scoped>
@@ -80,6 +77,10 @@ const isRTL = computed(() => {
   flex: 1;
   padding-bottom: 40px;
 }
+
+/* Large TVs: scale the page so it reads well from a distance */
+@media (min-width: 2200px) { .app-header, .app-footer { zoom: 1.4; } }
+@media (min-width: 3200px) { .app-header, .app-footer { zoom: 2; } }
 
 .app-footer {
   text-align: center;

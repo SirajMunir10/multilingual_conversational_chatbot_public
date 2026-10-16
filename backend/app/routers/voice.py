@@ -1,127 +1,66 @@
-import base64
+import json
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, WebSocket
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, UploadFile, File, Form, Header, HTTPException, Response
+
 from app.core.config import settings
-from app.voice.stt_service import STTService
-from app.voice.tts_service import TTSService
-from app.orchestrator.orchestrator import ConversationOrchestrator
+from app.core.security import enforce_rate_limit, rate_limiter
+from app.voice import stt_service
+from app.voice.tts_service import TTSService, TTSUnavailable
 
-from app.core.usage_tracker import UsageTracker
+router = APIRouter(prefix="/api/voice", tags=["Voice"])
 
-router = APIRouter(prefix="/api/voice", tags=["Voice Layer (STT & TTS)"])
 
-class TTSRequest(BaseModel):
-    text: str = Field(..., min_length=1, description="Text to synthesize")
-    language: str = Field(default="en", description="Language: 'en', 'ar', 'hi', or 'ur'")
-    session_id: Optional[str] = Field(default=None, description="Optional session correlation identifier")
+class SpeakRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=4000)
+    language: str = "en"
+    session_id: Optional[str] = None
 
-@router.post("/transcribe")
-async def transcribe_audio_endpoint(
-    audio: UploadFile = File(...),
-    language_hint: str = Form("en"),
-    session_id: Optional[str] = Form(None)
-):
-    """
-    Speech-to-Text endpoint using OpenAI's gpt-live-transcribe model.
-    Transcribes audio in EN, AR, HI, UR.
-    """
-    audio_bytes = await audio.read()
-    transcribed_text, detected_lang = await STTService.transcribe_audio(
-        audio_bytes=audio_bytes,
-        filename=audio.filename or "audio.wav",
-        language_hint=language_hint,
-        session_id=session_id
-    )
-    return {
-        "text": transcribed_text,
-        "language": detected_lang,
-        "model": "gpt-live-transcribe"
-    }
 
-@router.post("/synthesize")
-async def synthesize_speech_endpoint(payload: TTSRequest):
-    """
-    Text-to-Speech endpoint using ElevenLabs' eleven_flash_v2_5 model.
-    Synthesizes speech in EN, AR, HI, UR.
-    """
-    audio_bytes = await TTSService.synthesize_speech(
-        text=payload.text,
-        language=payload.language,
-        session_id=payload.session_id
-    )
-    return Response(content=audio_bytes, media_type="audio/mpeg")
+@router.post("/speak", dependencies=[Depends(enforce_rate_limit)])
+async def speak(payload: SpeakRequest):
+    """TTS for an XO reply (eleven_v4_turbo, Horatius). Streams MP3 as it is generated."""
+    stream = TTSService.stream(payload.text, payload.language, payload.session_id)
+    try:
+        first = await stream.__anext__()
+    except (TTSUnavailable, StopAsyncIteration):
+        raise HTTPException(status_code=503, detail="voice_unavailable")
 
-@router.post("/interact")
-async def voice_interaction_pipeline(
-    audio: UploadFile = File(...),
-    session_id: Optional[str] = Form(None),
-    language_hint: Optional[str] = Form("en"),
-    transcribed_text: Optional[str] = Form(None),
-    user_id: Optional[str] = Form(None),
-    x_user_id: Optional[str] = Header(None, alias="X-User-ID"),
-    x_session_id: Optional[str] = Header(None, alias="X-Session-ID")
-):
-    """
-    Composed Voice-to-Voice (V2V) Pipeline (Rule 7 & Confirmed Decision 1):
-    Audio In → STT (gpt-live-transcribe) → Conversation Orchestrator → TTS (eleven_flash_v2_5) → Audio Stream
-    Uses the exact same business logic and conversation orchestrator as text.
-    """
-    active_session_id = session_id or x_session_id
-    active_user_id = user_id or x_user_id
-    audio_bytes = await audio.read()
+    async def body():
+        yield first
+        async for chunk in stream:
+            yield chunk
+    return StreamingResponse(body(), media_type="audio/mpeg")
 
-    # Step 1: STT (Use client-side verified transcript if supplied, otherwise perform STT)
-    if transcribed_text and transcribed_text.strip():
-        user_text = transcribed_text.strip()
-        detected_lang = language_hint or "en"
-        # Also capture client-side STT duration if audio is present
-        if len(audio_bytes) > 200:
-            duration_sec = max(0.5, round((len(audio_bytes) - 44) / 32000.0, 2))
-            UsageTracker.record_stt(
-                session_id=active_session_id,
-                model="web-speech-verified",
-                audio_duration_sec=duration_sec,
-                audio_bytes=len(audio_bytes),
-                status="success"
-            )
-    else:
-        user_text, detected_lang = await STTService.transcribe_audio(
-            audio_bytes=audio_bytes,
-            filename=audio.filename or "audio.wav",
-            language_hint=language_hint or "en",
-            session_id=active_session_id
-        )
 
-    # Step 2: Conversation Orchestration
-    orchestration_result = await ConversationOrchestrator.process_user_turn(
-        user_message=user_text,
-        session_id=active_session_id,
-        user_id=active_user_id,
-        manual_language=detected_lang
-    )
+@router.post("/speak-timed", dependencies=[Depends(enforce_rate_limit)])
+async def speak_timed(payload: SpeakRequest):
+    """TTS with word timing: newline-delimited JSON, one line per audio chunk
+    ({"audio": base64 MP3, "chars", "start", "end"}). Lets the widget mark the word being spoken."""
+    stream = TTSService.stream_timed(payload.text, payload.language, payload.session_id)
+    try:
+        first = await stream.__anext__()
+    except (TTSUnavailable, StopAsyncIteration):
+        raise HTTPException(status_code=503, detail="voice_unavailable")
 
-    # Step 3: TTS Synthesis (ElevenLabs Flash v2.5)
-    bot_reply_text = orchestration_result["text"]
-    reply_audio_bytes = await TTSService.synthesize_speech(
-        text=bot_reply_text,
-        language=orchestration_result["language"],
-        session_id=orchestration_result["session_id"]
-    )
-    audio_base64 = base64.b64encode(reply_audio_bytes).decode("utf-8")
+    async def body():
+        yield json.dumps(first, ensure_ascii=False) + "\n"
+        async for chunk in stream:
+            yield json.dumps(chunk, ensure_ascii=False) + "\n"
+    return StreamingResponse(body(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
 
-    return {
-        "session_id": orchestration_result["session_id"],
-        "transcribed_user_text": user_text,
-        "detected_language": orchestration_result["language"],
-        "intent": orchestration_result["intent"],
-        "reply_text": bot_reply_text,
-        "property_results": orchestration_result.get("property_results", []),
-        "mortgage_result": orchestration_result.get("mortgage_result"),
-        "saved_properties": orchestration_result.get("saved_properties", []),
-        "application_status": orchestration_result.get("application_status"),
-        "handoff_data": orchestration_result.get("handoff_data"),
-        "handoff_offered": orchestration_result.get("handoff_offered", False),
-        "audio_base64": f"data:audio/mpeg;base64,{audio_base64}",
-        "pipeline": f"{settings.STT_MODEL} -> {settings.LLM_MODEL} -> {settings.TTS_MODEL}"
-    }
+
+@router.websocket("/stt")
+async def speech_to_text(websocket: WebSocket, language: Optional[str] = None, session_id: Optional[str] = None):
+    """Live transcription with gpt-live-transcribe. Send binary PCM16 (24 kHz mono) frames, then {"type":"commit"}."""
+    origin = websocket.headers.get("origin")
+    if origin and settings.ALLOWED_ORIGINS and origin not in settings.ALLOWED_ORIGINS:
+        await websocket.close(code=1008)
+        return
+    ip = websocket.headers.get("x-forwarded-for", "").split(",")[0].strip() or (websocket.client.host if websocket.client else "unknown")
+    if settings.RATE_LIMIT_ENABLED and not rate_limiter.allow(f"stt:{ip}", settings.RATE_LIMIT_PER_MINUTE):
+        await websocket.close(code=1013)
+        return
+    await stt_service.relay(websocket, language, session_id)

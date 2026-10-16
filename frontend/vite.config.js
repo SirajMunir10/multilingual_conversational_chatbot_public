@@ -8,8 +8,9 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true
+        target: process.env.VITE_DEV_API_TARGET || 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        ws: true
       }
     }
   }

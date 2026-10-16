@@ -1,0 +1,59 @@
+{
+  "version": "v3.0.0",
+  "effective_date": "2026-10-16",
+  "status": "approved",
+  "sources": "Mortgage Eligibility Calculations (UAE Mortgage Eligibility Check: Build Logic), approved by XOTO Product — based on CBUAE Rulebook Article 3 and the CBUAE Regulations Regarding Mortgage Loans. Where the KB differed, this document is followed.",
+  "settings_note": "Bank-controlled values the business can change without a code release. Central Bank values change only when the regulation does.",
+  "bank_settings": {
+    "min_age": 21,
+    "min_monthly_income_aed": 15000,
+    "min_monthly_income_range_aed": [10000, 15000],
+    "max_age_at_last_repayment": {"salaried": 65, "self_employed": 70},
+    "stress_test_addon_pct": 2.0,
+    "stress_test_addon_range_pct": [2.0, 4.0],
+    "credit_card_debt_pct_of_limit": 0.05,
+    "non_resident_ltv": 0.5,
+    "non_resident_note": "The Central Bank rulebook sets no non-resident tier, so each bank decides. The standard used here is 50%; some banks offer up to 65%."
+  },
+  "central_bank": {
+    "debt_burden_max_ratio": 0.5,
+    "max_term_years": 25,
+    "income_multiple": {"uae_national": 8, "expat": 7},
+    "rent_vacancy_months": 2
+  },
+  "property_value_threshold_aed": 5000000,
+  "threshold_note": "The regulation says 'up to AED 5 million' for UAE nationals and 'less than AED 5 million' for expats, so exactly AED 5 million gets the higher LTV for nationals and the lower LTV for expats.",
+  "ltv_table": [
+    {"order": 1, "case": "Off-plan property, any buyer", "property_status": "off_plan", "ltv": 0.5},
+    {"order": 2, "case": "Non-resident, ready property", "residency": "non_resident", "ltv_setting": "non_resident_ltv"},
+    {"order": 3, "case": "UAE national, first home, value up to AED 5 million", "residency": "uae_national", "home": "first", "value": "at_or_below", "ltv": 0.85},
+    {"order": 4, "case": "UAE national, first home, value above AED 5 million", "residency": "uae_national", "home": "first", "value": "above", "ltv": 0.75},
+    {"order": 5, "case": "UAE national, second home or investment", "residency": "uae_national", "home": "second", "ltv": 0.65},
+    {"order": 6, "case": "Expat, first home, value below AED 5 million", "residency": "uae_resident", "home": "first", "value": "below", "ltv": 0.8},
+    {"order": 7, "case": "Expat, first home, value AED 5 million or more", "residency": "uae_resident", "home": "first", "value": "at_or_above", "ltv": 0.7},
+    {"order": 8, "case": "Expat, second home or investment", "residency": "uae_resident", "home": "second", "ltv": 0.6}
+  ],
+  "first_home_note": "First-home terms apply when the buyer has no outstanding mortgage on another property; a fully paid-off property does not count. An investment property uses the second-home LTV. Each borrower can claim only one first home.",
+  "interest": {
+    "benchmark_rate_pct": 3.8,
+    "benchmark_note": "Used when the user has no rate from a bank; reviewed every 3-6 months with EIBOR (KB Art. 25-26).",
+    "min_rate_pct": 0.0,
+    "max_rate_pct": 20.0
+  },
+  "tenure": {"default_years": 25, "min_years": 1, "max_years": 25},
+  "residency_labels": {"uae_national": "UAE National", "uae_resident": "Expat resident", "non_resident": "Non-resident"},
+  "upfront_costs": {
+    "arrangement_fee_max_pct_of_loan": 0.01,
+    "note": "Each item is an estimate; the bank's offer and the emirate's fee schedule decide the final amounts."
+  },
+  "application_documents": ["Emirates ID", "Passport and visa", "Salary certificate", "Six months of bank statements", "Credit bureau report", "Length of employment", "Property valuation"],
+  "disclaimers": {
+    "label": "estimates, not offers",
+    "calculator": "estimate only, subject to lender approval"
+  },
+  "input_limits": {
+    "min_monthly_income_aed": 1000,
+    "max_monthly_income_aed": 10000000,
+    "note": "Sanity bounds for user-provided income; values outside are treated as missing so XO asks again."
+  }
+}

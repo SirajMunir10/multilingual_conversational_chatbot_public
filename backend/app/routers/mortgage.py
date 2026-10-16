@@ -1,95 +1,48 @@
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional, List
-from app.services.mortgage_service import (
-    MortgageCalculationService,
-    AffordabilityInput,
-    EMIInput,
-    EligibilityInput
-)
-from app.gateways.mortgage_rules_gateway import MortgageRulesGateway
+"""Deterministic calculator API (PRD FR-13): the same service the assistant's tools call."""
+from typing import Optional
 
-router = APIRouter(prefix="/api/mortgage", tags=["Mortgage & Financial Tools"])
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.core.security import enforce_rate_limit
+from app.services.mortgage_service import (AffordabilityInput, EligibilityInput, EMIInput, MortgageCalculationService,
+                                           MortgageInputError)
+
+router = APIRouter(prefix="/api/mortgage", tags=["Mortgage calculators"], dependencies=[Depends(enforce_rate_limit)])
+
+
+def _run(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except MortgageInputError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
 
 @router.post("/affordability")
-def calculate_affordability(payload: AffordabilityInput, session_id: Optional[str] = None):
-    """
-    Calculate maximum borrowing capacity and property affordability based on UAE Central Bank 50% DBR cap.
-    """
-    try:
-        return MortgageCalculationService.calc_affordability(payload, session_id=session_id)
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Affordability calculation error: {str(e)}")
+def affordability(payload: AffordabilityInput):
+    return _run(MortgageCalculationService.calc_affordability, payload)
+
 
 @router.post("/emi")
-def calculate_emi(payload: EMIInput, session_id: Optional[str] = None):
-    """
-    Calculate exact monthly EMI payment and amortization breakdown.
-    """
-    try:
-        return MortgageCalculationService.calc_emi(payload, session_id=session_id)
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"EMI calculation error: {str(e)}")
+def emi(payload: EMIInput):
+    return _run(MortgageCalculationService.calc_emi, payload)
+
 
 @router.post("/eligibility")
-def check_eligibility(payload: EligibilityInput, session_id: Optional[str] = None):
-    """
-    Evaluate applicant eligibility against UAE lending criteria and DBR limits.
-    """
-    try:
-        return MortgageCalculationService.check_eligibility(payload, session_id=session_id)
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Eligibility check error: {str(e)}")
+def eligibility(payload: EligibilityInput):
+    return _run(MortgageCalculationService.check_eligibility, payload)
 
-@router.post("/offers")
-def get_indicative_offers(
-    loan_amount: float = Query(..., gt=0),
-    salary: float = Query(..., gt=0),
-    nationality: str = Query("expat"),
-    tenure: int = Query(25, ge=1, le=25),
-    finance_type: Optional[str] = Query(None, description="conventional or islamic"),
-    session_id: Optional[str] = None
-):
-    """
-    Retrieve top tailored indicative offers from partner bank rate sheets (conventional or Islamic).
-    """
-    try:
-        return MortgageCalculationService.get_indicative_offers(
-            loan_amount=loan_amount,
-            salary=salary,
-            nationality=nationality,
-            tenure=tenure,
-            finance_type=finance_type,
-            session_id=session_id
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Offer estimation error: {str(e)}")
+
+@router.get("/purchase-costs")
+def purchase_costs(property_price: float, emirate: Optional[str] = None, loan_amount: Optional[float] = None):
+    return _run(MortgageCalculationService.calc_purchase_costs, property_price, emirate, loan_amount)
+
 
 @router.get("/products")
-def get_products(
-    bank: Optional[str] = None,
-    rate_type: Optional[str] = None,
-    salary: Optional[float] = None,
-    nationality: Optional[str] = None,
-    finance_type: Optional[str] = Query(None, description="conventional or islamic")
-):
-    """
-    Query internal admin-managed versioned rate/rule tables for UAE mortgage products (conventional and Islamic).
-    """
-    products = MortgageRulesGateway.get_mortgage_products(
-        bank=bank,
-        rate_type=rate_type,
-        salary=salary,
-        nationality=nationality,
-        finance_type=finance_type
-    )
-    return {
-        "count": len(products),
-        "version": MortgageRulesGateway._version,
-        "products": [p.model_dump() for p in products]
-    }
+def products(bank: Optional[str] = None, finance_type: Optional[str] = None, rate_type: Optional[str] = None, salary: Optional[float] = None):
+    return MortgageCalculationService.get_products(bank, finance_type, rate_type, salary)
+
+
+@router.get("/offers")
+def offers(loan_amount: float, monthly_income: Optional[float] = None, residency: Optional[str] = None,
+           tenure_years: Optional[int] = None, finance_type: Optional[str] = None):
+    return _run(MortgageCalculationService.estimate_offers, loan_amount, monthly_income, residency, tenure_years, finance_type)

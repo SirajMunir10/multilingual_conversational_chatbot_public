@@ -1,0 +1,60 @@
+{
+  "version": "v2.0.0",
+  "effective_date": "2026-10-15",
+  "status": "pending_mortgage_team_confirmation",
+  "source": "KB Article 2 (reviewed 23/03/2026), Article 11, Article 12",
+  "vat_rate": 0.05,
+  "emirates": {
+    "dubai": {
+      "label": "Dubai",
+      "registration_fee_pct": 0.04,
+      "registration_label": "DLD transfer fee",
+      "admin_fee_aed": 580,
+      "trustee_fee": {"threshold_aed": 500000, "above_aed": 4000, "at_or_below_aed": 2000},
+      "title_deed_fee_aed": 250
+    },
+    "abu_dhabi": {
+      "label": "Abu Dhabi",
+      "registration_fee_pct": 0.02,
+      "registration_label": "ADREC registration fee",
+      "admin_fee_aed": 0,
+      "trustee_fee": null,
+      "title_deed_fee_aed": 0
+    },
+    "sharjah": {
+      "label": "Sharjah",
+      "registration_fee_pct": 0.02,
+      "registration_label": "Registration fee",
+      "admin_fee_aed": 0,
+      "trustee_fee": null,
+      "title_deed_fee_aed": 0
+    },
+    "ras_al_khaimah": {
+      "label": "Ras Al Khaimah",
+      "registration_fee_pct": 0.02,
+      "registration_label": "Registration fee",
+      "admin_fee_aed": 0,
+      "trustee_fee": null,
+      "title_deed_fee_aed": 0
+    },
+    "ajman": {
+      "label": "Ajman",
+      "registration_fee_pct": 0.02,
+      "registration_label": "Registration fee",
+      "admin_fee_aed": 0,
+      "trustee_fee": null,
+      "title_deed_fee_aed": 0
+    }
+  },
+  "default_emirate": "dubai",
+  "agent_commission_pct": 0.02,
+  "agent_commission_vat_applies": true,
+  "mortgage": {
+    "registration_fee_pct_of_loan": 0.0025,
+    "valuation_fee_aed": {"min": 2500, "max": 3500}
+  },
+  "resale_only": {
+    "developer_noc_aed": {"min": 500, "max": 5000}
+  },
+  "early_settlement_fee_pct": {"min": 0.01, "max": 0.03}
+}

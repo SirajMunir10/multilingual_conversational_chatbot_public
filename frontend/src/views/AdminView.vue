@@ -6,7 +6,7 @@
         <div class="admin-avatar">AD</div>
         <div>
           <h3 class="admin-name">Admin Portal</h3>
-          <span class="role-badge">Super Admin</span>
+          <span class="role-badge">Preview</span>
         </div>
       </div>
 
@@ -35,43 +35,16 @@
         </div>
 
         <div class="admin-status-pill">
-          <span>Versioned Control Mode: <strong>v1.2.0</strong></span>
+          <span>Phase 7 — not yet built</span>
         </div>
       </div>
 
-      <!-- Module Summary Cards -->
-      <div class="admin-grid">
-        <div class="metric-card glass-card">
-          <span class="metric-label">Total Conversations</span>
-          <span class="metric-value">1,428</span>
-          <span class="metric-trend positive">↑ 18.4% vs last week</span>
-        </div>
-
-        <div class="metric-card glass-card">
-          <span class="metric-label">Resolution Rate</span>
-          <span class="metric-value">84.2%</span>
-          <span class="metric-trend positive">Target: ≥40% (Met)</span>
-        </div>
-
-        <div class="metric-card glass-card">
-          <span class="metric-label">Language Accuracy</span>
-          <span class="metric-value">99.1%</span>
-          <span class="metric-trend positive">Target: ≥98% (Met)</span>
-        </div>
-
-        <div class="metric-card glass-card">
-          <span class="metric-label">LLM Token Spend</span>
-          <span class="metric-value">$42.80</span>
-          <span class="metric-trend neutral">Cap: $250.00 / month</span>
-        </div>
-      </div>
-
-      <!-- Placeholder content for Phase 7 complete implementation -->
+      
       <div class="module-placeholder glass-card">
         <div class="placeholder-icon">🛠️</div>
         <h4>{{ currentNav?.label }} Architecture Ready</h4>
         <p>
-          This control surface is wired to backend scoped gateways. Full interactive management (knowledge base uploader, prompt editor, rule tables, escalation triggers, and translation CMS) will be fully developed in <strong>Phase 7 (Admin Module & Back Office)</strong>.
+          The admin module (PRD §5.6) is planned for Phase 7. Today, rule, rate, fee, community and prompt tables are edited as versioned files in <code>backend/app/data/config</code> and applied without a redeploy via the key-protected <code>/api/admin/reload-config</code> endpoint. Transcripts, leads, usage and audit logs are available through key-protected <code>/api/admin/*</code> APIs.
         </p>
       </div>
     </main>
@@ -89,7 +62,7 @@ const navItems = [
   { id: 'bot_tuning', label: 'Prompt & Persona Tuning', icon: '🧠', description: 'Manage system persona, conversation scripts, guardrails, and locale tone.' },
   { id: 'conversation_review', label: 'Conversation Review', icon: '🔍', description: 'Browse transcripts, tag responses, thumbs feedback, and 1-click KB creation.' },
   { id: 'calculator_rules', label: 'Mortgage Rules & Rates', icon: '🧮', description: 'Manage interest rates, LTV caps, DBR limits, and fee schedules without code deploys.' },
-  { id: 'integrations', label: 'Integrations & Models', icon: '🔌', description: 'Configure OpenAI keys, model selection (gpt-5-mini), GRID & Vault gateways.' },
+  { id: 'integrations', label: 'Integrations & Models', icon: '🔌', description: 'Configure OpenAI keys, model selection, GRID & Vault gateways.' },
   { id: 'escalation_rules', label: 'Escalation & Routing', icon: '🚨', description: 'Configure human handoff triggers (sentiment, low confidence, VIP leads) and queues.' },
   { id: 'rbac', label: 'Role-Based Access (RBAC)', icon: '🛡️', description: 'Manage permissions: Content Editors, Bot Trainers, Admins, Read-Only Analysts.' },
   { id: 'ab_testing', label: 'A/B Experimentation', icon: '⚖️', description: 'Test prompt variants, flows, and persona tones against conversion metrics.' },

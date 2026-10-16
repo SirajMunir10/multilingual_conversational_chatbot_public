@@ -1,0 +1,209 @@
+{
+ "version": "2026.10.15",
+ "default": "en",
+ "prd_launch_languages": [
+  "en",
+  "ar",
+  "hi",
+  "ur"
+ ],
+ "locales": {
+  "en": {
+   "name": "English",
+   "native": "English",
+   "dir": "ltr",
+   "stt_language": "en",
+   "tts_language_code": "en",
+   "messages": {
+    "error_generic": "Sorry, something went wrong on my side. Please try again.",
+    "voice_unavailable": "Voice isn't available right now. Please type your message.",
+    "button_confirm": "Confirm",
+    "button_edit": "Edit"
+   }
+  },
+  "ar": {
+   "name": "Arabic",
+   "native": "العربية",
+   "dir": "rtl",
+   "stt_language": "ar",
+   "tts_language_code": "ar",
+   "messages": {
+    "error_generic": "عذراً، حدث خطأ من جهتي. يرجى المحاولة مرة أخرى.",
+    "voice_unavailable": "الصوت غير متاح حالياً. يرجى كتابة رسالتك.",
+    "button_confirm": "تأكيد",
+    "button_edit": "تعديل"
+   }
+  },
+  "hi": {
+   "name": "Hindi",
+   "native": "हिन्दी",
+   "dir": "ltr",
+   "stt_language": "hi",
+   "tts_language_code": "hi",
+   "messages": {
+    "error_generic": "माफ़ कीजिए, मेरी तरफ़ से कुछ गड़बड़ हुई। कृपया फिर से कोशिश करें।",
+    "voice_unavailable": "अभी वॉइस उपलब्ध नहीं है। कृपया अपना संदेश टाइप करें।",
+    "button_confirm": "पुष्टि करें",
+    "button_edit": "बदलें"
+   }
+  },
+  "ur": {
+   "name": "Urdu",
+   "native": "اردو",
+   "dir": "rtl",
+   "stt_language": "ur",
+   "tts_language_code": "ur",
+   "messages": {
+    "error_generic": "معذرت، میری طرف سے کچھ خرابی ہوئی۔ براہ کرم دوبارہ کوشش کریں۔",
+    "voice_unavailable": "آواز کی سہولت ابھی دستیاب نہیں۔ براہ کرم اپنا پیغام لکھیں۔",
+    "button_confirm": "تصدیق کریں",
+    "button_edit": "تبدیل کریں"
+   }
+  },
+  "fr": {
+   "name": "French",
+   "native": "Français",
+   "dir": "ltr",
+   "stt_language": "fr",
+   "tts_language_code": "fr",
+   "messages": {
+    "error_generic": "Désolé, un problème est survenu de mon côté. Veuillez réessayer.",
+    "voice_unavailable": "La voix n'est pas disponible pour le moment. Veuillez écrire votre message.",
+    "button_confirm": "Confirmer",
+    "button_edit": "Modifier"
+   }
+  },
+  "es": {
+   "name": "Spanish",
+   "native": "Español",
+   "dir": "ltr",
+   "stt_language": "es",
+   "tts_language_code": "es",
+   "messages": {
+    "error_generic": "Lo siento, algo salió mal por mi parte. Inténtalo de nuevo.",
+    "voice_unavailable": "La voz no está disponible ahora. Por favor, escribe tu mensaje.",
+    "button_confirm": "Confirmar",
+    "button_edit": "Editar"
+   }
+  },
+  "de": {
+   "name": "German",
+   "native": "Deutsch",
+   "dir": "ltr",
+   "stt_language": "de",
+   "tts_language_code": "de",
+   "messages": {
+    "error_generic": "Entschuldigung, bei mir ist etwas schiefgelaufen. Bitte versuchen Sie es erneut.",
+    "voice_unavailable": "Sprache ist gerade nicht verfügbar. Bitte tippen Sie Ihre Nachricht.",
+    "button_confirm": "Bestätigen",
+    "button_edit": "Bearbeiten"
+   }
+  },
+  "zh": {
+   "name": "Chinese",
+   "native": "简体中文",
+   "dir": "ltr",
+   "stt_language": "zh",
+   "tts_language_code": "zh",
+   "messages": {
+    "error_generic": "抱歉，我这边出了点问题。请再试一次。",
+    "voice_unavailable": "语音暂时不可用，请输入文字。",
+    "button_confirm": "确认",
+    "button_edit": "编辑"
+   }
+  },
+  "tl": {
+   "name": "Tagalog",
+   "native": "Filipino",
+   "dir": "ltr",
+   "stt_language": "tl",
+   "tts_language_code": "fil",
+   "messages": {
+    "error_generic": "Paumanhin, may nagkaproblema sa aking panig. Pakisubukang muli.",
+    "voice_unavailable": "Hindi available ang boses ngayon. Paki-type ang iyong mensahe.",
+    "button_confirm": "Kumpirmahin",
+    "button_edit": "I-edit"
+   }
+  },
+  "fa": {
+   "name": "Persian",
+   "native": "فارسی",
+   "dir": "rtl",
+   "stt_language": "fa",
+   "tts_language_code": "fa",
+   "messages": {
+    "error_generic": "متأسفم، مشکلی از طرف من پیش آمد. لطفاً دوباره تلاش کنید.",
+    "voice_unavailable": "صدا در حال حاضر در دسترس نیست. لطفاً پیام خود را تایپ کنید.",
+    "button_confirm": "تأیید",
+    "button_edit": "ویرایش"
+   }
+  },
+  "bn": {
+   "name": "Bengali",
+   "native": "বাংলা",
+   "dir": "ltr",
+   "stt_language": "bn",
+   "tts_language_code": "bn",
+   "messages": {
+    "error_generic": "দুঃখিত, আমার দিকে একটি সমস্যা হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।",
+    "voice_unavailable": "ভয়েস এখন উপলব্ধ নয়। অনুগ্রহ করে আপনার বার্তা টাইপ করুন।",
+    "button_confirm": "নিশ্চিত করুন",
+    "button_edit": "সম্পাদনা"
+   }
+  },
+  "ta": {
+   "name": "Tamil",
+   "native": "தமிழ்",
+   "dir": "ltr",
+   "stt_language": "ta",
+   "tts_language_code": "ta",
+   "messages": {
+    "error_generic": "மன்னிக்கவும், என் பக்கத்தில் ஒரு பிழை ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்.",
+    "voice_unavailable": "குரல் வசதி இப்போது இல்லை. உங்கள் செய்தியைத் தட்டச்சு செய்யவும்.",
+    "button_confirm": "உறுதிசெய்",
+    "button_edit": "திருத்து"
+   }
+  },
+  "pa": {
+   "name": "Punjabi",
+   "native": "ਪੰਜਾਬੀ",
+   "dir": "ltr",
+   "stt_language": null,
+   "tts_language_code": "pa",
+   "messages": {
+    "error_generic": "ਮਾਫ਼ ਕਰਨਾ, ਮੇਰੇ ਵੱਲੋਂ ਕੋਈ ਗੜਬੜ ਹੋਈ। ਕਿਰਪਾ ਕਰਕੇ ਮੁੜ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "voice_unavailable": "ਆਵਾਜ਼ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ। ਕਿਰਪਾ ਕਰਕੇ ਆਪਣਾ ਸੁਨੇਹਾ ਟਾਈਪ ਕਰੋ।",
+    "button_confirm": "ਪੁਸ਼ਟੀ ਕਰੋ",
+    "button_edit": "ਬਦਲੋ"
+   },
+   "stt_note": "Not an accepted gpt-live-transcribe language hint (tested 15 Oct 2026); transcription runs without a hint."
+  },
+  "ml": {
+   "name": "Malayalam",
+   "native": "മലയാളം",
+   "dir": "ltr",
+   "stt_language": "ml",
+   "tts_language_code": "ml",
+   "messages": {
+    "error_generic": "ക്ഷമിക്കണം, എന്റെ ഭാഗത്ത് ഒരു പിശക് സംഭവിച്ചു. ദയവായി വീണ്ടും ശ്രമിക്കുക.",
+    "voice_unavailable": "ശബ്ദ സൗകര്യം ഇപ്പോൾ ലഭ്യമല്ല. ദയവായി സന്ദേശം ടൈപ്പ് ചെയ്യുക.",
+    "button_confirm": "സ്ഥിരീകരിക്കുക",
+    "button_edit": "തിരുത്തുക"
+   }
+  },
+  "or": {
+   "name": "Odia",
+   "native": "ଓଡ଼ିଆ",
+   "dir": "ltr",
+   "stt_language": null,
+   "tts_language_code": "or",
+   "messages": {
+    "error_generic": "କ୍ଷମା କରନ୍ତୁ, ମୋ ପକ୍ଷରୁ କିଛି ସମସ୍ୟା ହେଲା। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "voice_unavailable": "ସ୍ୱର ସୁବିଧା ବର୍ତ୍ତମାନ ଉପଲବ୍ଧ ନାହିଁ। ଦୟାକରି ଆପଣଙ୍କ ବାର୍ତ୍ତା ଟାଇପ୍ କରନ୍ତୁ।",
+    "button_confirm": "ନିଶ୍ଚିତ କରନ୍ତୁ",
+    "button_edit": "ସମ୍ପାଦନ"
+   },
+   "stt_note": "Not an accepted gpt-live-transcribe language hint (tested 15 Oct 2026); transcription runs without a hint."
+  }
+ }
+}

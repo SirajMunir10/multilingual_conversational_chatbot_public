@@ -10,7 +10,7 @@
           </span>
           <h2 class="hero-title">Experience Smarter Property Discovery &amp; Instant Mortgages</h2>
           <p class="hero-desc">
-            Meet XO, your dedicated futuristic AI companion for discovering premier luxury properties, calculating real-time mortgage affordability, and navigating UAE Central Bank regulations across 15 global and regional languages.
+            Meet XO, your assistant for discovering UAE properties, estimating mortgage affordability and understanding the buying process — in 15 languages, by text or voice.
           </p>
           
           <div class="hero-actions">
@@ -18,7 +18,7 @@
               <span>✨ Launch XO Assistant</span>
             </button>
             <div class="compliance-badge">
-              <span>UAE Central Bank &amp; DIFC Aligned &bull; Deterministic Math</span>
+              <span>Estimates, not offers &bull; Calculated by XOTO's rule tables</span>
             </div>
           </div>
         </div>
@@ -27,14 +27,14 @@
         <div class="hero-mascot-card">
           <div class="mascot-card-badge">
             <span class="live-dot-green"></span>
-            <span>XO AI v4.2 &bull; ONLINE</span>
+            <span>XO &bull; ONLINE</span>
           </div>
           <div class="mascot-glow-circle">
             <img src="/xo-mascot.png" alt="XO Mascot" class="mascot-showcase-img" />
           </div>
           <div class="mascot-card-info">
             <h4>XO Assistant</h4>
-            <p>Ready to compute EMI &amp; showcase Dubai penthouses</p>
+            <p>Ask about properties, mortgages and fees</p>
           </div>
         </div>
       </div>
@@ -44,19 +44,19 @@
         <div class="feature-card">
           <div class="feature-icon">🏙️</div>
           <h3>Property Discovery</h3>
-          <p>Real-time luxury inventory across Downtown, Palm Jumeirah, Business Bay, and Dubai Hills.</p>
+          <p>Live off-plan projects across the UAE, plus sample ready homes, filtered by budget, area and bedrooms.</p>
         </div>
 
         <div class="feature-card">
           <div class="feature-icon">🧮</div>
           <h3>Deterministic Mortgages</h3>
-          <p>Exact mathematical formulas calculating monthly EMI, Central Bank 50% DBR limits, and 4% DLD fees.</p>
+          <p>Monthly payments, affordability and buying costs from XOTO's lending rules (50% debt-burden cap, KB fee tables).</p>
         </div>
 
         <div class="feature-card">
           <div class="feature-icon">🎙️</div>
           <h3>Voice &amp; Multilingual</h3>
-          <p>Seamless voice-to-voice with native speech synthesis across 15 languages including English, Arabic, Hindi, Urdu, and French.</p>
+          <p>Talk or type in English, Arabic, Hindi, Urdu and 11 more languages.</p>
         </div>
       </div>
     </div>
@@ -87,8 +87,8 @@
           <span class="launcher-live-dot"></span>
         </div>
         <div class="launcher-text-col">
-          <span class="launcher-title">Chat with XO AI</span>
-          <span class="launcher-subtitle">Online &bull; Instant Response</span>
+          <span class="launcher-title">Chat with XO</span>
+          <span class="launcher-subtitle">Online</span>
         </div>
       </button>
     </div>
@@ -575,5 +575,46 @@ const openWidget = () => {
   .launcher-subtitle {
     font-size: 0.65rem;
   }
+}
+</style>
+
+<style scoped>
+/* Responsive widget sizing: laptops, tablets, phones (portrait & landscape), large monitors and TVs */
+.embedded-widget-shell {
+  --xo-zoom: 1;
+  zoom: var(--xo-zoom);
+  width: clamp(400px, 34vw, 480px);
+  --xo-widget-h: min(680px, calc((100dvh - 40px) / var(--xo-zoom)));
+  max-height: none;
+}
+.embedded-widget-shell.expanded {
+  width: min(860px, calc((100vw - 40px) / var(--xo-zoom)));
+  --xo-widget-h: min(860px, calc((100dvh - 40px) / var(--xo-zoom)));
+}
+@media (min-width: 601px) and (max-width: 1023px) {
+  .embedded-widget-shell { width: min(560px, calc(100vw - 32px)); --xo-widget-h: min(860px, calc(100dvh - 32px)); }
+}
+@media (min-width: 1600px) {
+  .embedded-widget-shell { width: clamp(460px, 28vw, 600px); --xo-widget-h: min(900px, calc(100dvh - 48px)); }
+}
+/* Large TVs: scale the page and the widget so text stays readable from a distance */
+@media (min-width: 2200px) { .demo-website-surface { zoom: 1.4; } }
+@media (min-width: 3200px) { .demo-website-surface { zoom: 2; } }
+@media (min-width: 2200px) {
+  .embedded-widget-shell { --xo-zoom: 1.4; width: 560px; --xo-widget-h: min(900px, calc((100dvh - 64px) / 1.4)); }
+}
+@media (min-width: 3200px) {
+  .embedded-widget-shell { --xo-zoom: 2; width: 560px; --xo-widget-h: min(900px, calc((100dvh - 80px) / 2)); }
+}
+/* Phones (portrait) and phones in landscape: full screen with safe areas */
+@media (max-width: 600px), (max-height: 520px) and (pointer: coarse) {
+  .embedded-widget-shell.open {
+    position: fixed; inset: 0; width: 100%; max-width: 100%; zoom: 1;
+    --xo-widget-h: calc(100dvh - env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) 0 env(safe-area-inset-left, 0px);
+    box-sizing: border-box; z-index: 999999;
+  }
+  /* Edge to edge on phones */
+  .embedded-widget-shell.open :deep(.xo-widget) { border-radius: 0; border: 0; box-shadow: none; }
 }
 </style>

@@ -1,0 +1,40 @@
+{
+ "version": "v1.0-unconfirmed",
+ "note": "Indicative per-sq-ft service quotations carried over from the prototype; pending confirmation.",
+ "currency": "AED",
+ "services": {
+  "interior_design": {
+   "rate_per_sqft": 140.0,
+   "min_weeks": 4,
+   "sqft_per_week": 500,
+   "inclusions": [
+    "3D Visualizations",
+    "Material Sourcing",
+    "FF&E Schedule",
+    "Site Supervision"
+   ]
+  },
+  "landscaping": {
+   "rate_per_sqft": 85.0,
+   "min_weeks": 3,
+   "sqft_per_week": 500,
+   "inclusions": [
+    "Automated Irrigation",
+    "Softscape & Flora",
+    "Hardscape Paving",
+    "Outdoor Lighting"
+   ]
+  },
+  "smart_home": {
+   "rate_per_sqft": 45.0,
+   "min_weeks": 2,
+   "sqft_per_week": 500,
+   "inclusions": [
+    "Lighting Automation",
+    "HVAC Control",
+    "Security Sensors",
+    "Mobile Integration"
+   ]
+  }
+ }
+}

@@ -1,202 +1,116 @@
+"""Advisor lead persistence (PRD FR-5, FR-16). Leads are stored only after explicit consent."""
 import json
 import logging
-from typing import Dict, Any, Optional, List
+from collections import OrderedDict
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
-from app.core.config import settings
 from app.core.audit import AuditService
+from app.core.config import settings
 
 logger = logging.getLogger("xo.lead_store")
 
-class LeadDatabaseService:
-    """
-    Company-Owned Private PostgreSQL Database Service for Verified Advisor Leads.
-    
-    Security & Architecture Rules:
-    1. Strictly gates persistence: ONLY saves leads when user requests an advisor and provides explicit consent.
-    2. Ordinary conversation sessions or sessions where consent is declined are NEVER persisted.
-    3. Strictly enforces deduplication by (session_id, phone_number).
-    4. Never fabricates contact information.
-    5. Gracefully handles DB connection pools and provides isolated testing storage.
-    """
-    _pool = None
-    _in_memory_leads: Dict[str, Dict[str, Any]] = {}
-    _is_initialized: bool = False
+SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS advisor_leads (
+    id SERIAL PRIMARY KEY,
+    session_id VARCHAR(128) NOT NULL,
+    full_name VARCHAR(255) NOT NULL,
+    phone_number VARCHAR(64) NOT NULL,
+    preferred_language VARCHAR(32) NOT NULL,
+    advisor_type VARCHAR(64) NOT NULL,
+    conversation_context JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT uq_session_lead UNIQUE (session_id, phone_number)
+);
+CREATE INDEX IF NOT EXISTS idx_advisor_leads_created_at ON advisor_leads(created_at DESC);
+-- Added with the review-card flow; safe to run on existing tables.
+ALTER TABLE advisor_leads ADD COLUMN IF NOT EXISTS ticket_id VARCHAR(32);
+ALTER TABLE advisor_leads ADD COLUMN IF NOT EXISTS consent_confirmed_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_advisor_leads_ticket ON advisor_leads(ticket_id);
+"""
 
-    SCHEMA_SQL = """
-    CREATE TABLE IF NOT EXISTS advisor_leads (
-        id SERIAL PRIMARY KEY,
-        session_id VARCHAR(128) NOT NULL,
-        full_name VARCHAR(255) NOT NULL,
-        phone_number VARCHAR(64) NOT NULL,
-        preferred_language VARCHAR(32) NOT NULL,
-        advisor_type VARCHAR(64) NOT NULL,
-        conversation_context JSONB NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT NOW(),
-        CONSTRAINT uq_session_lead UNIQUE (session_id, phone_number)
-    );
-    CREATE INDEX IF NOT EXISTS idx_advisor_leads_created_at ON advisor_leads(created_at DESC);
-    """
+
+class LeadDatabaseService:
+    _pool = None
+    _memory: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
 
     @classmethod
     async def init_db(cls) -> bool:
-        """
-        Initializes connection pool to company PostgreSQL database if DATABASE_URL is set.
-        Creates table schema if not already existing.
-        """
-        if cls._is_initialized and cls._pool:
-            return True
-
-        db_url = settings.DATABASE_URL
-        if not db_url:
-            logger.info("DATABASE_URL not configured. Operating with in-memory company lead store.")
-            cls._is_initialized = True
-            return True
-
+        if not settings.DATABASE_URL:
+            logger.warning("DATABASE_URL not set: advisor leads are kept in process memory only (lost on restart).")
+            return False
         try:
             import asyncpg
-            cls._pool = await asyncpg.create_pool(
-                dsn=db_url,
-                min_size=1,
-                max_size=5,
-                timeout=10.0
-            )
+            cls._pool = await asyncpg.create_pool(dsn=settings.DATABASE_URL, min_size=1, max_size=5, timeout=10.0)
             async with cls._pool.acquire() as conn:
-                await conn.execute(cls.SCHEMA_SQL)
-            logger.info("Successfully connected to company PostgreSQL database and verified schema.")
-            cls._is_initialized = True
+                await conn.execute(SCHEMA_SQL)
+            logger.info("Connected to PostgreSQL lead store.")
             return True
-        except Exception as e:
-            logger.warning(f"Could not connect to PostgreSQL database ({e}). Operating with local company lead store.")
-            cls._is_initialized = True
+        except Exception as exc:
+            logger.error("PostgreSQL lead store unavailable: %s", exc)
+            cls._pool = None
             return False
 
     @classmethod
     async def close_db(cls) -> None:
-        """Closes the connection pool on application shutdown."""
         if cls._pool:
-            try:
-                await cls._pool.close()
-            except Exception as e:
-                logger.warning(f"Error closing PostgreSQL connection pool: {e}")
+            await cls._pool.close()
             cls._pool = None
-        cls._is_initialized = False
 
     @classmethod
-    async def save_advisor_lead(
-        cls,
-        session_id: str,
-        full_name: str,
-        phone_number: str,
-        preferred_language: str,
-        advisor_type: str,
-        conversation_context: Dict[str, Any]
-    ) -> bool:
-        """
-        Persists a verified advisor lead to company storage with deduplication.
-        Returns True if successfully saved/verified, False if write failed.
-        """
-        if not full_name or not phone_number or not session_id or full_name.strip() in ["Valued Client", "Client"]:
-            logger.warning("Attempted to save advisor lead with missing mandatory fields or placeholder name.")
-            return False
+    def storage_mode(cls) -> str:
+        return "postgres" if cls._pool else "memory"
 
-        clean_name = full_name.strip()
-        clean_phone = phone_number.strip()
-        clean_lang = preferred_language.strip() or "en"
-        clean_type = advisor_type.strip() or "general"
-        lead_key = f"{session_id}:{clean_phone}"
-
-        # 1. Try PostgreSQL write if pool is active
-        saved_to_postgres = False
-        if cls._pool:
-            try:
-                async with cls._pool.acquire() as conn:
-                    query = """
-                    INSERT INTO advisor_leads (
-                        session_id, full_name, phone_number, preferred_language, advisor_type, conversation_context
-                    ) VALUES ($1, $2, $3, $4, $5, $6)
-                    ON CONFLICT (session_id, phone_number) 
-                    DO UPDATE SET conversation_context = EXCLUDED.conversation_context;
-                    """
-                    await conn.execute(
-                        query,
-                        session_id,
-                        clean_name,
-                        clean_phone,
-                        clean_lang,
-                        clean_type,
-                        json.dumps(conversation_context)
-                    )
-                    saved_to_postgres = True
-                    logger.info(f"Advisor lead saved to PostgreSQL for session {session_id} ({clean_name})")
-            except Exception as pe:
-                logger.error(f"PostgreSQL write failed: {pe}")
-
-        # 2. Update memory store for quick back-office lookups and offline testing
-        cls._in_memory_leads[lead_key] = {
-            "session_id": session_id,
-            "full_name": clean_name,
-            "phone_number": clean_phone,
-            "preferred_language": clean_lang,
-            "advisor_type": clean_type,
-            "status": "pending_contact",
-            "conversation_context": conversation_context,
-            "saved_to_postgres": saved_to_postgres,
-            "created_at": datetime.now(timezone.utc).isoformat()
+    @classmethod
+    async def save_advisor_lead(cls, session_id: str, full_name: str, phone_number: str, preferred_language: str,
+                                advisor_type: str, conversation_context: Dict[str, Any], ticket_id: Optional[str] = None) -> Dict[str, Any]:
+        """Returns {'saved': bool, 'storage': 'postgres'|'memory'|None}. 'saved' is True only after the write succeeded.
+        Called only when the user confirmed the callback card, which is the consent time recorded."""
+        now = datetime.now(timezone.utc)
+        record = {
+            "session_id": session_id, "ticket_id": ticket_id, "full_name": full_name.strip(), "phone_number": phone_number.strip(),
+            "preferred_language": (preferred_language or "en").strip(), "advisor_type": advisor_type,
+            "conversation_context": conversation_context, "consent_confirmed_at": now.isoformat(), "created_at": now.isoformat(),
         }
-
-        # 3. Log compliance audit event
-        AuditService.log_event(
-            event_type="business_write",
-            action="advisor_lead_persisted",
-            resource="company_leads_db",
-            session_id=session_id,
-            status="success",
-            details={
-                "session_id": session_id,
-                "applicant_name": clean_name,
-                "applicant_phone": clean_phone,
-                "preferred_language": clean_lang,
-                "advisor_type": clean_type,
-                "postgres_synced": saved_to_postgres
-            }
-        )
-
-        return True
-
-    @classmethod
-    async def get_lead_by_session(cls, session_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieves lead details for a specific session."""
-        # Check PostgreSQL first if available
+        outcome: Dict[str, Any] = {"saved": False, "storage": None}
         if cls._pool:
             try:
                 async with cls._pool.acquire() as conn:
-                    row = await conn.fetchrow(
-                        "SELECT * FROM advisor_leads WHERE session_id = $1 ORDER BY created_at DESC LIMIT 1",
-                        session_id
-                    )
-                    if row:
-                        return dict(row)
-            except Exception as e:
-                logger.warning(f"Error fetching lead from PostgreSQL: {e}")
+                    await conn.execute(
+                        """INSERT INTO advisor_leads (session_id, ticket_id, full_name, phone_number, preferred_language, advisor_type,
+                                                      conversation_context, consent_confirmed_at)
+                           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                           ON CONFLICT (session_id, phone_number) DO UPDATE SET
+                               ticket_id = EXCLUDED.ticket_id, full_name = EXCLUDED.full_name,
+                               preferred_language = EXCLUDED.preferred_language, advisor_type = EXCLUDED.advisor_type,
+                               conversation_context = EXCLUDED.conversation_context, consent_confirmed_at = EXCLUDED.consent_confirmed_at""",
+                        session_id, ticket_id, record["full_name"], record["phone_number"], record["preferred_language"], advisor_type,
+                        json.dumps(conversation_context, default=str), now)
+                outcome = {"saved": True, "storage": "postgres"}
+            except Exception as exc:
+                logger.error("Lead write to PostgreSQL failed: %s", exc)
+        elif not settings.DATABASE_URL:
+            cls._memory[f"{session_id}:{record['phone_number']}"] = record
+            while len(cls._memory) > 5000:
+                cls._memory.popitem(last=False)
+            outcome = {"saved": True, "storage": "memory"}
 
-        # Fallback to in-memory store
-        for k, v in cls._in_memory_leads.items():
-            if v.get("session_id") == session_id:
-                return v
-        return None
+        AuditService.log_event("business_write", "advisor_lead_persisted", "company_leads_db", session_id=session_id,
+                               status="success" if outcome["saved"] else "failed",
+                               details={"full_name": record["full_name"], "phone": record["phone_number"],
+                                        "advisor_type": advisor_type, "ticket_id": ticket_id, "storage": outcome["storage"]})
+        return outcome
 
     @classmethod
-    def get_all_leads(cls) -> List[Dict[str, Any]]:
-        """Returns list of all leads currently recorded (used for admin/testing)."""
-        return list(cls._in_memory_leads.values())
+    async def list_leads(cls, limit: int = 100) -> List[Dict[str, Any]]:
+        if cls._pool:
+            async with cls._pool.acquire() as conn:
+                rows = await conn.fetch("SELECT ticket_id, session_id, full_name, phone_number, preferred_language, advisor_type, "
+                                        "consent_confirmed_at, created_at "
+                                        "FROM advisor_leads ORDER BY created_at DESC LIMIT $1", limit)
+                return [dict(r) for r in rows]
+        return [{k: v for k, v in r.items() if k != "conversation_context"} for r in list(cls._memory.values())[-limit:]]
 
     @classmethod
-    def get_lead_count(cls) -> int:
-        """Returns total leads in company store."""
-        return len(cls._in_memory_leads)
-
-    @classmethod
-    def clear_all(cls) -> None:
-        """Resets the store (used for test isolation)."""
-        cls._in_memory_leads.clear()
+    def clear_memory(cls) -> None:
+        cls._memory.clear()

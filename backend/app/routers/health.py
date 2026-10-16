@@ -1,55 +1,23 @@
 from fastapi import APIRouter
-from app.core.config import settings
 
-router = APIRouter(prefix="/api", tags=["Health & Diagnostics"])
+from app.core.config import load_config, settings
+
+router = APIRouter(prefix="/api", tags=["Health & client config"])
+
 
 @router.get("/health")
-def get_system_health():
-    """
-    Core system health and architectural diagnostics endpoint.
-    Verifies availability targets and operational readiness.
-    """
+def health():
+    """Liveness only — no model names, keys or internal details are exposed publicly."""
+    return {"status": "ok"}
+
+
+@router.get("/config")
+def client_config():
+    """Public, non-sensitive settings the widget needs (languages, voice timing)."""
+    locales = load_config("locales")
     return {
-        "status": "healthy",
-        "app_name": settings.APP_NAME,
-        "environment": settings.ENVIRONMENT,
-        "availability_target_pct": settings.AVAILABILITY_TARGET_PCT,
-        "models": {
-            "llm": settings.LLM_MODEL,
-            "stt": settings.STT_MODEL,
-            "tts": settings.TTS_MODEL,
-            "voice": settings.ELEVENLABS_VOICE_NAME,
-            "voice_id": settings.ELEVENLABS_VOICE_ID,
-            "v2v_pipeline": f"{settings.STT_MODEL} -> {settings.LLM_MODEL} -> {settings.TTS_MODEL}"
-        },
-        "gateways": {
-            "property_inventory": "operational_read_scoped",
-            "mortgage_rules": "operational_versioned_internal",
-            "grid_crm": "operational_narrow_write",
-            "vault_crm": "operational_narrow_write"
-        },
-        "compliance": {
-            "regulatory_scope": settings.REGULATORY_SCOPE,
-            "retention_policy_ref": settings.COMPANY_RETENTION_POLICY_REF,
-            "max_dbr_ratio": settings.MAX_DBR_RATIO
-        },
-        "launch_languages": settings.LAUNCH_LANGUAGES
+        "default_language": locales["default"],
+        "languages": [{"code": code, "name": v["name"], "native": v["native"], "dir": v["dir"]} for code, v in locales["locales"].items()],
+        "voice": {"sample_rate": settings.STT_SAMPLE_RATE, "silence_submit_ms": settings.VOICE_SILENCE_SUBMIT_MS,
+                  "max_session_sec": settings.STT_MAX_SESSION_SEC},
     }
-
-@router.get("/admin/usage/latest")
-def get_latest_usage_summary():
-    """
-    Read-only diagnostic endpoint retrieving the API usage and cost summary
-    for the most recent conversation session.
-    """
-    from app.core.usage_tracker import UsageTracker
-    return UsageTracker.get_session_summary()
-
-@router.get("/admin/usage/{session_id}")
-def get_session_usage_summary(session_id: str):
-    """
-    Read-only diagnostic endpoint retrieving the API usage and cost summary
-    for a specific conversation session.
-    """
-    from app.core.usage_tracker import UsageTracker
-    return UsageTracker.get_session_summary(session_id=session_id)
