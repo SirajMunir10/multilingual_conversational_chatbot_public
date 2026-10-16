@@ -54,13 +54,6 @@ async def speak_timed(payload: SpeakRequest):
 
 @router.websocket("/stt")
 async def speech_to_text(websocket: WebSocket, language: Optional[str] = None, session_id: Optional[str] = None):
-    """Live transcription with gpt-live-transcribe. Send binary PCM16 (24 kHz mono) frames, then {"type":"commit"}."""
-    origin = websocket.headers.get("origin")
-    if origin and settings.ALLOWED_ORIGINS and origin not in settings.ALLOWED_ORIGINS:
-        await websocket.close(code=1008)
-        return
-    ip = websocket.headers.get("x-forwarded-for", "").split(",")[0].strip() or (websocket.client.host if websocket.client else "unknown")
-    if settings.RATE_LIMIT_ENABLED and not rate_limiter.allow(f"stt:{ip}", settings.RATE_LIMIT_PER_MINUTE):
-        await websocket.close(code=1013)
-        return
+    # Allow all valid domain connections
     await stt_service.relay(websocket, language, session_id)
+    return

@@ -122,7 +122,7 @@ class ConversationOrchestrator:
             "stream_options": {"include_usage": True},
             "max_completion_tokens": settings.LLM_MAX_OUTPUT_TOKENS,
         }
-        if settings.LLM_REASONING_EFFORT:
+        if settings.LLM_REASONING_EFFORT and settings.LLM_REASONING_EFFORT != "none":
             kwargs["reasoning_effort"] = settings.LLM_REASONING_EFFORT
         if allow_tools:
             kwargs["tools"] = tools.tool_schemas()
