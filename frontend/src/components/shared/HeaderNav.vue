@@ -12,10 +12,10 @@
             <h1 class="brand-title">XO</h1>
             <span class="badge-live">
               <span class="pulse-dot"></span>
-              ONLINE &amp; READY
+              ONLINE
             </span>
           </div>
-          <p class="brand-subtitle">UAE Luxury Real Estate &amp; Mortgage Assistant</p>
+          <p class="brand-subtitle">UAE Real Estate &amp; Mortgage Assistant</p>
         </div>
       </div>
     </div>
@@ -52,8 +52,6 @@
     </div>
 
     <div class="header-right">
-      <HealthIndicator />
-
       <!-- Theme Switcher: Light / Dark Mode Toggle -->
       <div class="theme-switcher-pill" role="radiogroup" aria-label="Theme Selection">
         <button 
@@ -84,18 +82,6 @@
         </button>
       </div>
 
-      <!-- Human Advisor Escalation Button (From Official UI Layout) -->
-      <button 
-        class="btn-advisor-top" 
-        @click="handleSpeakWithAdvisor" 
-        aria-label="Speak with Advisor"
-        title="Connect with a licensed human mortgage specialist"
-        data-tooltip="Speak with a licensed advisor"
-        data-tooltip-pos="bottom"
-      >
-        <span class="advisor-icon">🎧</span>
-        <span>Speak with Advisor</span>
-      </button>
       
       <div class="language-selector">
         <label for="lang-select" class="visually-hidden">Select Language</label>
@@ -105,21 +91,7 @@
           @change="$emit('update:currentLanguage', $event.target.value)"
           class="lang-dropdown"
         >
-          <option value="en">🌐 English (EN)</option>
-          <option value="ar">🇦🇪 العربية (AR)</option>
-          <option value="hi">🇮🇳 हिन्दी (HI)</option>
-          <option value="ur">🇵🇰 اردو (UR)</option>
-          <option value="fr">🇫🇷 Français (FR)</option>
-          <option value="es">🇪🇸 Español (ES)</option>
-          <option value="de">🇩🇪 Deutsch (DE)</option>
-          <option value="zh">🇨🇳 简体中文 (ZH)</option>
-          <option value="tl">🇵🇭 Tagalog (TL)</option>
-          <option value="fa">🇮🇷 فارسی (FA)</option>
-          <option value="bn">🇧🇩 বাংলা (BN)</option>
-          <option value="ta">🇮🇳 தமிழ் (TA)</option>
-          <option value="pa">🇮🇳 ਪੰਜਾਬੀ (PA)</option>
-          <option value="ml">🇮🇳 മലയാളം (ML)</option>
-          <option value="or">🇮🇳 ଓଡ଼ିଆ (OR)</option>
+          <option v-for="lang in languages" :key="lang.code" :value="lang.code">{{ lang.native }} ({{ lang.code.toUpperCase() }})</option>
         </select>
       </div>
     </div>
@@ -127,7 +99,7 @@
 </template>
 
 <script setup>
-import HealthIndicator from './HealthIndicator.vue'
+import { languages } from '../../i18n'
 
 defineProps({
   currentView: {
@@ -144,11 +116,7 @@ defineProps({
   }
 })
 
-const emit = defineEmits(['update:currentView', 'update:currentLanguage', 'update:currentTheme', 'speak-with-advisor'])
-
-const handleSpeakWithAdvisor = () => {
-  emit('speak-with-advisor')
-}
+defineEmits(['update:currentView', 'update:currentLanguage', 'update:currentTheme'])
 </script>
 
 <style scoped>

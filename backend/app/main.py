@@ -1,62 +1,53 @@
 import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from app.core.config import settings
-from app.routers import health, gateways, chat, voice, mortgage, properties
 
-# Configure root logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
+from app.core.config import settings
+from app.voice.tts_service import TTSService
+from app.db.lead_store import LeadDatabaseService
+from app.routers import admin, chat, handoff, health, mortgage, properties, voice
+from app.services.vector_store import VectorDatabase
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("xo.main")
 
-app = FastAPI(
-    title=settings.APP_NAME,
-    description="XO — Conversational AI Assistant: Embedded Real Estate, Mortgage, & Knowledge Engine.",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
-)
 
-# Configure CORS for Vue 3 frontend
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting %s (%s) — LLM=%s STT=%s TTS=%s", settings.APP_NAME, settings.ENVIRONMENT,
+                settings.LLM_MODEL, settings.STT_MODEL, settings.TTS_MODEL)
+    VectorDatabase.load()
+    await LeadDatabaseService.init_db()
+    yield
+    await LeadDatabaseService.close_db()
+    await TTSService.close()
+
+
+app = FastAPI(title=settings.APP_NAME, version="2.0.0", lifespan=lifespan,
+              docs_url="/docs" if settings.ENVIRONMENT != "production" else None, redoc_url=None)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS + ["*"],  # Permissive for local dev prototype
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Admin-Key"],
 )
 
-# Mount core routers
-app.include_router(health.router)
-app.include_router(gateways.router)
-app.include_router(chat.router)
-app.include_router(voice.router)
-app.include_router(mortgage.router)
-app.include_router(properties.router)
+
+@app.exception_handler(Exception)
+async def unhandled(request: Request, exc: Exception):
+    logger.exception("Unhandled error on %s", request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "internal_error"})
+
+
+for r in (health.router, chat.router, voice.router, mortgage.router, properties.router, handoff.router, admin.router):
+    app.include_router(r)
+
 
 @app.get("/")
 def root():
-    return {
-        "message": f"Welcome to {settings.APP_NAME}",
-        "status": "operational",
-        "health_check": "/api/health",
-        "api_docs": "/docs"
-    }
-
-@app.on_event("startup")
-async def on_startup():
-    logger.info(f"Starting {settings.APP_NAME}")
-    logger.info(f"Active Models: LLM={settings.LLM_MODEL}, STT={settings.STT_MODEL}, TTS={settings.TTS_MODEL} (ElevenLabs Flash v2.5 - Voice: {settings.ELEVENLABS_VOICE_NAME} [{settings.ELEVENLABS_VOICE_ID}])")
-    logger.info(f"Compliance Standard: {settings.REGULATORY_SCOPE} (Policy: {settings.COMPANY_RETENTION_POLICY_REF})")
-    
-    # Initialize company lead database connection if configured
-    from app.db.lead_store import LeadDatabaseService
-    await LeadDatabaseService.init_db()
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    from app.db.lead_store import LeadDatabaseService
-    await LeadDatabaseService.close_db()
+    return {"service": settings.APP_NAME, "status": "ok"}

@@ -1,68 +1,36 @@
-from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field
-from app.core.audit import AuditService
+"""Services & quotations gateway (PRD §6.1 getServicePricing). Rates come from data/config/services_pricing.json."""
+from typing import Any, Dict, Optional
 
-class ServicePricingEstimate(BaseModel):
-    category: str
-    area_sq_ft: float
-    base_rate_per_sq_ft: float
-    estimated_total_aed: float
-    timeline_weeks: int
-    package_inclusions: list[str] = Field(default_factory=list)
-    disclaimer: str = "indicative quotation only, subject to on-site engineering assessment"
+from app.core.audit import AuditService
+from app.core.config import load_config
+
 
 class ServicesGateway:
-    """
-    Live Services & Quotations Gateway.
-    PRD Architecture Function: get_service_pricing(category, area_sq_ft)
-    """
-
-    _pricing_matrix = {
-        "interior_design": {
-            "rate_per_sqft": 140.0,
-            "min_weeks": 4,
-            "inclusions": ["3D Visualizations", "Material Sourcing", "FF&E Schedule", "Site Supervision"]
-        },
-        "landscaping": {
-            "rate_per_sqft": 85.0,
-            "min_weeks": 3,
-            "inclusions": ["Automated Irrigation", "Softscape & Flora", "Hardscape Paving", "Outdoor Lighting"]
-        },
-        "smart_home": {
-            "rate_per_sqft": 45.0,
-            "min_weeks": 2,
-            "inclusions": ["Lighting Automation", "HVAC Control", "Security Sensors", "Mobile Integration"]
-        }
-    }
 
     @classmethod
-    def get_service_pricing(
-        cls,
-        category: str,
-        area_sq_ft: float,
-        session_id: Optional[str] = None
-    ) -> ServicePricingEstimate:
-        norm_cat = category.lower().replace(" ", "_")
-        config = cls._pricing_matrix.get(norm_cat, cls._pricing_matrix["interior_design"])
-        
-        total = round(area_sq_ft * config["rate_per_sqft"], 2)
-        timeline = max(config["min_weeks"], int(area_sq_ft / 500))
+    def available_categories(cls) -> list:
+        return list(load_config("services_pricing")["services"].keys())
 
-        estimate = ServicePricingEstimate(
-            category=category,
-            area_sq_ft=area_sq_ft,
-            base_rate_per_sq_ft=config["rate_per_sqft"],
-            estimated_total_aed=total,
-            timeline_weeks=timeline,
-            package_inclusions=config["inclusions"]
-        )
-
-        AuditService.log_event(
-            event_type="service_pricing_query",
-            action="get_service_pricing",
-            resource="service_quotations",
-            session_id=session_id,
-            details=estimate.model_dump()
-        )
-
+    @classmethod
+    def get_service_pricing(cls, category: str, area_sq_ft: float, session_id: Optional[str] = None) -> Dict[str, Any]:
+        table = load_config("services_pricing")
+        key = (category or "").strip().lower().replace(" ", "_").replace("-", "_")
+        if key not in table["services"]:
+            return {"status": "unknown_category", "available_categories": cls.available_categories()}
+        if area_sq_ft <= 0:
+            return {"status": "invalid_area", "message": "Area must be greater than zero."}
+        cfg = table["services"][key]
+        estimate = {
+            "status": "success",
+            "category": key,
+            "area_sq_ft": area_sq_ft,
+            "rate_per_sqft_aed": cfg["rate_per_sqft"],
+            "estimated_total_aed": round(area_sq_ft * cfg["rate_per_sqft"], 2),
+            "timeline_weeks": max(cfg["min_weeks"], int(area_sq_ft / cfg["sqft_per_week"])),
+            "inclusions": cfg["inclusions"],
+            "table_status": table["note"],
+            "disclaimer": "indicative quotation only, subject to on-site assessment",
+        }
+        AuditService.log_event("service_pricing_query", "get_service_pricing", "service_quotations", session_id=session_id,
+                               details={"category": key, "area": area_sq_ft})
         return estimate

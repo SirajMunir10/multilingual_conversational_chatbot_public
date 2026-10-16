@@ -1,8 +1,8 @@
 <template>
-  <div class="onboarding-tips-container glass-card" v-if="isOpen">
+  <div class="onboarding-tips-container" v-if="isOpen">
     <div class="tips-header">
       <div class="tips-title">
-        <span class="sparkle-icon">💡</span>
+        <span class="tip-icon"><XoIcon name="bulb" :size="16" /></span>
         <h4>XO Feature Tips & Guide</h4>
       </div>
       <button 
@@ -12,12 +12,12 @@
         title="Dismiss tips"
         data-tooltip="Dismiss tips"
         data-tooltip-pos="left"
-      >✕</button>
+      ><XoIcon name="close" :size="16" /></button>
     </div>
 
     <div class="tips-grid">
       <div class="tip-item">
-        <span class="tip-icon">🎙️</span>
+        <span class="tip-icon"><XoIcon name="mic" :size="16" /></span>
         <div>
           <strong>Voice Interaction:</strong>
           <p>Tap the microphone to speak naturally in any of the 15 supported languages.</p>
@@ -25,34 +25,34 @@
       </div>
 
       <div class="tip-item">
-        <span class="tip-icon">🌐</span>
+        <span class="tip-icon"><XoIcon name="globe" :size="16" /></span>
         <div>
           <strong>Auto Language Detect:</strong>
-          <p>Type in any supported language; XO automatically matches your locale and text direction.</p>
+          <p>Type in any supported language, or switch with the language button — your chat history stays.</p>
         </div>
       </div>
 
       <div class="tip-item">
-        <span class="tip-icon">🏙️</span>
+        <span class="tip-icon"><XoIcon name="pin" :size="16" /></span>
         <div>
-          <strong>Live Property Search:</strong>
+          <strong>Property Search:</strong>
           <p>Try: <em>"Show 2 bedroom apartments in Downtown under 3 million"</em>.</p>
         </div>
       </div>
 
       <div class="tip-item">
-        <span class="tip-icon">🧮</span>
+        <span class="tip-icon"><XoIcon name="calculator" :size="16" /></span>
         <div>
-          <strong>Deterministic Mortgages:</strong>
-          <p>Try: <em>"What would my EMI be with 40k income?"</em> for UAE Central Bank aligned calculations.</p>
+          <strong>Mortgage Estimates:</strong>
+          <p>Try: <em>"What can I afford with a 40k monthly salary?"</em></p>
         </div>
       </div>
 
       <div class="tip-item">
-        <span class="tip-icon">🤝</span>
+        <span class="tip-icon"><XoIcon name="headset" :size="16" /></span>
         <div>
           <strong>Human Agent Handoff:</strong>
-          <p>Tap 'Connect Human Agent' anytime to route your full transcript to our specialist team.</p>
+          <p>Tap 'Advisor' anytime to request a callback from XOTO's team.</p>
         </div>
       </div>
     </div>
@@ -60,6 +60,8 @@
 </template>
 
 <script setup>
+import XoIcon from '../shared/XoIcon.vue'
+
 defineProps({
   isOpen: {
     type: Boolean,
@@ -72,86 +74,27 @@ defineEmits(['close'])
 
 <style scoped>
 .onboarding-tips-container {
-  padding: 14px;
-  margin: 10px 0;
-  border: 1px solid var(--border-purple);
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
-  border-radius: var(--radius-md);
+  margin: 10px 12px 0; padding: 14px;
+  background: var(--w-bg, #fff); border: 1px solid var(--w-line, rgba(15, 23, 42, 0.08)); border-radius: 16px;
+  box-shadow: 0 12px 28px -18px rgba(38, 10, 74, 0.4);
+  animation: tipsIn 200ms ease both;
 }
-
-.tips-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.tips-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tips-title h4 {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
+@keyframes tipsIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.tips-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.tips-title { display: flex; align-items: center; gap: 8px; }
+.tips-title h4 { margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--w-ink, #0f172a); }
 .tips-close-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 0.9rem;
-  padding: 2px 6px;
-  border-radius: var(--radius-sm);
+  display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; cursor: pointer;
+  background: transparent; color: var(--w-ink-2, #64748b);
 }
-
-.tips-close-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-surface-hover);
-}
-
-.tips-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.tip-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 0.8rem;
-}
-
+.tips-close-btn:hover { background: var(--w-chip, rgba(92, 3, 155, 0.06)); color: var(--w-ink, #0f172a); }
+.tips-grid { display: flex; flex-direction: column; gap: 10px; }
+.tip-item { display: flex; align-items: flex-start; gap: 10px; font-size: 0.8rem; }
 .tip-icon {
-  font-size: 1.1rem;
-  line-height: 1;
+  display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 9px;
+  background: var(--w-chip, rgba(92, 3, 155, 0.06)); color: var(--w-brand, #5c039b);
 }
-
-.tip-item strong {
-  color: var(--text-primary);
-  display: block;
-  margin-bottom: 2px;
-}
-
-.tip-item p {
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-
-.tip-item em {
-  color: var(--brand-purple);
-  font-style: normal;
-  font-weight: 600;
-}
-
-[data-theme="dark"] .tip-item em {
-  color: var(--brand-cyan);
-}
+.tip-item strong { display: block; margin-bottom: 1px; color: var(--w-ink, #0f172a); }
+.tip-item p { margin: 0; line-height: 1.45; color: var(--w-ink-2, #64748b); }
+.tip-item em { font-style: normal; font-weight: 600; color: var(--w-brand, #5c039b); }
 </style>

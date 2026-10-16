@@ -384,3 +384,7 @@ body {
   }
 }
 
+
+/* Voice replies: the word XO is saying right now is shown faded (see useWordHighlight.js) */
+.xo-w { transition: opacity 140ms ease; }
+.xo-w-now { opacity: 0.35; }

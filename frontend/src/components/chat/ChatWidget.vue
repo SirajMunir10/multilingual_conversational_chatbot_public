@@ -1,3009 +1,991 @@
 <template>
-  <div class="chat-widget-wrapper glass-panel" :class="{ 'is-expanded': isExpanded }" role="region" aria-label="XO Conversational Assistant">
-    <!-- Chat Header with XO Mascot Avatar -->
-    <div class="chat-header">
-      <div class="chat-header-brand">
-        <div class="mascot-avatar-container">
-          <img src="/xo-mascot.png" alt="XO Mascot" class="mascot-avatar-img" />
-          <span class="live-status-dot"></span>
-        </div>
-        <div class="header-brand-info">
-          <div class="header-brand-title">
-            <h3 class="header-title">XO</h3>
-            <span class="badge-online">ONLINE</span>
-          </div>
-          <span class="header-status" :title="activeLanguageLabel + ' • Luxury Property & Mortgage Specialist'">
-            {{ activeLanguageLabel }} &bull; Real Estate &amp; Mortgages
-          </span>
-        </div>
+  <div class="xo-widget" :class="{ 'is-expanded': isExpanded, 'in-voice': voiceMode }" role="region" aria-label="XO"
+       :lang="currentLanguage" :dir="activeLanguage.dir">
+    <!-- Header -->
+    <header class="xo-header">
+      <div class="xo-brand">
+        <span class="xo-avatar">
+          <img src="/xo-mascot.png" alt="" />
+          <span class="xo-online" aria-hidden="true"></span>
+        </span>
+        <span class="xo-brand-text">
+          <strong>XO</strong>
+          <small>{{ t('header_tagline') }}</small>
+        </span>
       </div>
 
-      <div class="header-actions">
-        <!-- Context Pills -->
-        <div class="header-pills-group">
-          <!-- Persistent Human Handoff (FR-5) -->
-          <button 
-            class="handoff-btn" 
-            @click="requestHandoff" 
-            title="Connect with Human Specialist"
-            aria-label="Connect with Human Specialist"
-            data-tooltip="Human Advisor"
-            data-tooltip-pos="bottom"
-          >
-            <span class="pill-icon">🎧</span>
-            <span class="pill-label">Advisor</span>
+      <div class="xo-header-actions">
+        <!-- In-widget language switch (FR-1: visible manual toggle) -->
+        <div class="lang-switch" @keydown.escape="showLangMenu = false">
+          <button type="button" class="xo-chip lang-switch-btn" @click="showLangMenu = !showLangMenu" aria-haspopup="listbox"
+                  :aria-expanded="showLangMenu" :aria-label="`${t('change_language')}: ${activeLanguage.native}`"
+                  :data-tip="showLangMenu ? null : t('change_language')">
+            <XoIcon name="globe" :size="16" />
+            <span class="chip-label">{{ activeLanguage.native }}</span>
+            <span class="chip-code">{{ currentLanguage.toUpperCase() }}</span>
+            <XoIcon name="chevronDown" :size="14" :stroke="2.4" class="chip-caret" :class="{ open: showLangMenu }" />
           </button>
-
-          <!-- User Auth Context Toggle (FR-21/FR-22) -->
-          <button 
-            class="auth-toggle-btn" 
-            @click="toggleAuthUser" 
-            :title="currentUserId ? 'Authenticated: Siraj Munir (VIP Client). Click to switch to Guest mode.' : 'Guest Mode (Unauthenticated). Click to switch to VIP Client.'"
-            :aria-label="currentUserId ? 'Signed in as Siraj Munir' : 'Guest Mode'"
-            :data-tooltip="currentUserId ? '👑 VIP: Siraj (Sign Out)' : '👤 Guest (Sign In)'"
-            data-tooltip-pos="bottom"
-          >
-            <span class="pill-icon">{{ currentUserId ? '👑' : '👤' }}</span>
-            <span class="pill-label">{{ currentUserId ? 'Siraj' : 'Guest' }}</span>
-          </button>
+          <transition name="pop">
+            <ul v-if="showLangMenu" class="lang-menu" role="listbox" :aria-label="t('change_language')">
+              <li v-for="lang in languages" :key="lang.code">
+                <button type="button" role="option" :aria-selected="lang.code === currentLanguage"
+                        :class="{ active: lang.code === currentLanguage }" @click="chooseLanguage(lang.code)">
+                  <span class="lang-native" :dir="lang.dir">{{ lang.native }}</span>
+                  <span class="lang-name">{{ lang.name }}</span>
+                  <XoIcon v-if="lang.code === currentLanguage" name="check" :size="16" class="lang-check" />
+                </button>
+              </li>
+            </ul>
+          </transition>
         </div>
 
-        <!-- Utility Action Controls Cluster -->
-        <div class="header-tools-group">
-          <!-- Theme Toggle (Light / Dark) -->
-          <button 
-            class="icon-btn theme-toggle-btn"
-            @click="toggleTheme" 
-            :title="currentTheme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'"
-            :aria-label="currentTheme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'"
-            data-tooltip="Theme"
-            data-tooltip-pos="bottom"
-          >
-            <span>{{ currentTheme === 'light' ? '🌙' : '☀️' }}</span>
-          </button>
+        <!-- Persistent human handoff (FR-5) -->
+        <button type="button" class="xo-chip advisor-btn" @click="requestHandoff" :aria-label="t('tip_advisor')" :data-tip="t('tip_advisor')">
+          <XoIcon name="headset" :size="16" />
+          <span class="chip-label">{{ t('advisor') }}</span>
+        </button>
 
-          <!-- Feature Tips Toggle -->
-          <button 
-            class="icon-btn tips-toggle-btn" 
-            @click="showTips = !showTips" 
-            title="Toggle Feature Tips (💡)"
-            aria-label="Toggle Feature Tips"
-            data-tooltip="Tips"
-            data-tooltip-pos="bottom"
-          >
-            <span>💡</span>
-          </button>
+        <span class="xo-divider" aria-hidden="true"></span>
 
-          <!-- Clear Chat Button with explicit Clear Chat hover tooltip -->
-          <button 
-            class="icon-btn clear-chat-btn" 
-            @click="clearChat" 
-            title="Clear Chat"
-            aria-label="Clear Chat"
-          >
-            <span class="btn-icon">🗑️</span>
-            <span class="clear-tooltip-bubble">Clear Chat</span>
-          </button>
+        <button type="button" class="xo-icon-btn theme-toggle-btn" @click="toggleTheme"
+                :aria-label="currentTheme === 'light' ? t('tip_dark') : t('tip_light')" :data-tip="currentTheme === 'light' ? t('tip_dark') : t('tip_light')">
+          <XoIcon :name="currentTheme === 'light' ? 'moon' : 'sun'" />
+        </button>
+        <button type="button" class="xo-icon-btn tips-toggle-btn" @click="showTips = !showTips" :aria-label="t('tip_tips')" :data-tip="t('tip_tips')">
+          <XoIcon name="bulb" />
+        </button>
+        <button type="button" class="xo-icon-btn clear-chat-btn" @click="clearChat" :aria-label="t('clear_chat')" :data-tip="t('clear_chat')" data-tip-pos="end">
+          <XoIcon name="trash" />
+        </button>
+        <button type="button" class="xo-icon-btn close-widget-btn" @click="$emit('close')" :aria-label="t('tip_close')" :data-tip="t('tip_close')" data-tip-pos="end">
+          <XoIcon name="close" />
+        </button>
+      </div>
+    </header>
 
-          <!-- Resize / Preview Size Toggle (Arrow button) -->
-          <button 
-            class="icon-btn resize-toggle-btn" 
-            @click="$emit('toggle-expand')" 
-            :title="isExpanded ? 'Restore compact view (⤡)' : 'Expand to larger view (⤢)'"
-            :aria-label="isExpanded ? 'Restore compact view' : 'Expand preview'"
-            :data-tooltip="isExpanded ? 'Compact' : 'Expand'"
-            data-tooltip-pos="bottom"
-          >
-            <span class="resize-icon">{{ isExpanded ? '⤡' : '⤢' }}</span>
-          </button>
+    <OnboardingTooltips :is-open="showTips" @close="showTips = false" />
 
-          <!-- Close Chatbot Button (✕) -->
-          <button 
-            class="icon-btn close-widget-btn" 
-            @click="$emit('close')" 
-            title="Close Chatbot (✕)"
-            aria-label="Close Chatbot"
-            data-tooltip="Close"
-            data-tooltip-pos="bottom"
-          >
-            <span>✕</span>
-          </button>
+    <div class="feed-wrap">
+    <div class="feed-backdrop" aria-hidden="true"><UaeSkyline /></div>
+    <div class="chat-feed" ref="feedRef" role="log" aria-live="polite" @scroll="handleFeedScroll">
+      <div v-if="messages.length <= 1" class="xo-hero">
+        <div class="xo-hero-mascot">
+          <img src="/xo-mascot.png" alt="XO" />
+        </div>
+        <h3 dir="auto">{{ t('hero_title') }}</h3>
+        <p dir="auto">{{ t('hero_sub') }}</p>
+      </div>
+
+      <template v-for="msg in messages" :key="msg.id">
+        <div v-if="msg.kind === 'divider'" class="lang-divider" role="separator"><span dir="auto">{{ msg.content }}</span></div>
+        <MessageItem v-else-if="!msg.hidden" :message="msg" :language="currentLanguage" @ask="sendQuickPrompt" />
+      </template>
+
+      <div class="typing-indicator" v-if="isTyping">
+        <img src="/xo-mascot.png" alt="" class="typing-avatar" />
+        <div class="typing-pill">
+          <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="typing-text">{{ statusText }}</span>
         </div>
       </div>
     </div>
-
-    <!-- Onboarding Feature Tips (Prompt Section 6) -->
-    <OnboardingTooltips 
-      :is-open="showTips" 
-      @close="showTips = false" 
-    />
-
-    <!-- Dedicated Voice Mode Screen: Replicates Perplexity AI Voice UI & Animation -->
-    <div 
-      v-if="isVoiceActive" 
-      class="pplx-voice-screen" 
-      :class="{ 'is-speaking': Boolean(liveSpokenText.trim()) }"
-    >
-      <div class="pplx-voice-stage">
-        <!-- 3D Particle Sphere Model (Perplexity Orb) -->
-        <div class="pplx-orb-container">
-          <VoiceVisualizer 
-            :is-active="isVoiceActive" 
-            :audio-level="currentAudioLevel"
-            :is-compact="Boolean(liveSpokenText.trim())"
-          />
-        </div>
-
-        <!-- Live Speech Transcription / Prompt Text -->
-        <div class="pplx-text-zone">
-          <p v-if="liveSpokenText.trim()" class="pplx-transcript-text">
-            “{{ liveSpokenText }}”
-          </p>
-          <p v-else class="pplx-prompt-text">
-            Say something...
-          </p>
-          <div v-if="silenceTimerActive && liveSpokenText.trim()" class="pplx-silence-pulse">
-            <span class="pplx-silence-dot"></span>
-            <span>Sending in 2s...</span>
-          </div>
-        </div>
-
-        <!-- Circular Action Buttons: Cross ✕ on Left, Tick ✓ on Right -->
-        <div class="pplx-actions-row">
-          <!-- Cross / Cancel Button -->
-          <button 
-            type="button" 
-            class="pplx-action-btn pplx-btn-cancel" 
-            @click="cancelVoiceInput"
-            title="Cancel voice input (✕)"
-            aria-label="Cancel Voice Input"
-          >
-            ✕
-          </button>
-
-          <!-- Tick / Confirm Button -->
-          <button 
-            type="button" 
-            class="pplx-action-btn pplx-btn-confirm" 
-            :disabled="!liveSpokenText.trim() && !inputQuery.trim() && audioChunks.length === 0"
-            @click="confirmVoiceInput"
-            title="Send speech to chat (✓)"
-            aria-label="Confirm Voice Input"
-          >
-            ✓
-          </button>
-        </div>
-      </div>
     </div>
 
-    <!-- Standard Chat Interface: Displayed when Voice Mode is NOT active -->
-    <template v-else>
-      <!-- Message Feed -->
-      <div class="chat-feed" ref="feedRef" role="log" aria-live="polite" @scroll="handleFeedScroll">
-        <!-- HERO CENTERPIECE: Shown upon opening / at start of conversation -->
-        <div v-if="messages.length <= 1" class="hero-centerpiece glass-card">
-          <div class="hero-badge">
-            <span class="pulse-dot"></span>
-            <span>XO AI v4.2</span>
-          </div>
+    <transition name="pop">
+      <button v-if="isUserScrolledUp" type="button" class="jump-to-latest-btn" @click="scrollToLatest">
+        <XoIcon name="arrowDown" :size="14" />
+        <span>{{ t('latest') }}</span>
+      </button>
+    </transition>
 
-          <div class="hero-mascot-visual">
-            <img src="/xo-mascot.png" alt="XO Assistant Mascot" class="hero-mascot-img" />
-          </div>
-
-          <h3 class="hero-greeting-title">
-            How can I assist your UAE investment journey today?
-          </h3>
-          <p class="hero-greeting-sub">
-            Speak or message naturally across 15 global &amp; regional languages.
-          </p>
-        </div>
-
-        <!-- Messages Stream -->
-        <MessageItem 
-          v-for="msg in messages" 
-          :key="msg.id" 
-          :message="msg"
-          @select-property-mortgage="handlePropertyMortgageCheck"
-          @jump-to-properties="handleJumpToProperties"
-          @shortlist-property="handleShortlistProperty"
-        />
-
-        <!-- Streaming / Typing Indicator -->
-        <div class="typing-indicator" v-if="isTyping">
-          <div class="mascot-typing-avatar">
-            <img src="/xo-mascot.png" alt="XO" class="typing-mascot-img" />
-          </div>
-          <div class="typing-dots-wrapper">
-            <span class="typing-dot"></span>
-            <span class="typing-dot"></span>
-            <span class="typing-dot"></span>
-            <span class="typing-text">XO AI is analyzing market data...</span>
-          </div>
-        </div>
+    <!-- First-time voice intro -->
+    <transition name="voice-intro">
+      <div v-if="voiceIntro" class="voice-intro" role="dialog" :aria-label="t('voice_intro')" @click="voiceIntro = false">
+        <VoiceOrb :size="introOrbSize" phase="speaking" :beat="introBeat" :dark="true" assemble />
+        <p class="voice-intro-text" dir="auto">{{ t('voice_intro') }}</p>
       </div>
+    </transition>
 
-      <!-- Floating Jump to Latest Button (Auto-scroll assistance) -->
-      <transition name="jump-fade">
-        <button 
-          v-if="isUserScrolledUp" 
-          type="button" 
-          class="jump-to-latest-btn" 
-          @click="scrollToLatest"
-          title="Jump to latest message"
-          aria-label="Jump to latest message"
-        >
-          <span class="jump-arrow">↓</span>
-          <span class="jump-text">Latest</span>
-        </button>
-      </transition>
-
-      <!-- Compact Voice Playback Bar (when XO is speaking back audio) -->
-      <div v-if="isPlayingVoice" class="voice-playback-bar" @click="stopVoicePlayback" title="Click to stop voice playback">
-        <span class="playback-dot"></span>
-        <span class="playback-text">XO is speaking • Click to interrupt</span>
-        <button type="button" class="btn-stop-playback" @click.stop="stopVoicePlayback" aria-label="Stop audio">⏹</button>
-      </div>
-
-      <!-- Autoplay Fallback Bar (if browser blocks auto-play) -->
-      <div v-if="!isPlayingVoice && autoplayBlockedAudioUrl" class="voice-playback-bar tap-to-play" @click="playAudioUrl(autoplayBlockedAudioUrl)" title="Tap to listen to XO's voice response">
-        <span class="playback-dot" style="background: #a855f7;"></span>
-        <span class="playback-text">🔊 Tap to listen to XO's voice response</span>
-        <button type="button" class="btn-stop-playback" style="background: #a855f7;" aria-label="Play audio">▶</button>
-      </div>
-
-      <!-- Advisor Standby Notification Bar -->
-      <div class="advisor-standby-bar">
-        <div class="standby-status">
-          <span class="standby-icon">🎧</span>
-          <span class="standby-text">
-            Advisor on Standby: <strong>4 licensed specialists</strong> available
+    <!-- Voice dock: the conversation stays visible while XO listens, thinks and speaks -->
+    <transition name="dock" mode="out-in">
+      <div v-if="voiceMode" key="voice" class="voice-dock" :class="'phase-' + voicePhase" role="region" :aria-label="t('voice_listening')">
+        <button type="button" class="voice-orb-btn" :class="'phase-' + voicePhase" @click="micAction" :aria-label="micLabel" :data-tip="micLabel" data-tip-pos="top-start">
+          <VoiceOrb :size="68" :phase="voicePhase" :level="voice.level.value" :beat="orbBeat" :dark="currentTheme === 'dark'" />
+          <!-- "Your turn": a short double heartbeat each time the mic goes live -->
+          <span v-if="voicePhase === 'listening'" :key="listenBeat" class="orb-heartbeat" aria-hidden="true"></span>
+          <span v-if="voicePhase === 'hold' || voicePhase === 'idle'" class="orb-glyph" aria-hidden="true">
+            <XoIcon name="mic" :size="20" />
           </span>
-        </div>
-        <button 
-          type="button" 
-          class="btn-standby-connect" 
-          @click="requestHandoff"
-          title="Connect with a licensed human specialist"
-          data-tooltip="Connect with 1 of 4 advisors"
-          data-tooltip-pos="left"
-        >
-          Connect
+          <span v-if="voicePhase === 'speaking' || voicePhase === 'thinking'" class="orb-badge" aria-hidden="true">
+            <XoIcon name="pause" :size="10" :stroke="3" />
+          </span>
         </button>
+        <div class="voice-dock-text" aria-live="polite">
+          <span class="voice-dock-status">{{ voiceStatusText }}</span>
+          <p v-if="voicePhase === 'listening' && voice.liveText.value.trim()" class="voice-dock-caption" dir="auto">{{ voice.liveText.value }}</p>
+          <p v-if="voiceError" class="voice-error-text" role="alert">{{ voiceError }}</p>
+        </div>
+        <div class="voice-dock-actions">
+          <transition name="pop">
+            <button v-if="voicePhase === 'listening' && voice.liveText.value.trim()" type="button" class="xo-round-btn confirm" @click="voice.commit()" :aria-label="t('send')" :data-tip="t('send')" data-tip-pos="top">
+              <XoIcon name="check" :size="20" />
+            </button>
+          </transition>
+          <button type="button" class="xo-round-btn cancel" @click="exitVoiceMode" :aria-label="t('tip_end_voice')" :data-tip="t('tip_end_voice')" data-tip-pos="top-end">
+            <XoIcon name="close" :size="20" />
+          </button>
+        </div>
       </div>
 
-      <!-- Chat Input Controls (Floating Pill Dock) -->
-      <div class="chat-footer">
-        <form @submit.prevent="sendMessage" class="input-form">
-          <label for="chat-text-input" class="visually-hidden">Type your message</label>
-          <input 
-            id="chat-text-input"
-            ref="inputRef"
-            v-model="inputQuery" 
-            type="text" 
-            :placeholder="inputPlaceholder" 
-            class="chat-input-field"
-            :disabled="isTyping"
-            autocomplete="off"
-          />
-
-          <!-- Microphone Button -->
-          <button 
-            type="button" 
-            class="mic-btn" 
-            :class="{ 'speaking': isPlayingVoice }"
-            @click="toggleVoiceRecording"
-            :title="isPlayingVoice ? 'Interrupt XO & Speak' : 'Tap to Speak (Voice STT in EN, AR, HI, UR)'"
-            aria-label="Microphone Voice Input"
-            :data-tooltip="isPlayingVoice ? 'Click to Interrupt & Speak' : 'Voice Input: Tap to Speak'"
-            data-tooltip-pos="left"
-          >
-            <svg class="mic-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-              <line x1="12" y1="19" x2="12" y2="22"></line>
-            </svg>
+      <div v-else key="text" class="chat-footer">
+        <form @submit.prevent="sendMessage()" class="input-form">
+          <label for="chat-text-input" class="visually-hidden">{{ t('placeholder') }}</label>
+          <input id="chat-text-input" ref="inputRef" v-model="inputQuery" type="text" dir="auto" enterkeyhint="send"
+                 :placeholder="t('placeholder')" class="chat-input-field" :disabled="isTyping" autocomplete="off" maxlength="2000" />
+          <button type="button" class="mic-btn" @click="enterVoiceMode" :aria-label="t('tip_voice')" :data-tip="t('tip_voice')" data-tip-pos="top">
+            <XoIcon name="mic" :size="20" />
           </button>
-
-          <!-- Send Button: Purple circle with upward arrow -->
-          <button 
-            type="submit" 
-            class="send-btn" 
-            :disabled="!inputQuery.trim() || isTyping"
-            title="Send message (Enter)"
-            aria-label="Send Message"
-            data-tooltip="Send message (Enter)"
-            data-tooltip-pos="left"
-          >
-            <span class="send-arrow">↑</span>
+          <button type="submit" class="send-btn" :disabled="!inputQuery.trim() || isTyping" :aria-label="t('send')" :data-tip="t('send')" data-tip-pos="top-end">
+            <XoIcon name="send" :size="18" :stroke="2.4" />
           </button>
         </form>
       </div>
+    </transition>
 
-      <!-- Legal Disclaimer Under Input -->
-      <div class="input-disclaimer">
-        <span>XO AI provides informational estimates based on official UAE Central Bank &amp; DLD guidelines. Real-time rates subject to bank approval.</span>
-      </div>
-    </template>
-
-    <!-- Audio Element for synthesized TTS playback -->
-    <audio ref="audioPlayerRef" @ended="stopVoicePlayback" class="visually-hidden"></audio>
-
-    <!-- Anonymous Shortlist Lead Capture Modal (FR-10) -->
-    <div v-if="showLeadCaptureModal" class="lead-modal-overlay" @click.self="showLeadCaptureModal = false">
-      <div class="lead-modal-card glass-card">
-        <div class="lead-modal-header">
-          <div class="lead-modal-title">
-            <img src="/xo-mascot.png" alt="XO Mascot" class="modal-mascot-icon" />
-            <div>
-              <h4>Save to Shortlist &amp; Request Brochure</h4>
-              <span class="modal-sub">Direct access to XO Luxury Advisory</span>
-            </div>
-          </div>
-          <button class="lead-modal-close" @click="showLeadCaptureModal = false" aria-label="Close modal">✕</button>
-        </div>
-
-        <p class="lead-modal-subtitle" v-if="selectedShortlistProp">
-          You shortlisted <strong>{{ selectedShortlistProp.title }}</strong> (AED {{ formatNumber(selectedShortlistProp.price) }}). Enter your contact details to save your portfolio and receive official floor plans, payment schedules, and DLD verification directly from an XO Luxury Specialist.
-        </p>
-
-        <form @submit.prevent="submitLeadCapture" class="lead-form">
-          <div class="form-group">
-            <label for="lead-name">Full Name</label>
-            <input 
-              id="lead-name" 
-              v-model="leadForm.name" 
-              type="text" 
-              placeholder="e.g. Alex Henderson" 
-              required 
-              class="lead-input"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="lead-email">Email Address</label>
-            <input 
-              id="lead-email" 
-              v-model="leadForm.email" 
-              type="email" 
-              placeholder="e.g. alex@example.com" 
-              required 
-              class="lead-input"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="lead-phone">Phone / WhatsApp</label>
-            <input 
-              id="lead-phone" 
-              v-model="leadForm.phone" 
-              type="tel" 
-              placeholder="e.g. +971 50 123 4567" 
-              required 
-              class="lead-input"
-            />
-          </div>
-
-          <div class="lead-modal-actions">
-            <button type="button" class="btn-cancel" @click="showLeadCaptureModal = false">
-              Maybe Later
-            </button>
-            <button type="submit" class="btn-submit" :disabled="isSubmittingLead">
-              {{ isSubmittingLead ? 'Saving...' : 'Save & Send Brochure' }}
-            </button>
-          </div>
-        </form>
-      </div>
+    <div class="input-disclaimer">
+      <span dir="auto">{{ t('footer_disclaimer') }}</span>
     </div>
+
+    <audio ref="audioPlayerRef" class="visually-hidden" playsinline></audio>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick, toRefs } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, toRefs, provide } from 'vue'
 import MessageItem from './MessageItem.vue'
 import OnboardingTooltips from './OnboardingTooltips.vue'
-import VoiceVisualizer from './VoiceVisualizer.vue'
+import VoiceOrb from './VoiceOrb.vue'
+import UaeSkyline from './UaeSkyline.vue'
+import XoIcon from '../shared/XoIcon.vue'
+import { languages, languageInfo, t as translate } from '../../i18n'
+import { apiUrl, fetchClientConfig } from '../../services/api'
+import { useVoice } from '../../composables/useVoice'
+import { useSpeech } from '../../composables/useSpeech'
+import { useWordHighlight } from '../../composables/useWordHighlight'
 
 const props = defineProps({
-  currentLanguage: {
-    type: String,
-    default: 'en'
-  },
-  currentTheme: {
-    type: String,
-    default: 'light'
-  },
-  isExpanded: {
-    type: Boolean,
-    default: false
-  }
+  currentLanguage: { type: String, default: 'en' },
+  currentTheme: { type: String, default: 'light' },
+  isExpanded: { type: Boolean, default: false }
 })
-
 const { isExpanded } = toRefs(props)
-
 const emit = defineEmits(['close', 'language-changed', 'update:currentTheme', 'toggle-expand'])
 
-const SESSION_STORAGE_KEY_ID = 'xo_session_id'
-const SESSION_STORAGE_KEY_MESSAGES = 'xo_chat_messages'
+const STORE_SESSION = 'xo_session_id'
+const STORE_MESSAGES = 'xo_chat_messages'
 
-// Initialize or restore session ID across widget close/reopen and page loads
-const getInitialSessionId = () => {
-  if (typeof window !== 'undefined' && window.sessionStorage) {
-    const saved = window.sessionStorage.getItem(SESSION_STORAGE_KEY_ID)
-    if (saved) return saved
-    const newId = `sess_${Math.random().toString(36).substring(2, 10)}`
-    window.sessionStorage.setItem(SESSION_STORAGE_KEY_ID, newId)
-    return newId
-  }
-  return `sess_${Math.random().toString(36).substring(2, 10)}`
-}
+const t = (key, vars) => translate(props.currentLanguage, key, vars)
+const activeLanguage = computed(() => languageInfo(props.currentLanguage))
 
 const messages = ref([])
 const inputQuery = ref('')
 const isTyping = ref(false)
-const isRecording = ref(false)
-const isPlayingVoice = ref(false)
+const statusKey = ref('thinking')
 const showTips = ref(false)
-const sessionId = ref(getInitialSessionId())
-
-// Phase 6: Authenticated User Context (FR-21, FR-22, FR-23)
-// Default to Siraj Munir VIP client; can toggle to null (Guest) to test unauthenticated rejection flow
-const currentUserId = ref('user_siraj_vip')
-const toggleAuthUser = () => {
-  currentUserId.value = currentUserId.value ? null : 'user_siraj_vip'
-}
-
-// Voice UX Refinement State
-const hasVoiceSessionGreeted = ref(false)
-const isVoiceActive = ref(false)
-const isVoiceInFlight = ref(false)
-const recordedAudioBlob = ref(null)
-const liveSpokenText = ref('')
-const currentAudioLevel = ref(0)
-const hasMeaningfulSpeech = ref(false)
-const silenceTimerActive = ref(false)
-let silenceTimer = null
-let audioContext = null
-let analyserNode = null
-let audioAnalysisInterval = null
-let speechRecognition = null
-let voiceAbortController = null
-
-const voiceStatusLabel = computed(() => {
-  if (silenceTimerActive.value) {
-    return 'Silence detected • Auto-sending in 2s...'
-  }
-  if (isRecording.value) {
-    return liveSpokenText.value 
-      ? 'Listening • ' + (liveSpokenText.value.length > 28 ? liveSpokenText.value.slice(-28) : liveSpokenText.value)
-      : 'Listening (Speak in EN, AR, HI, UR)...'
-  }
-  if (isPlayingVoice.value) {
-    return 'Speaking (XO Audio Stream) • Click mic to interrupt'
-  }
-  return 'Voice Mode Active'
-})
-
+const showLangMenu = ref(false)
 const feedRef = ref(null)
 const inputRef = ref(null)
 const audioPlayerRef = ref(null)
+const isUserScrolledUp = ref(false)
+const sessionId = ref(safeStorage('get', STORE_SESSION) || null)
+const clientConfig = ref({ voice: { sample_rate: 24000, silence_submit_ms: 2000, max_session_sec: 120 } })
 
-const toggleTheme = () => {
-  const nextTheme = props.currentTheme === 'light' ? 'dark' : 'light'
-  emit('update:currentTheme', nextTheme)
+// Language bookkeeping: a manual choice is sent once as `selected_language`;
+// a switch made by the assistant is only reflected in the UI.
+let pendingSelectedLanguage = null
+let serverLanguage = props.currentLanguage
+
+const statusText = computed(() => t(statusKey.value))
+const STATUS_BY_TOOL = {
+  search_properties: 'status_search', find_similar: 'status_search', compare_listings: 'status_search', get_listing_details: 'status_search',
+  calc_affordability: 'status_calc', calc_emi: 'status_calc', check_eligibility: 'status_calc', calc_purchase_costs: 'status_calc',
+  estimate_offers: 'status_calc', get_mortgage_products: 'status_calc', get_lending_rules: 'status_calc',
+  retrieve_kb: 'status_kb', request_human_handoff: 'status_handoff'
 }
 
-const activeLanguageLabel = computed(() => {
-  const map = {
-    en: 'English',
-    ar: 'العربية',
-    hi: 'हिन्दी',
-    ur: 'اردو',
-    fr: 'Français',
-    es: 'Español',
-    de: 'Deutsch',
-    zh: '简体中文',
-    tl: 'Tagalog',
-    fa: 'فارسی',
-    bn: 'বাংলা',
-    ta: 'தமிழ்',
-    pa: 'ਪੰਜਾਬੀ',
-    ml: 'മലയാളം',
-    or: 'ଓଡ଼ିଆ'
+function safeStorage(op, key, value) {
+  try {
+    if (op === 'get') return window.sessionStorage.getItem(key)
+    if (op === 'set') return window.sessionStorage.setItem(key, value)
+    if (op === 'remove') return window.sessionStorage.removeItem(key)
+  } catch (e) {
+    return null
   }
-  return map[props.currentLanguage] || 'English'
-})
-
-const inputPlaceholder = computed(() => {
-  const map = {
-    ar: 'اسأل عن عقار في دبي، أو احسب قسط التمويل...',
-    hi: 'दुबई में प्रॉपर्टी खोजें या मॉर्गेज EMI की गणना करें...',
-    ur: 'دبئی میں پراپرٹی سرچ کریں یا مارگیج قسط معلوم کریں...',
-    fr: 'Rechercher un bien à Dubaï ou calculer un prêt...',
-    es: 'Buscar propiedades en Dubái o calcular hipoteca...',
-    de: 'Immobilien in Dubai suchen oder Hypothek berechnen...',
-    zh: '搜索迪拜房产或计算房贷月供...',
-    tl: 'Maghanap ng ari-arian sa Dubai o kalkulahin ang mortgage...',
-    fa: 'جستجوی ملک در دبی یا محاسبه اقساط وام...',
-    bn: 'দুবাইয়ে সম্পত্তি খুঁজুন বা মর্টগেজ ইএমআই গণনা করুন...',
-    ta: 'துபாயில் சொத்துக்களைத் தேடுங்கள் அல்லது வீட்டுக் கடனைக் கணக்கிடுங்கள்...',
-    pa: 'ਦੁਬਈ ਵਿੱਚ ਜਾਇਦਾਦ ਲੱਭੋ ਜਾਂ ਮੌਰਗੇਜ ਕਿਸ਼ਤ ਜਾਣੋ...',
-    ml: 'ദുബായിൽ പ്രോപ്പർട്ടി തിരയുക അല്ലെങ്കിൽ മോർട്ട്ഗേജ് കണക്കാക്കുക...',
-    or: 'ଦୁବାଇରେ ସମ୍ପତ୍ତି ଖୋଜନ୍ତୁ କିମ୍ବା ମର୍ଟଗେଜ୍ ହିସାବ କରନ୍ତୁ...',
-    en: 'Ask about properties, mortgage eligibility, or market analysis...'
-  }
-  return map[props.currentLanguage] || map.en
-})
-
-// Automated Welcome Message upon Opening (FR-1 / Prompt Section 6)
-const initializeWelcomeMessage = () => {
-  const welcomeTexts = {
-    ar: 'أهلاً بك في XO! أنا مساعدك الذكي للعقارات والتمويل العقاري في الإمارات. كيف يمكنني مساعدتك اليوم؟',
-    hi: 'नमस्ते! मैं XO हूँ, यूएई में प्रॉपर्टी और होम लोन के लिए आपका एआई सहायक। आज मैं आपकी क्या सहायता कर सकता हूँ?',
-    ur: 'خوش آمدید! میں XO ہوں، متحدہ عرب امارات میں پراپرٹی اور مارگیج کے لیے آپ کا AI اسسٹنٹ۔ میں آپ کی کیا مدد کر سکتا ہوں؟',
-    fr: 'Bienvenue chez XO ! Je suis votre assistant IA pour l\'immobilier de luxe et le financement aux Émirats arabes unis. Comment puis-je vous aider aujourd\'hui ?',
-    es: '¡Bienvenido a XO! Soy su asistente de IA para propiedades de lujo y préstamos hipotecarios en los EAU. ¿Cómo puedo ayudarle hoy?',
-    de: 'Willkommen bei XO! Ich bin Ihr KI-Assistent für Luxusimmobilien und Baufinanzierungen in den VAE. Wie kann ich Ihnen heute helfen?',
-    zh: '欢迎来到 XO！我是您的阿联酋豪华房产与按揭贷款智能助手。今天有什么我可以帮您的？',
-    tl: 'Maligayang pagdating sa XO! Ako ang iyong AI assistant para sa marangyang ari-arian at mortgage sa UAE. Paano kita matutulungan ngayon?',
-    fa: 'به XO خوش آمدید! من دستیار هوش مصنوعی شما برای املاک لوکس و وام مسکن در امارات هستم. امروز چگونه می‌توانم به شما کمک کنم؟',
-    bn: 'XO-তে স্বাগতম! আমি সংযুক্ত আরব আমিরাতে প্রিমিয়ার সম্পত্তি ও মর্টগেজের জন্য আপনার এআই সহকারী। আজ আমি আপনাকে কীভাবে সাহায্য করতে পারি?',
-    ta: 'XO-விற்கு வரவேற்கிறோம்! யுஏஇ-ல் பிரீமியம் சொத்துக்கள் மற்றும் வீட்டுக் கடன்களுக்கான உங்கள் AI உதவியாளர் நான். இன்று நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?',
-    pa: 'XO ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ! ਮੈਂ UAE ਵਿੱਚ ਪ੍ਰੀਮੀਅਰ ਸੰਪਤੀਆਂ ਅਤੇ ਮੌਰਗੇਜ ਲਈ ਤੁਹਾਡਾ AI ਸਹਾਇਕ ਹਾਂ। ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?',
-    ml: 'XO-ലേക്ക് സ്വാഗതം! യുഎഇയിലെ പ്രീമിയർ പ്രോപ്പർട്ടികൾക്കും മോർട്ട്ഗേജിനുമുള്ള നിങ്ങളുടെ AI അസിസ്റ്റന്റാണ് ഞാൻ. ഇന്ന് ഞാൻ നിങ്ങളെ എങ്ങനെ സഹായിക്കണം?',
-    or: 'XO କୁ ସ୍ୱାଗତ! ମୁଁ UAE ରେ ପ୍ରିମିୟର ସମ୍ପତ୍ତି ଏବଂ ମର୍ଟଗେଜ୍ ପାଇଁ ଆପଣଙ୍କର AI ସହାୟକ। ଆଜି ମୁଁ ଆପଣଙ୍କୁ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?',
-    en: 'Welcome to XO! I am your AI assistant for premier properties, mortgage affordability, and instant guidance across the UAE. How can I help you today?'
-  }
-
-  messages.value.push({
-    id: 'welcome-msg',
-    role: 'assistant',
-    content: welcomeTexts[props.currentLanguage] || welcomeTexts.en,
-    timestamp: new Date().toISOString(),
-    language: props.currentLanguage
-  })
 }
 
-// Restore previous messages from sessionStorage or initialize fresh welcome message
-const initializeChatSession = () => {
-  if (typeof window !== 'undefined' && window.sessionStorage) {
-    const saved = window.sessionStorage.getItem(SESSION_STORAGE_KEY_MESSAGES)
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Filter out corrupted/empty placeholder assistant messages and clear any stuck streaming flags
-          const cleaned = parsed
-            .filter(msg => msg.role === 'user' || (msg.role === 'assistant' && (msg.content?.trim() || msg.metadata?.property_results?.length || msg.metadata?.mortgage_result)))
-            .map(msg => ({
-              ...msg,
-              isStreaming: false
-            }))
-          if (cleaned.length > 0) {
-            messages.value = cleaned
-            return
-          }
-        }
-      } catch (e) {
-        console.warn('Could not parse saved chat messages:', e)
-      }
-    }
-  }
-  initializeWelcomeMessage()
+const newId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+
+function welcomeMessage() {
+  return { id: 'welcome', role: 'assistant', content: t('welcome'), timestamp: new Date().toISOString(), metadata: {} }
 }
 
-// Watch and persist messages to sessionStorage so state is never lost on widget close
-watch(messages, (newMsgs) => {
-  if (typeof window !== 'undefined' && window.sessionStorage) {
+function restoreMessages() {
+  const saved = safeStorage('get', STORE_MESSAGES)
+  if (saved) {
     try {
-      window.sessionStorage.setItem(SESSION_STORAGE_KEY_MESSAGES, JSON.stringify(newMsgs))
-    } catch (e) {
-      console.warn('Could not persist messages to sessionStorage:', e)
-    }
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed) && parsed.length) {
+        messages.value = parsed.map(m => ({ ...m, isStreaming: false, hidden: false }))
+        return
+      }
+    } catch (e) {}
   }
+  messages.value = [welcomeMessage()]
+}
+
+watch(messages, (val) => {
+  safeStorage('set', STORE_MESSAGES, JSON.stringify(val.filter(m => !m.isStreaming)))
 }, { deep: true })
 
-// Reset voice greeting status when user switches language so XO greets in the new language
-watch(() => props.currentLanguage, () => {
-  hasVoiceSessionGreeted.value = false
-  if (isVoiceActive.value || isRecording.value) {
-    cancelVoiceInput()
+// ---- Language switching (history is always preserved) ----
+function addLanguageDivider(code) {
+  if (messages.value.length <= 1 && messages.value[0]?.id === 'welcome') {
+    messages.value = [welcomeMessage()]
+    return
   }
-})
-
-// Auto-trigger silence countdown whenever spoken text updates
-watch(liveSpokenText, (newText) => {
-  if (isVoiceActive.value && !isVoiceInFlight.value && newText.trim()) {
-    restartSilenceTimer()
-  }
-})
-
-const clearChat = () => {
-  messages.value = []
-  
-  if (typeof window !== 'undefined' && window.sessionStorage) {
-    window.sessionStorage.removeItem(SESSION_STORAGE_KEY_MESSAGES)
-    
-    // Generate a fresh session ID for the backend
-    const newId = `sess_${Math.random().toString(36).substring(2, 10)}`
-    window.sessionStorage.setItem(SESSION_STORAGE_KEY_ID, newId)
-    sessionId.value = newId
-  }
-
-  // Stop active processes
-  if (isPlayingVoice.value) stopVoicePlayback()
-  if (isVoiceActive.value || isRecording.value) {
-    if (typeof cancelVoiceInput === 'function') cancelVoiceInput()
-  }
-  if (chatAbortController) {
-    chatAbortController.abort()
-    chatAbortController = null
-  }
-  isTyping.value = false
-
-  // Re-initialize the welcome message
-  initializeWelcomeMessage()
+  messages.value.push({ id: newId('div'), kind: 'divider', content: translate(code, 'language_changed', { lang: languageInfo(code).native }) })
 }
 
-// Scroll and Progressive Auto-Scroll State
-const isUserScrolledUp = ref(false)
-let chatAbortController = null
+function chooseLanguage(code) {
+  showLangMenu.value = false
+  if (code !== props.currentLanguage) emit('language-changed', code)
+}
 
-const handleFeedScroll = () => {
-  if (!feedRef.value) return
+watch(() => props.currentLanguage, (code, old) => {
+  if (code === old) return
+  if (code !== serverLanguage) pendingSelectedLanguage = code
+  serverLanguage = code
+  addLanguageDivider(code)
+})
+
+// ---- Scrolling ----
+function handleFeedScroll() {
   const el = feedRef.value
-  // User is considered at bottom if within 60px of the bottom edge
-  const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-  isUserScrolledUp.value = distanceFromBottom > 60
+  if (el) isUserScrolledUp.value = el.scrollHeight - el.scrollTop - el.clientHeight > 60
 }
-
-const scrollToLatest = () => {
+async function scrollToBottom(force = false) {
+  await nextTick()
+  if (feedRef.value && (force || !isUserScrolledUp.value)) feedRef.value.scrollTop = feedRef.value.scrollHeight
+}
+function scrollToLatest() {
   isUserScrolledUp.value = false
-  if (feedRef.value) {
-    feedRef.value.scrollTo({
-      top: feedRef.value.scrollHeight,
-      behavior: 'smooth'
-    })
-  }
+  scrollToBottom(true)
 }
 
-const scrollToBottom = async () => {
-  await nextTick()
-  if (feedRef.value) {
-    feedRef.value.scrollTop = feedRef.value.scrollHeight
-  }
-}
+// ---- Conversation ----
+let abortController = null
 
-const conditionallyScrollToBottom = async (force = false) => {
-  await nextTick()
-  if (!feedRef.value) return
-  if (force || !isUserScrolledUp.value) {
-    feedRef.value.scrollTop = feedRef.value.scrollHeight
-  }
-}
-
-const sendQuickPrompt = (text) => {
-  inputQuery.value = text
-  sendMessage()
-}
-
-const sendMessage = async () => {
-  if (isPlayingVoice.value) {
-    stopVoicePlayback()
-  }
-  const query = inputQuery.value.trim()
-  if (!query) return
-
-  // Abort any in-flight streaming request cleanly
-  if (chatAbortController) {
-    chatAbortController.abort()
-    chatAbortController = null
-  }
-
-  // Add User Message
-  messages.value.push({
-    id: `usr_${Date.now()}`,
-    role: 'user',
-    content: query,
-    timestamp: new Date().toISOString(),
-    language: props.currentLanguage
-  })
-  inputQuery.value = ''
+// hooks: onToken(text), onLanguage(code), onMessage(reply), hold (voice: keep the reply hidden until reveal()).
+async function streamTurn(text, channel = 'text', hooks = {}) {
+  if (abortController) abortController.abort()
+  abortController = new AbortController()
   isTyping.value = true
-  isUserScrolledUp.value = false
-  await conditionallyScrollToBottom(true)
-
-  // Do NOT add an empty assistant message yet!
-  // While XO AI is analyzing, the user sees ONLY the typing indicator:
-  // "XO AI is analyzing market data..."
-  let assistantMsg = null
-
-  chatAbortController = new AbortController()
-
-  const processChunkPayload = (payload) => {
-    // When the first packet arrives, dismiss the typing indicator and instantiate the reactive assistant message
-    if (!assistantMsg) {
-      isTyping.value = false
-      assistantMsg = reactive({
-        id: `ast_${Date.now()}`,
-        role: 'assistant',
-        content: '',
-        isStreaming: true,
-        timestamp: new Date().toISOString(),
-        language: props.currentLanguage,
-        metadata: {}
-      })
-      messages.value.push(assistantMsg)
+  statusKey.value = 'thinking'
+  const reply = { id: newId('ast'), role: 'assistant', content: '', isStreaming: true, hidden: !!hooks.hold, timestamp: new Date().toISOString(), metadata: {} }
+  let added = false
+  let live = null
+  const ensureAdded = () => {
+    if (!added) {
+      messages.value.push(reply)
+      added = true
+      live = messages.value[messages.value.length - 1]
+      if (!reply.hidden) isTyping.value = false
+      hooks.onMessage && hooks.onMessage(live)
     }
-
-    if (payload.error) {
-      assistantMsg.content = `Notice: ${payload.error}`
-      assistantMsg.isStreaming = false
-      return
-    }
-
-    if (payload.token) {
-      assistantMsg.content += payload.token
-      conditionallyScrollToBottom(false)
-    }
-
-    if (payload.is_final) {
-      assistantMsg.isStreaming = false
-      if (payload.text && !assistantMsg.content) {
-        assistantMsg.content = payload.text
-      }
-      if (payload.language && payload.language !== props.currentLanguage) {
-        emit('language-changed', payload.language)
-      }
-      assistantMsg.metadata = {
-        property_results: payload.property_results || [],
-        mortgage_result: payload.mortgage_result || null,
-        saved_properties: payload.saved_properties || [],
-        application_status: payload.application_status || null,
-        handoff_data: payload.handoff_data || null
-      }
-      conditionallyScrollToBottom(false)
-    }
+    return live
   }
 
+  const body = {
+    message: text,
+    session_id: sessionId.value,
+    ui_language: props.currentLanguage,
+    channel
+  }
+  if (pendingSelectedLanguage) {
+    body.selected_language = pendingSelectedLanguage
+    pendingSelectedLanguage = null
+  }
+
+  let finalEvent = null
   try {
-    const headers = {
-      'Content-Type': 'application/json',
-      'X-Session-ID': sessionId.value
-    }
-    if (currentUserId.value) {
-      headers['X-User-ID'] = currentUserId.value
-    }
-
-    const res = await fetch('/api/chat/stream', {
-      method: 'POST',
-      headers,
-      signal: chatAbortController.signal,
-      body: JSON.stringify({
-        message: query,
-        session_id: sessionId.value,
-        language: props.currentLanguage
-      })
-    })
-
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}))
-      throw new Error(errData.detail || `Server error (${res.status})`)
-    }
-
-    if (!res.body) {
-      throw new Error('Streaming response body unavailable')
-    }
-
-    const reader = res.body.getReader()
-    const decoder = new TextDecoder('utf-8')
-    let sseBuffer = ''
-
-    while (true) {
-      const { value, done } = await reader.read()
-      if (done) {
-        if (sseBuffer.trim()) {
-          const remainingLines = sseBuffer.split('\n\n')
-          for (const line of remainingLines) {
-            const trimmed = line.trim()
-            if (trimmed.startsWith('data: ')) {
-              try {
-                processChunkPayload(JSON.parse(trimmed.slice(6)))
-              } catch (e) {}
-            }
-          }
-        }
-        break
-      }
-
-      sseBuffer += decoder.decode(value, { stream: true })
-      const lines = sseBuffer.split('\n\n')
-      sseBuffer = lines.pop() || ''
-
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed.startsWith('data: ')) continue
-
-        try {
-          const payload = JSON.parse(trimmed.slice(6))
-          processChunkPayload(payload)
-        } catch (jsonErr) {
-          console.warn('Failed to parse SSE JSON chunk:', jsonErr, trimmed)
-        }
-      }
-    }
-  } catch (err) {
-    if (err.name === 'AbortError') {
-      console.log('Chat stream turn cancelled by user or next request.')
-    } else {
-      console.error('Streaming turn error:', err)
-      isTyping.value = false
-      if (!assistantMsg) {
-        assistantMsg = reactive({
-          id: `ast_${Date.now()}`,
-          role: 'assistant',
-          content: `Notice: ${err.message || 'Unable to connect to assistant.'}`,
-          isStreaming: false,
-          timestamp: new Date().toISOString(),
-          language: props.currentLanguage,
-          metadata: {}
-        })
-        messages.value.push(assistantMsg)
-      } else {
-        if (!assistantMsg.content) {
-          assistantMsg.content = `Notice: ${err.message || 'Unable to connect to assistant.'}`
-        }
-        assistantMsg.isStreaming = false
-      }
-    }
-  } finally {
-    isTyping.value = false
-    if (assistantMsg) {
-      assistantMsg.isStreaming = false
-    }
-    chatAbortController = null
-    conditionallyScrollToBottom(false)
-  }
-}
-
-// Composed Voice-to-Voice (V2V) Interaction
-const mediaRecorder = ref(null)
-const audioChunks = ref([])
-let currentVoiceBlobUrl = null
-const autoplayBlockedAudioUrl = ref(null)
-
-const stopVoicePlayback = () => {
-  if (audioPlayerRef.value) {
-    try {
-      audioPlayerRef.value.pause()
-      audioPlayerRef.value.currentTime = 0
-    } catch (e) {
-      console.warn('Error pausing audio playback:', e)
-    }
-  }
-  if (currentVoiceBlobUrl) {
-    try { URL.revokeObjectURL(currentVoiceBlobUrl) } catch (e) {}
-    currentVoiceBlobUrl = null
-  }
-  isPlayingVoice.value = false
-}
-
-const base64ToAudioUrl = (base64String) => {
-  try {
-    if (currentVoiceBlobUrl) {
-      try { URL.revokeObjectURL(currentVoiceBlobUrl) } catch (e) {}
-      currentVoiceBlobUrl = null
-    }
-    const cleanB64 = base64String.includes(',') ? base64String.split(',')[1] : base64String
-    const binary = atob(cleanB64)
-    const len = binary.length
-    const buffer = new Uint8Array(len)
-    for (let i = 0; i < len; i++) {
-      buffer[i] = binary.charCodeAt(i)
-    }
-    const blob = new Blob([buffer], { type: 'audio/mpeg' })
-    currentVoiceBlobUrl = URL.createObjectURL(blob)
-    return currentVoiceBlobUrl
-  } catch (e) {
-    console.warn('Error converting base64 to audio Blob URL:', e)
-    return base64String
-  }
-}
-
-const playAudioUrl = async (audioUrl) => {
-  if (!audioPlayerRef.value || !audioUrl) return
-
-  try {
-    audioPlayerRef.value.pause()
-    audioPlayerRef.value.currentTime = 0
-    audioPlayerRef.value.src = audioUrl
-    audioPlayerRef.value.onended = () => {
-      stopVoicePlayback()
-    }
-    audioPlayerRef.value.onerror = (e) => {
-      console.warn('Audio playback error event:', e)
-      isPlayingVoice.value = false
-    }
-
-    isPlayingVoice.value = true
-    await audioPlayerRef.value.play()
-    autoplayBlockedAudioUrl.value = null
-  } catch (err) {
-    console.warn('Voice auto-play blocked or failed:', err)
-    isPlayingVoice.value = false
-    autoplayBlockedAudioUrl.value = audioUrl
-  }
-}
-
-// 1. Voice Session Greeting (Requirement 1)
-const playVoiceGreeting = async () => {
-  const welcomeTexts = {
-    ar: 'أهلاً بك في XO! أنا مساعدك الذكي للعقارات والتمويل العقاري في الإمارات. كيف يمكنني مساعدتك اليوم؟',
-    hi: 'नमस्ते! मैं XO हूँ, यूएई में प्रॉपर्टी और होम लोन के लिए आपका एआई सहायक। आज मैं आपकी क्या सहायता कर सकता हूँ?',
-    ur: 'خوش آمدید! میں XO ہوں، متحدہ عرب امارات میں پراپرٹی اور مارگیج کے لیے آپ کا AI اسسٹنٹ۔ میں آپ کی کیا مدد کر سکتا ہوں؟',
-    fr: 'Bienvenue chez XO ! Je suis votre assistant IA pour l\'immobilier de luxe et le financement aux Émirats arabes unis. Comment puis-je vous aider aujourd\'hui ?',
-    es: '¡Bienvenido a XO! Soy su asistente de IA para propiedades de lujo y préstamos hipotecarios en los EAU. ¿Cómo puedo ayudarle hoy?',
-    de: 'Willkommen bei XO! Ich bin Ihr KI-Assistent für Luxusimmobilien und Baufinanzierungen in den VAE. Wie kann ich Ihnen heute helfen?',
-    zh: '欢迎来到 XO！我是您的阿联酋豪华房产与按揭贷款智能助手。今天有什么我可以帮您的？',
-    tl: 'Maligayang pagdating sa XO! Ako ang iyong AI assistant para sa marangyang ari-arian at mortgage sa UAE. Paano kita matutulungan ngayon?',
-    fa: 'به XO خوش آمدید! من دستیار هوش مصنوعی شما برای املاک لوکس و وام مسکن در امارات هستم. امروز چگونه می‌توانم به شما کمک کنم؟',
-    bn: 'XO-তে স্বাগতম! আমি সংযুক্ত আরব আমিরাতে প্রিমিয়ার সম্পত্তি ও মর্টগেজের জন্য আপনার এআই সহকারী। আজ আমি আপনাকে কীভাবে সাহায্য করতে পারি?',
-    ta: 'XO-விற்கு வரவேற்கிறோம்! யுஏஇ-ல் பிரீமியம் சொத்துக்கள் மற்றும் வீட்டுக் கடன்களுக்கான உங்கள் AI உதவியாளர் நான். இன்று நான் உங்களுக்கு எவ்வாறு உதவ முடியும்?',
-    pa: 'XO ਵਿੱਚ ਤੁਹਾਡਾ ਸੁਆਗਤ ਹੈ! ਮੈਂ UAE ਵਿੱਚ ਪ੍ਰੀਮੀਅਰ ਸੰਪਤੀਆਂ ਅਤੇ ਮੌਰਗੇਜ ਲਈ ਤੁਹਾਡਾ AI ਸਹਾਇਕ ਹਾਂ। ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕੀ ਮਦਦ ਕਰ ਸਕਦਾ ਹਾਂ?',
-    ml: 'XO-ലേക്ക് സ്വാഗതം! യുഎഇയിലെ പ്രീമിയർ പ്രോപ്പർട്ടികൾക്കും മോർട്ട്ഗേജിനുമുള്ള നിങ്ങളുടെ AI അസിസ്റ്റന്റാണ് ഞാൻ. ഇന്ന് ഞാൻ നിങ്ങളെ എങ്ങനെ സഹായിക്കണം?',
-    or: 'XO କୁ ସ୍ୱାଗତ! ମୁଁ UAE ରେ ପ୍ରିମିୟର ସମ୍ପତ୍ତି ଏବଂ ମର୍ଟଗେଜ୍ ପାଇଁ ଆପଣଙ୍କର AI ସହାୟକ। ଆଜି ମୁଁ ଆପଣଙ୍କୁ କିପରି ସାହାଯ୍ୟ କରିପାରିବି?',
-    en: 'Welcome to XO! I am your AI assistant for premier properties, mortgage affordability, and instant guidance across the UAE. How can I help you today?'
-  }
-  const text = welcomeTexts[props.currentLanguage] || welcomeTexts.en
-
-  // Ensure greeting text is present in the feed if empty
-  if (messages.value.length === 0) {
-    messages.value.push({
-      id: 'welcome-msg',
-      role: 'assistant',
-      content: text,
-      timestamp: new Date().toISOString(),
-      language: props.currentLanguage
-    })
-  }
-
-  try {
-    const res = await fetch('/api/voice/synthesize', {
+    const res = await fetch(apiUrl('/api/chat/stream'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, language: props.currentLanguage })
+      body: JSON.stringify(body),
+      signal: abortController.signal
     })
-
-    if (res.ok && audioPlayerRef.value) {
-      const blob = await res.blob()
-      const audioUrl = URL.createObjectURL(blob)
-      stopVoicePlayback()
-      isPlayingVoice.value = true
-      audioPlayerRef.value.src = audioUrl
-
-      audioPlayerRef.value.onended = () => {
-        stopVoicePlayback()
-        startVoiceRecording()
+    if (!res.ok || !res.body) throw new Error(String(res.status))
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const events = buffer.split('\n\n')
+      buffer = events.pop() || ''
+      for (const raw of events) {
+        if (!raw.startsWith('data: ')) continue
+        const ev = JSON.parse(raw.slice(6))
+        if (ev.type === 'session') {
+          sessionId.value = ev.session_id
+          safeStorage('set', STORE_SESSION, ev.session_id)
+          hooks.onLanguage && hooks.onLanguage(ev.language)
+        } else if (ev.type === 'language') {
+          hooks.onLanguage && hooks.onLanguage(ev.language)
+        } else if (ev.type === 'status') {
+          statusKey.value = STATUS_BY_TOOL[ev.tool] || 'thinking'
+        } else if (ev.type === 'token') {
+          const msg = ensureAdded()
+          msg.content += ev.text
+          hooks.onToken && hooks.onToken(ev.text)
+          scrollToBottom()
+        } else if (ev.type === 'final') {
+          finalEvent = ev
+        } else if (ev.type === 'error') {
+          const msg = ensureAdded()
+          msg.content = ev.message
+          msg.isError = true
+        }
       }
-
-      await audioPlayerRef.value.play().catch((err) => {
-        console.warn('Greeting playback auto-play error:', err)
-        isPlayingVoice.value = false
-        startVoiceRecording()
-      })
-      return
     }
   } catch (err) {
-    console.warn('Voice greeting error:', err)
-  }
-
-  // Fallback if audio playback fails: smoothly proceed to recording
-  startVoiceRecording()
-}
-
-// 2. Start Voice Recording & Live Speech Recognition (Requirement 2)
-const resetSilenceTimer = () => {
-  if (silenceTimer) {
-    clearTimeout(silenceTimer)
-    silenceTimer = null
-  }
-  silenceTimerActive.value = false
-}
-
-const restartSilenceTimer = () => {
-  if (silenceTimer) {
-    clearTimeout(silenceTimer)
-    silenceTimer = null
-  }
-  if (!isVoiceActive.value || isVoiceInFlight.value) {
-    silenceTimerActive.value = false
-    return
-  }
-  const text = liveSpokenText.value.trim() || inputQuery.value.trim()
-  if (!text) {
-    silenceTimerActive.value = false
-    return
-  }
-
-  silenceTimerActive.value = true
-  silenceTimer = setTimeout(async () => {
-    silenceTimerActive.value = false
-    silenceTimer = null
-    // Auto-confirm & submit after 2 seconds of continuous silence
-    if (isVoiceActive.value && !isVoiceInFlight.value) {
-      const finalText = liveSpokenText.value.trim() || inputQuery.value.trim()
-      if (finalText) {
-        await confirmVoiceInput()
-      }
-    }
-  }, 2000)
-}
-
-const startVoiceRecording = async () => {
-  if (isPlayingVoice.value) {
-    stopVoicePlayback()
-  }
-
-  audioChunks.value = []
-  recordedAudioBlob.value = null
-  liveSpokenText.value = ''
-  inputQuery.value = ''
-  hasMeaningfulSpeech.value = false
-  resetSilenceTimer()
-  isVoiceActive.value = true
-  isRecording.value = true
-
-  // Initialize SpeechRecognition for live progressive text display on screen
-  const SpeechRecognition = typeof window !== 'undefined' ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null
-  if (SpeechRecognition) {
-    try {
-      if (speechRecognition) {
-        speechRecognition.onresult = null
-        speechRecognition.onerror = null
-        speechRecognition.onend = null
-        speechRecognition.onspeechend = null
-        speechRecognition.stop()
-      }
-      speechRecognition = new SpeechRecognition()
-      speechRecognition.continuous = true
-      speechRecognition.interimResults = true
-      const langMap = {
-        en: 'en-US',
-        ar: 'ar-AE',
-        hi: 'hi-IN',
-        ur: 'ur-PK',
-        fr: 'fr-FR',
-        es: 'es-ES',
-        de: 'de-DE',
-        zh: 'zh-CN',
-        tl: 'fil-PH',
-        fa: 'fa-IR',
-        bn: 'bn-IN',
-        ta: 'ta-IN',
-        pa: 'pa-IN',
-        ml: 'ml-IN',
-        or: 'or-IN'
-      }
-      speechRecognition.lang = langMap[props.currentLanguage] || 'en-US'
-
-      speechRecognition.onresult = (event) => {
-        let interim = ''
-        let final = ''
-        for (let i = 0; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            final += event.results[i][0].transcript
-          } else {
-            interim += event.results[i][0].transcript
-          }
-        }
-        const transcript = (final + ' ' + interim).trim()
-        if (transcript) {
-          liveSpokenText.value = transcript
-          inputQuery.value = transcript
-          hasMeaningfulSpeech.value = true
-          // Debounce 2 seconds of silence after words are captured
-          restartSilenceTimer()
-        }
-      }
-
-      speechRecognition.onspeechend = () => {
-        // Native browser VAD detected speech ceased
-        if (liveSpokenText.value.trim()) {
-          restartSilenceTimer()
-        }
-      }
-
-      speechRecognition.onend = () => {
-        if (isVoiceActive.value && !isVoiceInFlight.value) {
-          if (liveSpokenText.value.trim()) {
-            restartSilenceTimer()
-          } else if (isRecording.value) {
-            try { speechRecognition.start() } catch (e) {}
-          }
-        }
-      }
-
-      speechRecognition.onerror = (e) => {
-        console.warn('SpeechRecognition notice:', e)
-      }
-      speechRecognition.start()
-    } catch (err) {
-      console.warn('SpeechRecognition init error:', err)
-    }
-  }
-
-  // Initialize MediaRecorder for audio recording & Web Audio API for 3D visualizer
-  if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
-      const recorder = new MediaRecorder(stream, { mimeType })
-      mediaRecorder.value = recorder
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          audioChunks.value.push(e.data)
-        }
-      }
-
-      recorder.onstop = () => {
-        if (audioChunks.value.length > 0) {
-          recordedAudioBlob.value = new Blob(audioChunks.value, { type: mimeType })
-        }
-        if (stream) {
-          stream.getTracks().forEach(t => t.stop())
-        }
-      }
-
-      recorder.start()
-
-      // Connect Web Audio API Analyser exclusively for real-time 3D orb organic pulsation
-      try {
-        const AudioCtx = window.AudioContext || window.webkitAudioContext
-        if (AudioCtx) {
-          if (audioContext) {
-            try { audioContext.close() } catch (e) {}
-          }
-          audioContext = new AudioCtx()
-          analyserNode = audioContext.createAnalyser()
-          analyserNode.fftSize = 256
-          const source = audioContext.createMediaStreamSource(stream)
-          source.connect(analyserNode)
-
-          const bufferLength = analyserNode.frequencyBinCount
-          const dataArray = new Uint8Array(bufferLength)
-
-          if (audioAnalysisInterval) clearInterval(audioAnalysisInterval)
-          audioAnalysisInterval = setInterval(() => {
-            if (!isRecording.value || !analyserNode) return
-            analyserNode.getByteFrequencyData(dataArray)
-            let sum = 0
-            for (let i = 0; i < bufferLength; i++) {
-              sum += dataArray[i]
-            }
-            const avg = sum / bufferLength
-            const normalized = Math.min(avg / 65.0, 1.0)
-            currentAudioLevel.value = normalized
-          }, 80)
-        }
-      } catch (audioErr) {
-        console.warn('Web Audio Analyser init notice:', audioErr)
-      }
-    } catch (err) {
-      console.warn('Microphone permission or hardware unavailable:', err)
-    }
-  }
-}
-
-const stopVoiceRecording = () => {
-  isRecording.value = false
-  if (audioAnalysisInterval) {
-    clearInterval(audioAnalysisInterval)
-    audioAnalysisInterval = null
-  }
-  currentAudioLevel.value = 0
-  if (speechRecognition) {
-    try {
-      speechRecognition.stop()
-    } catch (e) {
-      // ignore
-    }
-  }
-  if (mediaRecorder.value && mediaRecorder.value.state === 'recording') {
-    try {
-      mediaRecorder.value.requestData()
-    } catch (e) {
-      // ignore
-    }
-  }
-  // isVoiceActive remains true so Confirm (✓) and Cancel (✕) buttons stay accessible
-}
-
-const toggleVoiceRecording = async () => {
-  // Prime audio player on direct user gesture to ensure browser grants playback permission
-  if (audioPlayerRef.value) {
-    try {
-      audioPlayerRef.value.play().then(() => {
-        audioPlayerRef.value.pause()
-      }).catch(() => {})
-    } catch (e) {}
-  }
-
-  // If XO is currently speaking, clicking mic interrupts audio and starts recording
-  if (isPlayingVoice.value) {
-    stopVoicePlayback()
-    await startVoiceRecording()
-    return
-  }
-
-  // If voice session has not greeted yet, greet user through voice (Requirement 1)
-  if (!hasVoiceSessionGreeted.value) {
-    hasVoiceSessionGreeted.value = true
-    await playVoiceGreeting()
-    return
-  }
-
-  if (isRecording.value) {
-    stopVoiceRecording()
-  } else {
-    await startVoiceRecording()
-  }
-}
-
-// 3. Cancel / X Action (Requirement 3)
-const cancelVoiceInput = () => {
-  resetSilenceTimer()
-  hasMeaningfulSpeech.value = false
-  if (audioAnalysisInterval) {
-    clearInterval(audioAnalysisInterval)
-    audioAnalysisInterval = null
-  }
-  if (audioContext) {
-    try { audioContext.close() } catch (e) {}
-    audioContext = null
-    analyserNode = null
-  }
-  currentAudioLevel.value = 0
-
-  if (voiceAbortController) {
-    try {
-      voiceAbortController.abort()
-    } catch (e) {}
-    voiceAbortController = null
-  }
-
-  if (speechRecognition) {
-    try {
-      speechRecognition.onresult = null
-      speechRecognition.onerror = null
-      speechRecognition.stop()
-    } catch (e) {
-      // ignore
-    }
-    speechRecognition = null
-  }
-
-  if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
-    mediaRecorder.value.onstop = null // Discard without pipeline execution
-    try {
-      mediaRecorder.value.stop()
-      if (mediaRecorder.value.stream) {
-        mediaRecorder.value.stream.getTracks().forEach(t => t.stop())
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  audioChunks.value = []
-  recordedAudioBlob.value = null
-  liveSpokenText.value = ''
-  inputQuery.value = ''
-  isRecording.value = false
-  isVoiceActive.value = false
-  isVoiceInFlight.value = false
-  // Chatbot remains open, session context completely preserved
-}
-
-// 4. Confirm / ✓ Action (Requirement 3)
-const confirmVoiceInput = async () => {
-  if (isVoiceInFlight.value) return
-  resetSilenceTimer()
-
-  // Prime audio player on direct user gesture
-  if (audioPlayerRef.value) {
-    try {
-      audioPlayerRef.value.play().then(() => {
-        audioPlayerRef.value.pause()
-      }).catch(() => {})
-    } catch (e) {}
-  }
-  if (audioAnalysisInterval) {
-    clearInterval(audioAnalysisInterval)
-    audioAnalysisInterval = null
-  }
-  if (audioContext) {
-    try { audioContext.close() } catch (e) {}
-    audioContext = null
-    analyserNode = null
-  }
-  currentAudioLevel.value = 0
-
-  const capturedText = liveSpokenText.value.trim() || inputQuery.value.trim()
-  if (!capturedText && audioChunks.value.length === 0 && !recordedAudioBlob.value) {
-    // Empty voice interaction, cancel instead of submitting blank message
-    cancelVoiceInput()
-    return
-  }
-
-  if (speechRecognition) {
-    try {
-      speechRecognition.onresult = null
-      speechRecognition.onerror = null
-      speechRecognition.stop()
-    } catch (e) {
-      // ignore
-    }
-    speechRecognition = null
-  }
-
-  const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
-
-  if (mediaRecorder.value && mediaRecorder.value.state !== 'inactive') {
-    const recorder = mediaRecorder.value
-    recorder.onstop = async () => {
-      const audioBlob = audioChunks.value.length > 0
-        ? new Blob(audioChunks.value, { type: mimeType })
-        : null
-      if (recorder.stream) {
-        recorder.stream.getTracks().forEach(t => t.stop())
-      }
-      await executeVoicePipeline(audioBlob, capturedText)
-    }
-    try {
-      recorder.stop()
-    } catch (e) {
-      console.warn('MediaRecorder stop error:', e)
-      const audioBlob = audioChunks.value.length > 0 ? new Blob(audioChunks.value, { type: mimeType }) : null
-      await executeVoicePipeline(audioBlob, capturedText)
-    }
-  } else {
-    const audioBlob = recordedAudioBlob.value || (audioChunks.value.length > 0 ? new Blob(audioChunks.value, { type: mimeType }) : null)
-    await executeVoicePipeline(audioBlob, capturedText)
-  }
-}
-
-const executeVoicePipeline = async (recordedBlob = null, textOverride = null) => {
-  if (isVoiceInFlight.value) return
-  isVoiceInFlight.value = true
-  isTyping.value = true
-  isVoiceActive.value = false
-  isRecording.value = false
-
-  const textToSend = textOverride || liveSpokenText.value || inputQuery.value || ''
-
-  const controller = new AbortController()
-  voiceAbortController = controller
-  const timeoutId = setTimeout(() => controller.abort(), 60000) // 60s timeout for multi-turn voice pipeline
-
-  try {
-    const formData = new FormData()
-    if (recordedBlob && recordedBlob.size > 200) {
-      const ext = recordedBlob.type.includes('webm') ? 'webm' : 'wav'
-      formData.append('audio', recordedBlob, `voice_recording.${ext}`)
-    } else {
-      const fakeWav = new Uint8Array([
-        0x52, 0x49, 0x46, 0x46, 0x24, 0x00, 0x00, 0x00, 0x57, 0x41, 0x56, 0x66,
-        0x6d, 0x74, 0x20, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
-        0x44, 0xac, 0x00, 0x00, 0x88, 0x58, 0x01, 0x00, 0x02, 0x00, 0x10, 0x00,
-        0x64, 0x61, 0x74, 0x61, 0x00, 0x00, 0x00, 0x00
-      ])
-      const audioBlob = new Blob([fakeWav], { type: 'audio/wav' })
-      formData.append('audio', audioBlob, 'mic_recording.wav')
-    }
-    formData.append('session_id', sessionId.value)
-    formData.append('language_hint', props.currentLanguage)
-    if (currentUserId.value) {
-      formData.append('user_id', currentUserId.value)
-    }
-    if (textToSend.trim()) {
-      formData.append('transcribed_text', textToSend.trim())
-    }
-
-    const res = await fetch('/api/voice/interact', {
-      method: 'POST',
-      body: formData,
-      signal: controller.signal
-    })
-
-    if (!res.ok) {
-      const errJson = await res.json().catch(() => ({}))
-      throw new Error(errJson.detail || `Server error (${res.status})`)
-    }
-
-    const data = await res.json()
-
-    messages.value.push({
-      id: `usr_v_${Date.now()}`,
-      role: 'user',
-      content: `🎙️ ${data.transcribed_user_text}`,
-      timestamp: new Date().toISOString()
-    })
-
-    messages.value.push({
-      id: `ast_v_${Date.now()}`,
-      role: 'assistant',
-      content: data.reply_text,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        property_results: data.property_results,
-        mortgage_result: data.mortgage_result,
-        saved_properties: data.saved_properties,
-        application_status: data.application_status,
-        handoff_data: data.handoff_data
-      }
-    })
-
-    if (data.audio_base64 && audioPlayerRef.value) {
-      const audioUrl = base64ToAudioUrl(data.audio_base64)
-      await playAudioUrl(audioUrl)
-    }
-  } catch (err) {
-    let errMsg = err.message
     if (err.name === 'AbortError') {
-      errMsg = props.currentLanguage === 'ar' 
-        ? 'انتهت مهلة معالجة الصوت، يرجى المحاولة مرة أخرى.' 
-        : 'Voice request timed out. Please try again.'
-    } else if (err.message && err.message.includes('Failed to fetch')) {
-      errMsg = props.currentLanguage === 'ar'
-        ? 'تعذر الاتصال بالخادم. يرجى التحقق من تشغيل الخادم والاتصال بالشبكة.'
-        : 'Could not connect to backend server. Please verify server is running.'
+      if (added) { live.isStreaming = false; live.hidden = false }
+      return null
     }
-    messages.value.push({
-      id: `err_v_${Date.now()}`,
-      role: 'assistant',
-      content: `Voice error: ${errMsg}`,
-      timestamp: new Date().toISOString()
-    })
+    const msg = ensureAdded()
+    msg.content = t('error_generic')
+    msg.isError = true
   } finally {
-    clearTimeout(timeoutId)
-    voiceAbortController = null
-    isVoiceInFlight.value = false
-    isTyping.value = false
-    liveSpokenText.value = ''
-    inputQuery.value = ''
-    scrollToBottom()
+    if (!added || !live.hidden) isTyping.value = false
+    abortController = null
+  }
+
+  const msg = ensureAdded()
+  msg.isStreaming = false
+  if (msg.isError) msg.hidden = false
+  if (finalEvent) {
+    msg.content = finalEvent.text || msg.content
+    msg.metadata = {
+      property_results: finalEvent.property_results || [],
+      results_are_alternatives: finalEvent.results_are_alternatives || null,
+      mortgage_result: finalEvent.mortgage_result || null,
+      handoff_data: finalEvent.handoff_data || null,
+      handoff_draft: finalEvent.handoff_draft || null
+    }
+    if (finalEvent.handoff_draft) {
+      // A newer callback card replaces any earlier card that was never confirmed.
+      messages.value.forEach(m => {
+        const d = m !== msg && m.metadata?.handoff_draft
+        if (d && d.status === 'review') d.status = 'expired'
+      })
+    }
+    if (finalEvent.language && finalEvent.language !== props.currentLanguage) {
+      serverLanguage = finalEvent.language
+      emit('language-changed', finalEvent.language)
+    }
+  }
+  scrollToBottom()
+  return finalEvent
+}
+
+async function sendMessage(textOverride) {
+  const text = (textOverride ?? inputQuery.value).trim()
+  if (!text || isTyping.value) return
+  stopAudio()
+  messages.value.push({ id: newId('usr'), role: 'user', content: text, timestamp: new Date().toISOString() })
+  inputQuery.value = ''
+  isUserScrolledUp.value = false
+  scrollToBottom(true)
+  await streamTurn(text, 'text')
+}
+
+// Advisor callback review card → saves the confirmed (or edited) details to the lead store.
+async function submitHandoff(details) {
+  try {
+    const res = await fetch(apiUrl('/api/handoff/confirm'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId.value, ...details })
+    })
+    if (res.status === 404) return { lead_saved: false, error: 'draft_expired' }
+    if (!res.ok) return { lead_saved: false, error: 'save_failed' }
+    return await res.json()
+  } catch (e) {
+    return { lead_saved: false, error: 'save_failed' }
   }
 }
+provide('submitHandoff', submitHandoff)
+
+function sendQuickPrompt(text) {
+  sendMessage(text)
+}
+
+function requestHandoff() {
+  sendMessage(t('advisor_request'))
+}
+
+function clearChat() {
+  if (abortController) abortController.abort()
+  exitVoiceMode()
+  safeStorage('remove', STORE_MESSAGES)
+  safeStorage('remove', STORE_SESSION)
+  sessionId.value = null
+  pendingSelectedLanguage = props.currentLanguage !== 'en' ? props.currentLanguage : null
+  messages.value = [welcomeMessage()]
+  isTyping.value = false
+}
+
+function toggleTheme() {
+  emit('update:currentTheme', props.currentTheme === 'light' ? 'dark' : 'light')
+}
+
+// ---- Voice (gpt-live-transcribe in, eleven_v4_turbo out) ----
+// Phases: listening → thinking → speaking → hold. In hold the mic waits for a tap (no auto-listen);
+// tapping while XO thinks or speaks interrupts it and starts listening straight away.
+const VOICE_INTRO_KEY = 'xo_voice_intro_seen'
+const voice = useVoice()
+const speech = useSpeech(() => audioPlayerRef.value)
+const voiceMode = ref(false)
+const voicePhase = ref('idle') // listening | thinking | speaking | hold | idle
+const voiceError = ref('')
+const voiceIntro = ref(false)
+const highlighter = useWordHighlight()
+const orbBeat = ref(0)
+const introBeat = ref(0)
+const listenBeat = ref(0)
+const introOrbSize = ref(180)
+let voiceTurn = 0
+let pendingReveal = null
+
+const voiceStatusText = computed(() => {
+  if (voicePhase.value === 'thinking') return statusText.value
+  if (voicePhase.value === 'speaking') return t('voice_speaking')
+  if (voicePhase.value === 'hold') return t('voice_hold')
+  if (voicePhase.value === 'listening') {
+    if (voice.silenceCountdown.value && voice.liveText.value.trim()) return t('voice_sending')
+    return voice.liveText.value.trim() ? t('voice_listening') : t('voice_say_something')
+  }
+  return t('tap_to_talk')
+})
+
+const micLabel = computed(() => (voicePhase.value === 'listening' ? t('send') : t('tap_to_talk')))
+
+function stopAudio() {
+  speech.stop()
+}
+
+function primeAudio() {
+  // Unlocks playback on mobile browsers while we are inside the user's tap.
+  const el = audioPlayerRef.value
+  if (!el) return
+  el.muted = true
+  el.play().catch(() => {}).finally(() => { el.pause(); el.muted = false })
+}
+
+function revealReply(reply) {
+  if (reply && reply.hidden) reply.hidden = false
+  isTyping.value = false
+  scrollToBottom(true)
+}
+
+async function listenTurn() {
+  const turn = ++voiceTurn
+  speech.stop()
+  highlighter.detach()
+  if (pendingReveal) pendingReveal()
+  voiceError.value = ''
+  voicePhase.value = 'listening'
+  listenBeat.value += 1
+  let transcript = ''
+  try {
+    transcript = await voice.listen({
+      language: props.currentLanguage,
+      sessionId: sessionId.value,
+      sampleRate: clientConfig.value.voice.sample_rate,
+      silenceMs: clientConfig.value.voice.silence_submit_ms,
+      maxSec: clientConfig.value.voice.max_session_sec
+    })
+  } catch (err) {
+    if (turn !== voiceTurn || !voiceMode.value) return
+    voiceError.value = t('voice_unavailable')
+    voicePhase.value = 'hold'
+    return
+  }
+  if (turn !== voiceTurn || !voiceMode.value) return
+  if (!transcript) {
+    voicePhase.value = 'hold'
+    return
+  }
+
+  messages.value.push({ id: newId('usr'), role: 'user', content: transcript, viaVoice: true, timestamp: new Date().toISOString() })
+  isUserScrolledUp.value = false
+  scrollToBottom(true)
+  voicePhase.value = 'thinking'
+
+  // The reply text stays hidden until XO starts speaking, so text and voice arrive together.
+  let reply = null
+  let audioStarted = false
+  let textDone = false
+  let revealTimer = null
+  const reveal = async () => {
+    clearTimeout(revealTimer)
+    if (!reply || !reply.hidden) return
+    revealReply(reply)
+    await nextTick()
+    if (turn === voiceTurn) highlighter.attach(document.querySelector(`[data-msg-id="${reply.id}"] .md`))
+  }
+  const maybeReveal = () => { if (audioStarted && textDone) reveal() }
+  pendingReveal = () => { pendingReveal = null; reveal() }
+
+  const spoken = speech.start({
+    language: props.currentLanguage,
+    sessionId: sessionId.value,
+    onStart: () => {
+      if (turn !== voiceTurn || !voiceMode.value) return
+      audioStarted = true
+      voicePhase.value = 'speaking'
+      maybeReveal()
+    },
+    onWord: (word) => {
+      if (turn !== voiceTurn) return
+      highlighter.mark(word)
+      if (word) orbBeat.value += 1
+    },
+    onError: () => { if (turn === voiceTurn) voiceError.value = t('voice_unavailable') }
+  })
+  const final = await streamTurn(transcript, 'voice', {
+    hold: true,
+    onMessage: (msg) => { reply = msg },
+    onToken: (text) => { if (turn === voiceTurn) speech.push(text) },
+    onLanguage: (lang) => { if (turn === voiceTurn) speech.setLanguage(lang) }
+  })
+  textDone = true
+  if (turn !== voiceTurn || !voiceMode.value) return reveal()
+  speech.end(final && final.text)
+  maybeReveal()
+  // Never keep the answer hidden for long if the voice is slow or unavailable.
+  revealTimer = setTimeout(reveal, 2500)
+  await spoken
+  reveal()
+  highlighter.detach()
+  pendingReveal = null
+  if (turn === voiceTurn && voiceMode.value) voicePhase.value = 'hold'
+}
+
+function micAction() {
+  if (voicePhase.value === 'listening') {
+    voice.commit()
+    return
+  }
+  // Interrupt XO (or resume from hold) and listen. Runs inside the tap, so audio stays unlocked.
+  voice.prepare()
+  listenTurn()
+}
+
+// First-time voice intro: remembered across visits (localStorage), shown again only if storage is unavailable.
+function introSeen(mark) {
+  try {
+    if (mark) window.localStorage.setItem(VOICE_INTRO_KEY, '1')
+    return window.localStorage.getItem(VOICE_INTRO_KEY) === '1'
+  } catch (e) {
+    return false
+  }
+}
+
+function showVoiceIntro() {
+  if (introSeen()) return Promise.resolve()
+  introSeen(true)
+  introOrbSize.value = Math.round(Math.min(200, (feedRef.value?.clientWidth || 320) * 0.5))
+  voiceIntro.value = true
+  const beats = setInterval(() => { introBeat.value += 1 }, 280)
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => { voiceIntro.value = false }, 3000)
+    const stopWatching = watch(voiceIntro, (shown) => {
+      if (shown) return
+      clearTimeout(timer)
+      clearInterval(beats)
+      stopWatching()
+      resolve()
+    })
+  })
+}
+
+async function enterVoiceMode() {
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    messages.value.push({ id: newId('ast'), role: 'assistant', content: t('voice_unavailable'), isError: true, timestamp: new Date().toISOString() })
+    return
+  }
+  // Must run synchronously inside the tap: unlocks audio input and playback on Android and iOS.
+  voice.prepare()
+  primeAudio()
+  if (abortController) abortController.abort()
+  voiceError.value = ''
+  voiceMode.value = true
+  voicePhase.value = 'thinking'
+  const turn = ++voiceTurn
+  const intro = showVoiceIntro()
+  try {
+    await voice.open()
+  } catch (err) {
+    voiceIntro.value = false
+    voiceError.value = err.message === 'mic_denied' ? t('voice_mic_denied') : t('voice_unavailable')
+    voicePhase.value = 'hold'
+    return
+  }
+  await intro
+  if (turn === voiceTurn && voiceMode.value) listenTurn()
+}
+
+function exitVoiceMode() {
+  voiceTurn += 1
+  if (pendingReveal) pendingReveal()
+  highlighter.detach()
+  voiceMode.value = false
+  voiceIntro.value = false
+  voicePhase.value = 'idle'
+  speech.stop()
+  voice.close()
+  scrollToBottom(true)
+}
+
+onMounted(async () => {
+  restoreMessages()
+  scrollToBottom(true)
+  const cfg = await fetchClientConfig()
+  if (cfg?.voice) clientConfig.value = cfg
+})
 
 onUnmounted(() => {
-  stopVoicePlayback()
-  if (speechRecognition) {
-    try {
-      speechRecognition.stop()
-    } catch (e) {
-      // ignore
-    }
-  }
-})
-
-const handlePropertyMortgageCheck = (prop) => {
-  inputQuery.value = `What mortgage would I qualify for on ${prop.title} priced at ${prop.price.toLocaleString()} AED?`
-  sendMessage()
-}
-
-const handleJumpToProperties = (budget) => {
-  inputQuery.value = `Show me matching properties around ${Number(budget).toLocaleString()} AED`
-  sendMessage()
-}
-
-const requestHandoff = () => {
-  inputQuery.value = 'I would like to speak with a human agent.'
-  sendMessage()
-}
-
-// Property Shortlisting & Lead Capture (FR-10)
-const showLeadCaptureModal = ref(false)
-const selectedShortlistProp = ref(null)
-const isSubmittingLead = ref(false)
-const leadForm = ref({
-  name: '',
-  email: '',
-  phone: ''
-})
-
-const formatNumber = (num) => {
-  if (!num) return '0'
-  return Number(num).toLocaleString()
-}
-
-const handleShortlistProperty = async (prop) => {
-  try {
-    const res = await fetch(`/api/properties/${prop.id}/shortlist`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Session-ID': sessionId.value
-      },
-      body: JSON.stringify({
-        user_id: null,
-        session_id: sessionId.value
-      })
-    })
-
-    if (!res.ok) throw new Error('Failed to update shortlist')
-    const data = await res.json()
-
-    prop.is_shortlisted = data.is_shortlisted
-
-    if (data.is_shortlisted && data.requires_lead_capture) {
-      selectedShortlistProp.value = prop
-      showLeadCaptureModal.value = true
-    }
-  } catch (err) {
-    console.error('Shortlist error:', err)
-  }
-}
-
-const submitLeadCapture = async () => {
-  if (!leadForm.value.name || !leadForm.value.email || !leadForm.value.phone) return
-  isSubmittingLead.value = true
-  try {
-    const res = await fetch('/api/properties/shortlist/lead', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Session-ID': sessionId.value
-      },
-      body: JSON.stringify({
-        property_id: selectedShortlistProp.value?.id,
-        full_name: leadForm.value.name,
-        email: leadForm.value.email,
-        phone: leadForm.value.phone,
-        session_id: sessionId.value
-      })
-    })
-
-    if (!res.ok) throw new Error('Lead capture failed')
-    const data = await res.json()
-
-    showLeadCaptureModal.value = false
-    const propTitle = selectedShortlistProp.value ? selectedShortlistProp.value.title : 'property'
-
-    messages.value.push({
-      id: `lead_${Date.now()}`,
-      role: 'assistant',
-      content: `✅ Thank you, **${leadForm.value.name}**! **${propTitle}** has been saved to your portfolio. An XO luxury property specialist has been assigned and will send complete floor plans, payment schedules, and DLD verification to **${leadForm.value.email}** shortly.`,
-      timestamp: new Date().toISOString()
-    })
-
-    leadForm.value = { name: '', email: '', phone: '' }
-    selectedShortlistProp.value = null
-    scrollToBottom()
-  } catch (err) {
-    alert(`Could not save lead: ${err.message}`)
-  } finally {
-    isSubmittingLead.value = false
-  }
-}
-
-onMounted(() => {
-  initializeChatSession()
-})
-
-onUnmounted(() => {
-  if (chatAbortController) {
-    chatAbortController.abort()
-    chatAbortController = null
-  }
+  if (abortController) abortController.abort()
+  exitVoiceMode()
 })
 </script>
 
 <style scoped>
-.chat-widget-wrapper {
+/* ===== XO widget — design tokens (light / dark) ===== */
+.xo-widget {
+  --w-bg: #ffffff;
+  --w-feed: #f7f6fb;
+  --w-line: rgba(15, 23, 42, 0.08);
+  --w-ink: #0f172a;
+  --w-ink-2: #64748b;
+  --w-brand: #5c039b;
+  --w-brand-2: #7c2cf0;
+  --w-accent: #03a4f4;
+  --w-lime: #64ef0a;
+  --w-grad: linear-gradient(135deg, #5c039b 0%, #7c2cf0 60%, #03a4f4 140%);
+  --w-chip: rgba(92, 3, 155, 0.06);
+  --w-chip-hover: rgba(92, 3, 155, 0.12);
+  --w-ring: rgba(124, 44, 240, 0.14);
+  --w-shadow: 0 28px 70px -18px rgba(38, 10, 74, 0.32), 0 10px 24px -12px rgba(38, 10, 74, 0.22);
+
+  position: relative;
   display: flex;
   flex-direction: column;
-  height: 580px;
-  max-height: calc(100vh - 44px);
   width: 100%;
-  background: var(--bg-surface);
-  border: 1.5px solid var(--border-purple);
-  border-radius: var(--radius-lg);
+  height: var(--xo-widget-h, 620px);
+  background: var(--w-bg);
+  color: var(--w-ink);
+  border: 1px solid var(--w-line);
+  border-radius: 24px;
+  box-shadow: var(--w-shadow);
   overflow: hidden;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.16), 0 0 20px rgba(92, 3, 155, 0.14);
-  transition: height 0.3s cubic-bezier(0.16, 1, 0.3, 1), background-color var(--transition-normal), border-color var(--transition-normal);
-}
-
-.chat-widget-wrapper.is-expanded {
-  height: 720px;
-  max-height: calc(100vh - 44px);
-}
-
-/* Header */
-.chat-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 14px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-subtle);
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  flex-shrink: 0;
-  transition: background-color var(--transition-normal);
-}
-
-.chat-header-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.mascot-avatar-container {
-  position: relative;
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(92, 3, 155, 0.15) 0%, rgba(3, 164, 244, 0.10) 70%);
-  border: 1.5px solid var(--brand-purple);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px;
-  box-shadow: 0 2px 8px rgba(92, 3, 155, 0.15);
-  flex-shrink: 0;
-}
-
-.mascot-avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 50%;
-}
-
-.live-status-dot {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--brand-lime-vivid);
-  border: 1.5px solid var(--bg-surface);
-  box-shadow: 0 0 6px var(--brand-lime-vivid);
-  animation: pulseLive 2s infinite;
-}
-
-.header-brand-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.header-brand-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  line-height: 1.2;
-}
-
-.header-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-  line-height: 1.2;
-}
-
-.badge-online {
-  font-size: 0.58rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: #020202;
-  background: var(--brand-lime-vivid);
-  padding: 1.5px 6px;
-  border-radius: 999px;
-  box-shadow: 0 0 6px rgba(100, 239, 10, 0.3);
-  line-height: 1.2;
-}
-
-.header-status {
-  display: block;
-  font-size: 0.69rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
-  margin-top: 2px;
-  line-height: 1.2;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.header-pills-group {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.header-tools-group {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  background: var(--bg-surface);
-  padding: 2px 4px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-xs);
-}
-
-.icon-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  width: 26px;
-  height: 26px;
-  font-size: 0.85rem;
-  border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  position: relative;
-}
-
-.icon-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-surface-hover);
-  border-color: var(--border-subtle);
-  transform: translateY(-1px);
-}
-
-/* Dedicated Clear Chat button with prominent hover tooltip */
-.clear-chat-btn {
-  position: relative;
-}
-
-.clear-chat-btn:hover {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.35);
-  color: #DC2626;
-}
-
-.clear-tooltip-bubble {
-  position: absolute;
-  top: calc(100% + 7px);
-  right: -8px;
-  background: #0F172A;
-  color: #FFFFFF;
+  container-type: inline-size;
   font-family: var(--font-body);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  padding: 4px 8px;
-  border-radius: 6px;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(-3px);
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.32);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  z-index: 10002;
+  -webkit-tap-highlight-color: transparent;
 }
-
-.clear-tooltip-bubble::before {
-  content: '';
-  position: absolute;
-  bottom: 100%;
-  right: 14px;
-  border: 4px solid transparent;
-  border-bottom-color: #0F172A;
+[data-theme="dark"] .xo-widget {
+  --w-bg: #110e1f;
+  --w-feed: #0b0916;
+  --w-line: rgba(255, 255, 255, 0.08);
+  --w-ink: #f1f0f7;
+  --w-ink-2: #9a97ad;
+  --w-brand: #c59bff;
+  --w-chip: rgba(168, 85, 247, 0.12);
+  --w-chip-hover: rgba(168, 85, 247, 0.22);
+  --w-ring: rgba(168, 85, 247, 0.22);
+  --w-shadow: 0 28px 70px -18px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(168, 85, 247, 0.12);
 }
+.xo-widget button { font-family: inherit; -webkit-tap-highlight-color: transparent; }
+.xo-widget :focus-visible { outline: 2px solid var(--w-accent); outline-offset: 2px; }
 
-.clear-chat-btn:hover .clear-tooltip-bubble,
-.clear-chat-btn:focus-visible .clear-tooltip-bubble {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
+/* ===== Header ===== */
+.xo-header {
+  position: relative; z-index: 6;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 12px 10px 12px 14px;
+  background: var(--w-bg);
+  border-bottom: 1px solid var(--w-line);
 }
+.xo-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.xo-avatar { position: relative; flex: none; width: 38px; height: 38px; padding: 2px; border-radius: 50%; background: var(--w-grad); }
+.xo-avatar img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #f4efff; }
+.xo-online { position: absolute; right: 0; bottom: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--w-lime); box-shadow: 0 0 0 2px var(--w-bg); }
+.xo-brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.xo-brand-text strong { font-family: var(--font-heading); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.01em; }
+.xo-brand-text small { font-size: 0.72rem; color: var(--w-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-[data-theme="dark"] .clear-tooltip-bubble {
-  background: #1E293B;
-  border-color: rgba(255, 255, 255, 0.20);
+.xo-header-actions { display: flex; align-items: center; gap: 2px; flex: none; }
+.xo-chip {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; padding: 0 11px; margin-inline-end: 4px;
+  border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--w-chip); color: var(--w-brand);
+  font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+  transition: background 150ms ease, transform 150ms ease;
 }
-
-[data-theme="dark"] .clear-tooltip-bubble::before {
-  border-bottom-color: #1E293B;
+.xo-chip:hover { background: var(--w-chip-hover); }
+.xo-chip:active { transform: scale(0.96); }
+.xo-divider { width: 1px; height: 20px; margin: 0 4px; background: var(--w-line); }
+.xo-icon-btn {
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--w-ink-2); cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
 }
+.xo-icon-btn:hover { background: var(--w-chip); color: var(--w-ink); }
+.close-widget-btn:hover { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
 
-.resize-toggle-btn {
-  font-size: 0.95rem;
-  color: var(--brand-purple);
+/* Language menu */
+.lang-switch { position: relative; }
+.lang-menu {
+  position: absolute; top: calc(100% + 8px); inset-inline-end: -4px; z-index: 40;
+  width: 236px; max-height: min(340px, 60vh); overflow-y: auto; margin: 0; padding: 6px; list-style: none;
+  background: var(--w-bg); border: 1px solid var(--w-line); border-radius: 16px;
+  box-shadow: 0 18px 40px -12px rgba(15, 23, 42, 0.3);
 }
-
-.resize-toggle-btn:hover {
-  background: rgba(92, 3, 155, 0.15);
-  color: var(--brand-purple);
+.lang-menu button {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px;
+  border: 0; border-radius: 10px; background: transparent; color: var(--w-ink); cursor: pointer; text-align: start;
 }
+.lang-menu button:hover { background: var(--w-chip); }
+.lang-menu button.active { background: var(--w-chip-hover); color: var(--w-brand); font-weight: 600; }
+.lang-native { font-size: 0.92rem; }
+.lang-name { font-size: 0.74rem; color: var(--w-ink-2); }
+.lang-check { margin-inline-start: auto; }
+.chip-code { display: none; }
+.chip-caret { opacity: 0.7; transition: transform 180ms ease; }
+.chip-caret.open { transform: rotate(180deg); }
 
-[data-theme="dark"] .resize-toggle-btn {
-  color: var(--brand-cyan-vivid);
-}
-
-[data-theme="dark"] .resize-toggle-btn:hover {
-  background: rgba(3, 164, 244, 0.20);
-  color: #FFFFFF;
-}
-
-.close-widget-btn {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--text-muted);
-}
-
-.close-widget-btn:hover {
-  background: rgba(239, 68, 68, 0.14);
-  border-color: rgba(239, 68, 68, 0.40);
-  color: #DC2626;
-}
-
-[data-theme="dark"] .close-widget-btn:hover {
-  background: rgba(239, 68, 68, 0.25);
-  border-color: rgba(239, 68, 68, 0.55);
-  color: #F87171;
-}
-
-.handoff-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(92, 3, 155, 0.08);
-  border: 1px solid var(--border-purple);
-  color: var(--brand-purple);
-  font-size: 0.70rem;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-}
-
-[data-theme="dark"] .handoff-btn {
-  background: rgba(92, 3, 155, 0.25);
-  color: #FFFFFF;
-}
-
-.handoff-btn:hover {
-  background: var(--brand-purple);
-  color: #FFFFFF;
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
-}
-
-.auth-toggle-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(217, 119, 6, 0.08);
-  border: 1px solid rgba(217, 119, 6, 0.30);
-  color: #B45309;
-  font-size: 0.70rem;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-}
-
-[data-theme="dark"] .auth-toggle-btn {
-  background: rgba(245, 158, 11, 0.16);
-  border-color: rgba(245, 158, 11, 0.40);
-  color: #FBBF24;
-}
-
-.auth-toggle-btn:hover {
-  background: rgba(217, 119, 6, 0.22);
-  border-color: #D97706;
-  transform: translateY(-1px);
-}
-
-/* Responsive collapse for header pills on narrow widget widths */
-@media (max-width: 460px) {
-  .chat-header {
-    padding: 8px 10px;
-    gap: 6px;
+/* Hover / keyboard tooltips (pointer devices; touch users get aria-labels and visible labels) */
+[data-tip] { position: relative; }
+@media (hover: hover) {
+  [data-tip]:hover::after, [data-tip]:focus-visible::after {
+    content: attr(data-tip); position: absolute; z-index: 60; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    padding: 6px 10px; border-radius: 8px; white-space: nowrap; pointer-events: none;
+    background: #1d1430; color: #fff; font-size: 0.72rem; font-weight: 500; line-height: 1.2; letter-spacing: 0;
+    box-shadow: 0 8px 20px -6px rgba(15, 23, 42, 0.45);
+    animation: tipIn 140ms ease 300ms both;
   }
-  .header-status {
-    max-width: 110px;
-  }
-  .header-pills-group .pill-label {
-    display: none;
-  }
-  .handoff-btn,
-  .auth-toggle-btn {
-    padding: 3px 6px;
-  }
+  [data-tip-pos="end"]:hover::after, [data-tip-pos="end"]:focus-visible::after { left: auto; inset-inline-end: 0; transform: none; }
+  [data-tip-pos^="top"]:hover::after, [data-tip-pos^="top"]:focus-visible::after { top: auto; bottom: calc(100% + 8px); }
+  [data-tip-pos="top-end"]:hover::after, [data-tip-pos="top-end"]:focus-visible::after { left: auto; inset-inline-end: 0; transform: none; }
+  [data-tip-pos="top-start"]:hover::after, [data-tip-pos="top-start"]:focus-visible::after { left: 0; transform: none; }
+  [dir="rtl"] [data-tip-pos="top-start"]:hover::after { left: auto; right: 0; }
+  [data-theme="dark"] [data-tip]:hover::after { background: #f1f0f7; color: #110e1f; }
+}
+@keyframes tipIn { from { opacity: 0; translate: 0 3px; } to { opacity: 1; translate: 0 0; } }
+
+/* The header adapts to the widget's own width on any device */
+@container (max-width: 560px) {
+  .advisor-btn .chip-label { display: none; }
+  .advisor-btn { width: 32px; padding: 0; margin-inline-end: 2px; }
+  .lang-switch-btn { gap: 5px; padding: 0 9px 0 10px; }
+}
+@container (max-width: 440px) {
+  .lang-switch-btn .chip-label { display: none; }
+  .lang-switch-btn { gap: 4px; padding: 0 8px 0 9px; }
+  .lang-switch-btn .chip-code { display: inline; font-size: 0.74rem; letter-spacing: 0.02em; }
+}
+@container (max-width: 420px) {
+  .tips-toggle-btn { display: none; }
+}
+@container (max-width: 340px) {
+  .theme-toggle-btn, .xo-divider, .xo-brand-text small { display: none; }
 }
 
-/* Chat Feed */
+/* ===== Conversation ===== */
+.feed-wrap {
+  position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
+  background:
+    radial-gradient(120% 50% at 0% 0%, rgba(124, 44, 240, 0.06), transparent 60%),
+    radial-gradient(100% 45% at 100% 0%, rgba(3, 164, 244, 0.05), transparent 60%),
+    var(--w-feed);
+}
+/* UAE skyline behind the conversation: fixed while messages scroll, very faint so text stays crisp */
+.feed-backdrop {
+  position: absolute; left: 0; right: 0; bottom: 0; height: min(46%, 300px); pointer-events: none;
+  opacity: 0.075;
+  -webkit-mask-image: linear-gradient(to top, #000 55%, transparent);
+  mask-image: linear-gradient(to top, #000 55%, transparent);
+}
+[data-theme="dark"] .feed-backdrop { opacity: 0.16; }
 .chat-feed {
-  flex: 1;
-  padding: 16px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  background: var(--bg-feed);
-  transition: background-color var(--transition-normal);
+  position: relative; z-index: 1;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 18px 14px 22px;
+  scrollbar-width: thin; scrollbar-color: var(--w-line) transparent;
 }
+.chat-feed::-webkit-scrollbar { width: 6px; }
+.chat-feed::-webkit-scrollbar-thumb { background: var(--w-line); border-radius: 6px; }
 
-/* Hero Centerpiece: Polished, human-designed greeting */
-.hero-centerpiece {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 20px 16px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-purple);
-  border-radius: var(--radius-lg);
-  margin-bottom: 8px;
-  box-shadow: var(--shadow-sm);
+.xo-hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 14px 12px 4px; }
+.xo-hero-mascot {
+  width: 96px; height: 96px; margin-bottom: 14px; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 40%, rgba(3, 164, 244, 0.18), rgba(124, 44, 240, 0.12) 60%, transparent 72%);
 }
+.xo-hero-mascot img { width: 84px; height: 84px; object-fit: contain; animation: floatMascot 4s ease-in-out infinite; }
+.xo-hero h3 { margin: 0 0 6px; font-family: var(--font-heading); font-size: 1.22rem; font-weight: 700; line-height: 1.3; color: var(--w-ink); max-width: 320px; }
+.xo-hero p { margin: 0; font-size: 0.9rem; color: var(--w-ink-2); }
+@keyframes floatMascot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: rgba(92, 3, 155, 0.08);
-  border: 1px solid var(--border-purple);
-  font-size: 0.70rem;
-  font-weight: 700;
-  color: var(--brand-cyan);
-  margin-bottom: 12px;
+.lang-divider { display: flex; align-items: center; gap: 10px; margin: 2px 0; color: var(--w-ink-2); font-size: 0.72rem; }
+.lang-divider::before, .lang-divider::after { content: ""; flex: 1; height: 1px; background: var(--w-line); }
+
+.typing-indicator { display: flex; align-items: center; gap: 8px; animation: rise 220ms ease both; }
+.typing-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #f4efff; flex: none; }
+.typing-pill {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px;
+  background: var(--w-bg); border: 1px solid var(--w-line); border-radius: 16px 16px 16px 6px;
+  font-size: 0.8rem; color: var(--w-ink-2);
 }
+[dir="rtl"] .typing-pill { border-radius: 16px 16px 6px 16px; }
+.typing-dots { display: inline-flex; gap: 3px; }
+.typing-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--w-brand-2); opacity: 0.35; animation: typing 1.2s infinite ease-in-out; }
+.typing-dots i:nth-child(2) { animation-delay: 0.15s; }
+.typing-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes typing { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-.pulse-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--brand-lime-vivid);
-  box-shadow: 0 0 6px var(--brand-lime-vivid);
-}
-
-.hero-mascot-visual {
-  position: relative;
-  width: 90px;
-  height: 90px;
-  margin: 0 auto 10px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(92, 3, 155, 0.15) 0%, rgba(3, 164, 244, 0.08) 70%, transparent 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.hero-mascot-img {
-  width: 82px;
-  height: 82px;
-  object-fit: contain;
-  animation: floatMascot 4s ease-in-out infinite;
-}
-
-.hero-greeting-title {
-  font-size: 1.10rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 6px;
-  font-family: var(--font-heading);
-}
-
-.hero-greeting-sub {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin: 0 0 6px;
-  max-width: 320px;
-  line-height: 1.45;
-}
-
-/* 4 Quick Suggestion Prompt Cards */
-.quick-prompts-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  width: 100%;
-}
-
-.prompt-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  text-align: left;
-  cursor: pointer;
-  transition: all var(--transition-normal);
-}
-
-.prompt-card:hover {
-  background: var(--bg-surface-hover);
-  border-color: var(--brand-purple);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-2px);
-}
-
-.prompt-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.prompt-text-group {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-
-.prompt-text-group strong {
-  font-size: 0.78rem;
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.prompt-text-group span {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  line-height: 1.25;
-}
-
-.prompt-arrow {
-  color: var(--brand-purple);
-  font-size: 0.85rem;
-  transition: transform var(--transition-fast);
-}
-
-.prompt-card:hover .prompt-arrow {
-  transform: translateX(3px);
-}
-
-/* Typing Indicator with Mascot */
-.typing-indicator {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 14px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  width: fit-content;
-  margin-top: 6px;
-  box-shadow: var(--shadow-sm);
-}
-
-.mascot-typing-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 1px solid var(--brand-purple);
-}
-
-.typing-mascot-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.typing-dots-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.typing-dot {
-  width: 6px;
-  height: 6px;
-  background: var(--brand-purple);
-  border-radius: 50%;
-  animation: typingBounce 1.2s infinite;
-}
-
-.typing-dot:nth-child(2) { animation-delay: 0.2s; }
-.typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
-.typing-text {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  margin-left: 6px;
-}
-
-/* Advisor Standby Notification Bar */
-.advisor-standby-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 14px;
-  background: var(--bg-surface-elevated);
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-  transition: background-color var(--transition-normal);
-}
-
-.standby-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.73rem;
-  color: var(--text-secondary);
-}
-
-.standby-icon {
-  font-size: 0.9rem;
-}
-
-.standby-status strong {
-  color: var(--brand-lime);
-}
-
-.btn-standby-connect {
-  background: rgba(92, 3, 155, 0.10);
-  border: 1px solid var(--border-purple);
-  color: var(--brand-purple);
-  font-size: 0.70rem;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.btn-standby-connect:hover {
-  background: var(--brand-purple);
-  color: #FFFFFF;
-}
-
-/* ==========================================================================
-   Dedicated Voice Mode Screen: Perplexity AI Replication
-   ========================================================================== */
-.pplx-voice-screen {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  background: var(--bg-surface, #FFFFFF);
-  position: relative;
-  overflow: hidden;
-  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-[data-theme="dark"] .pplx-voice-screen {
-  background: #111113;
-}
-
-.pplx-voice-stage {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  max-width: 420px;
-  position: relative;
-  padding: 24px 20px;
-}
-
-/* 3D Particle Sphere Orb Container */
-.pplx-orb-container {
-  position: absolute;
-  top: 38%;
-  left: 50%;
-  width: 200px;
-  height: 200px;
-  transform: translate(-50%, -50%);
-  transition: all 0.55s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 2;
-  pointer-events: none;
-}
-
-/* When user starts speaking: 3D model goes down between buttons (Perplexity Style) */
-.pplx-voice-screen.is-speaking .pplx-orb-container {
-  top: calc(100% - 72px);
-  transform: translate(-50%, -50%);
-  width: 104px;
-  height: 104px;
-}
-
-/* Text Zone: Prompts & Live Transcription */
-.pplx-text-zone {
-  position: absolute;
-  top: calc(38% + 120px);
-  left: 50%;
-  transform: translate(-50%, 0);
-  width: 88%;
-  max-width: 320px;
-  text-align: center;
-  transition: all 0.55s cubic-bezier(0.16, 1, 0.3, 1);
-  z-index: 3;
-}
-
-.pplx-prompt-text {
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: var(--brand-cyan, #0284c7);
-  margin: 0;
-  letter-spacing: 0.2px;
-  font-family: var(--font-heading, system-ui);
-}
-
-[data-theme="dark"] .pplx-prompt-text {
-  color: var(--brand-cyan-vivid, #03a4f4);
-}
-
-.pplx-transcript-text {
-  font-size: 1.05rem;
-  font-weight: 500;
-  color: var(--text-primary, #1e293b);
-  line-height: 1.45;
-  font-style: italic;
-  margin: 0;
-  word-break: break-word;
-  max-height: 100px;
-  overflow-y: auto;
-}
-
-[data-theme="dark"] .pplx-transcript-text {
-  color: #f1f5f9;
-}
-
-/* When speaking: Text floats cleanly in the center above the descended orb and buttons */
-.pplx-voice-screen.is-speaking .pplx-text-zone {
-  top: 40%;
-  transform: translate(-50%, -50%);
-  max-width: 340px;
-}
-
-.pplx-silence-pulse {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  padding: 4px 12px;
-  border-radius: 12px;
-  background: rgba(3, 164, 244, 0.08);
-  border: 1px solid rgba(3, 164, 244, 0.2);
-  color: var(--brand-cyan, #0284c7);
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-  animation: fadeIn 0.25s ease;
-}
-
-.pplx-silence-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--brand-cyan, #0284c7);
-  animation: pulseRecording 1s infinite;
-}
-
-/* Action Controls Row (✕ on Left, ✓ on Right) */
-.pplx-actions-row {
-  position: absolute;
-  bottom: 46px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 36px;
-  z-index: 4;
-  transition: gap 0.55s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* When speaking: Buttons spread apart to nestle the particle orb right in the middle */
-.pplx-voice-screen.is-speaking .pplx-actions-row {
-  gap: 120px;
-}
-
-/* Perplexity Minimalist Soft Circular Buttons */
-.pplx-action-btn {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.05);
-  border: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-}
-
-.pplx-btn-cancel {
-  color: #374151;
-  font-size: 1.15rem;
-  font-weight: 700;
-}
-
-.pplx-btn-cancel:hover {
-  background: rgba(0, 0, 0, 0.10);
-  transform: scale(1.06);
-}
-
-.pplx-btn-confirm {
-  color: #16a34a;
-  font-size: 1.35rem;
-  font-weight: 800;
-}
-
-.pplx-btn-confirm:hover:not(:disabled) {
-  background: rgba(22, 163, 74, 0.12);
-  transform: scale(1.06);
-}
-
-.pplx-btn-confirm:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  transform: none;
-}
-
-[data-theme="dark"] .pplx-action-btn {
-  background: rgba(255, 255, 255, 0.10);
-  color: #f4f4f5;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-[data-theme="dark"] .pplx-btn-cancel:hover {
-  background: rgba(255, 255, 255, 0.18);
-}
-
-[data-theme="dark"] .pplx-btn-confirm {
-  color: #4ade80;
-}
-
-[data-theme="dark"] .pplx-btn-confirm:hover:not(:disabled) {
-  background: rgba(74, 222, 128, 0.20);
-}
-
-/* Compact Voice Playback Bar (when XO is speaking back audio) */
-.voice-playback-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 14px;
-  margin: 0 12px 6px;
-  background: rgba(168, 85, 247, 0.12);
-  border: 1px solid var(--border-purple, rgba(168, 85, 247, 0.3));
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all var(--transition-fast, 0.15s ease);
-}
-
-.voice-playback-bar:hover {
-  background: rgba(168, 85, 247, 0.2);
-}
-
-.playback-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #22C55E;
-  box-shadow: 0 0 8px #22C55E;
-  animation: pulseRecording 1.4s infinite;
-}
-
-.playback-text {
-  font-size: 0.74rem;
-  font-weight: 600;
-  color: var(--brand-purple, #9333ea);
-}
-
-[data-theme="dark"] .playback-text {
-  color: #d8b4fe;
-}
-
-.btn-stop-playback {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 2px 4px;
-}
-
-.btn-stop-playback:hover {
-  color: #EF4444;
-}
-
-/* Floating Jump to Latest Button */
 .jump-to-latest-btn {
-  position: absolute;
-  bottom: 84px;
-  right: 18px;
-  z-index: 25;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  background: var(--bg-surface-elevated, #ffffff);
-  border: 1.5px solid var(--border-purple, #5c039b);
-  border-radius: 999px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 0 10px rgba(92, 3, 155, 0.20);
-  color: var(--brand-purple, #5c039b);
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  position: absolute; left: 50%; bottom: 118px; z-index: 8; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px;
+  border: 1px solid var(--w-line); border-radius: 999px; cursor: pointer;
+  background: var(--w-bg); color: var(--w-brand); font-size: 0.76rem; font-weight: 600;
+  box-shadow: 0 8px 20px -8px rgba(15, 23, 42, 0.3);
 }
 
-[data-theme="dark"] .jump-to-latest-btn {
-  background: rgba(26, 26, 36, 0.92);
-  border-color: var(--border-cyan, #03a4f4);
-  color: var(--brand-cyan, #03a4f4);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(3, 164, 244, 0.25);
-}
-
-.jump-to-latest-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(92, 3, 155, 0.35);
-  background: var(--brand-purple, #5c039b);
-  color: #ffffff;
-}
-
-[data-theme="dark"] .jump-to-latest-btn:hover {
-  background: var(--brand-cyan, #03a4f4);
-  color: #000000;
-  box-shadow: 0 6px 20px rgba(3, 164, 244, 0.45);
-}
-
-.jump-arrow {
-  font-size: 0.95rem;
-  font-weight: 800;
-  line-height: 1;
-  animation: bounceDown 1.5s infinite;
-}
-
-.jump-text {
-  font-size: 0.75rem;
-  letter-spacing: 0.2px;
-}
-
-@keyframes bounceDown {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(2px); }
-}
-
-/* Transition */
-.jump-fade-enter-active,
-.jump-fade-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
-}
-
-.jump-fade-enter-from,
-.jump-fade-leave-to {
-  opacity: 0;
-  transform: translateY(10px);
-}
-
-/* Chat Input Footer Dock */
-.chat-footer {
-  padding: 8px 12px;
-  margin: 10px 12px 6px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-purple);
-  border-radius: 999px;
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-normal);
-}
-
+/* ===== Text input ===== */
+.chat-footer { padding: 10px 12px 2px; background: var(--w-bg); border-top: 1px solid var(--w-line); }
 .input-form {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: flex; align-items: center; gap: 4px; padding: 5px 5px 5px 16px;
+  border: 1px solid var(--w-line); border-radius: 999px; background: var(--w-feed);
+  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
 }
-
+[dir="rtl"] .input-form { padding: 5px 16px 5px 5px; }
+.input-form:focus-within { border-color: rgba(124, 44, 240, 0.45); box-shadow: 0 0 0 4px var(--w-ring); background: var(--w-bg); }
 .chat-input-field {
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: var(--text-primary);
-  font-size: 0.88rem;
-  padding: 6px 6px;
+  flex: 1 1 auto; min-width: 0; padding: 10px 0; border: 0; outline: none; background: transparent;
+  color: var(--w-ink); font-size: 0.95rem; font-family: inherit;
 }
-
-.chat-input-field:focus {
-  outline: none;
+.chat-input-field::placeholder { color: var(--w-ink-2); opacity: 0.85; }
+.chat-input-field:focus-visible { outline: none; }
+.mic-btn, .send-btn {
+  flex: none; display: grid; place-items: center; width: 40px; height: 40px;
+  border: 0; border-radius: 50%; cursor: pointer; transition: transform 150ms ease, background 150ms ease, opacity 150ms ease;
 }
-
-.chat-input-field::placeholder {
-  color: var(--text-muted);
-  font-size: 0.82rem;
-}
-
-.mic-btn {
-  background: linear-gradient(135deg, rgba(2, 132, 199, 0.14), rgba(92, 3, 155, 0.10));
-  border: 1.5px solid var(--brand-cyan);
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  color: var(--brand-cyan);
-  box-shadow: 0 0 10px rgba(2, 132, 199, 0.22);
-  flex-shrink: 0;
-}
-
-.mic-svg-icon {
-  width: 18px;
-  height: 18px;
-  stroke: currentColor;
-  transition: transform var(--transition-fast);
-}
-
-.mic-btn:hover {
-  background: var(--brand-cyan);
-  color: #FFFFFF;
-  border-color: var(--brand-cyan);
-  transform: scale(1.10);
-  box-shadow: 0 0 16px rgba(2, 132, 199, 0.45);
-}
-
-.mic-btn:hover .mic-svg-icon {
-  transform: scale(1.08);
-}
-
-[data-theme="dark"] .mic-btn {
-  background: linear-gradient(135deg, rgba(3, 164, 244, 0.20), rgba(92, 3, 155, 0.25));
-  border-color: var(--brand-cyan-vivid);
-  color: var(--brand-cyan-vivid);
-  box-shadow: 0 0 14px rgba(3, 164, 244, 0.35);
-}
-
-[data-theme="dark"] .mic-btn:hover {
-  background: var(--brand-cyan-vivid);
-  color: #020202;
-  box-shadow: 0 0 22px rgba(3, 164, 244, 0.65);
-}
-
-.mic-btn.recording {
-  background: #EF4444;
-  border-color: #EF4444;
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.7);
-  color: #FFFFFF;
-  animation: pulseRecording 1.1s infinite;
-}
-
-.mic-btn.speaking {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.20), rgba(239, 68, 68, 0.20));
-  border-color: #F59E0B;
-  color: #F59E0B;
-  box-shadow: 0 0 16px rgba(245, 158, 11, 0.5);
-  animation: pulseSpeaking 1.4s infinite;
-}
-
-@keyframes pulseSpeaking {
-  0% { transform: scale(1); box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
-  50% { transform: scale(1.08); box-shadow: 0 0 20px rgba(245, 158, 11, 0.7); }
-  100% { transform: scale(1); box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
-}
-
-.rec-stop-box {
-  font-size: 0.95rem;
-  line-height: 1;
-  color: #FFFFFF;
-}
-
-/* Send Button: Solid brand purple circle with upward arrow */
-.send-btn {
-  background: var(--brand-purple);
-  color: #FFFFFF;
-  border: none;
-  border-radius: 50%;
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-weight: 800;
-  transition: all var(--transition-fast);
-  box-shadow: var(--shadow-sm);
-}
-
-.send-arrow {
-  font-size: 1.10rem;
-  line-height: 1;
-  font-weight: 900;
-}
-
-.send-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.send-btn:not(:disabled):hover {
-  background: var(--brand-purple-light);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-/* Disclaimer text under input */
+.mic-btn { background: transparent; color: var(--w-brand); }
+.mic-btn:hover { background: var(--w-chip-hover); }
+.send-btn { background: var(--w-grad); color: #fff; box-shadow: 0 6px 14px -6px rgba(92, 3, 155, 0.6); }
+.send-btn:hover:not(:disabled) { transform: translateY(-1px); }
+.send-btn:disabled { background: var(--w-line); color: var(--w-ink-2); box-shadow: none; cursor: default; }
+.mic-btn:active, .send-btn:active:not(:disabled) { transform: scale(0.94); }
 .input-disclaimer {
-  padding: 0 16px 10px;
-  text-align: center;
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  line-height: 1.35;
+  padding: 6px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--w-bg); color: var(--w-ink-2); font-size: 0.68rem; line-height: 1.35; text-align: center;
 }
 
-/* Shortlist Lead Capture Modal */
-.lead-modal-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.65);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  padding: 16px;
-  animation: fadeIn 200ms ease;
+/* ===== Voice dock ===== */
+.voice-dock {
+  position: relative; display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px 2px 8px; background: var(--w-bg); border-top: 1px solid var(--w-line);
 }
-
-.lead-modal-card {
-  width: 100%;
-  max-width: 380px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-purple);
-  border-radius: var(--radius-lg);
-  padding: 20px;
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  animation: scaleIn 250ms cubic-bezier(0.16, 1, 0.3, 1);
+.voice-dock::before {
+  content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: var(--w-grad); opacity: 0.55;
 }
-
-.lead-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+.voice-orb-btn {
+  position: relative; flex: none; display: grid; place-items: center; width: 68px; height: 68px; padding: 0;
+  border: 0; border-radius: 50%; background: transparent; cursor: pointer; transition: transform 150ms ease;
 }
-
-.lead-modal-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.voice-orb-btn :deep(canvas) { position: absolute; inset: 0; }
+.voice-orb-btn:active { transform: scale(0.95); }
+.orb-heartbeat {
+  position: absolute; inset: 6px; border-radius: 50%; pointer-events: none;
+  border: 2px solid rgba(124, 44, 240, 0.55);
+  animation: heartbeat 1.1s ease-out both;
 }
-
-.modal-mascot-icon {
-  width: 36px;
-  height: 36px;
-  object-fit: cover;
-  border-radius: 50%;
-  border: 1.5px solid var(--brand-purple);
+@keyframes heartbeat {
+  0% { transform: scale(0.85); opacity: 0; }
+  12% { transform: scale(1.12); opacity: 0.9; }
+  24% { transform: scale(0.98); opacity: 0.5; }
+  38% { transform: scale(1.22); opacity: 0.8; }
+  100% { transform: scale(1.45); opacity: 0; }
 }
-
-.lead-modal-title h4 {
-  margin: 0;
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: var(--text-primary);
+.orb-glyph {
+  position: relative; z-index: 1; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(92, 3, 155, 0.78); color: #fff; box-shadow: 0 4px 12px -2px rgba(92, 3, 155, 0.6);
 }
-
-.modal-sub {
-  font-size: 0.7rem;
-  color: var(--brand-cyan);
+.orb-glyph:empty { display: none; }
+.orb-badge {
+  position: absolute; right: 6px; bottom: 6px; z-index: 2; display: grid; place-items: center; width: 20px; height: 20px;
+  border-radius: 50%; background: #5c039b; color: #fff; box-shadow: 0 0 0 2px var(--w-bg);
 }
-
-.lead-modal-close {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 1rem;
-  cursor: pointer;
-  padding: 4px;
-  line-height: 1;
-  transition: color var(--transition-fast);
+.voice-dock-text { flex: 1 1 auto; min-width: 0; }
+.voice-dock-status { display: block; font-size: 0.86rem; font-weight: 600; color: var(--w-ink); }
+.voice-dock.phase-listening .voice-dock-status { color: var(--w-brand); }
+.voice-dock-caption {
+  margin: 3px 0 0; font-size: 0.92rem; line-height: 1.35; color: var(--w-ink-2);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
-
-.lead-modal-close:hover {
-  color: var(--text-primary);
+.voice-error-text { margin: 4px 0 0; color: #dc2626; font-size: 0.8rem; }
+.voice-dock-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.xo-round-btn {
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--w-line); background: var(--w-bg); color: var(--w-ink-2);
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
 }
+.xo-round-btn:active { transform: scale(0.94); }
+.xo-round-btn.cancel:hover { background: rgba(220, 38, 38, 0.08); color: #dc2626; }
+.xo-round-btn.confirm { border: 0; background: var(--w-grad); color: #fff; box-shadow: 0 6px 14px -6px rgba(92, 3, 155, 0.6); }
 
-.lead-modal-subtitle {
-  margin: 0;
-  font-size: 0.77rem;
-  line-height: 1.45;
-  color: var(--text-secondary);
+/* First-time voice intro */
+.voice-intro {
+  position: absolute; inset: 0; z-index: 30; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px;
+  background: radial-gradient(circle at 50% 42%, #2a0a52 0%, #140829 55%, #07040f 100%);
+  color: #fff; text-align: center;
 }
+.voice-intro-text { max-width: 290px; margin: 0; font-size: 1rem; line-height: 1.55; color: rgba(255, 255, 255, 0.92); animation: rise 600ms 500ms ease both; }
 
-.lead-modal-subtitle strong {
-  color: var(--brand-purple);
+/* ===== Transitions ===== */
+.dock-enter-active, .dock-leave-active { transition: opacity 160ms ease, transform 160ms ease; }
+.dock-enter-from, .dock-leave-to { opacity: 0; transform: translateY(10px); }
+.voice-intro-enter-active, .voice-intro-leave-active { transition: opacity 350ms ease; }
+.voice-intro-enter-from, .voice-intro-leave-to { opacity: 0; }
+.pop-enter-active, .pop-leave-active { transition: opacity 140ms ease, transform 140ms ease; }
+.pop-enter-from, .pop-leave-to { opacity: 0; transform: translateY(-4px) scale(0.97); }
+.jump-to-latest-btn.pop-enter-from, .jump-to-latest-btn.pop-leave-to { transform: translateX(-50%) translateY(6px); }
+
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; white-space: nowrap; }
+
+/* Comfortable touch targets on phones and tablets */
+@media (pointer: coarse) {
+  .xo-icon-btn, .xo-chip { min-width: 36px; height: 36px; }
+  .chat-input-field { font-size: 16px; } /* prevents iOS zoom on focus */
 }
-
-[data-theme="dark"] .lead-modal-subtitle strong {
-  color: var(--brand-lime-vivid);
-}
-
-.lead-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.form-group label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.lead-input {
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-prominent);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  color: var(--text-primary);
-  font-size: 0.82rem;
-  transition: all var(--transition-fast);
-}
-
-.lead-input:focus {
-  outline: none;
-  border-color: var(--brand-purple);
-  box-shadow: 0 0 0 3px var(--brand-purple-glow);
-}
-
-.lead-modal-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 6px;
-}
-
-.btn-cancel {
-  flex: 1;
-  background: transparent;
-  border: 1px solid var(--border-prominent);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  padding: 8px 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.btn-cancel:hover {
-  background: var(--bg-surface-hover);
-  color: var(--text-primary);
-}
-
-.btn-submit {
-  flex: 1.5;
-  background: var(--brand-purple);
-  border: none;
-  border-radius: var(--radius-sm);
-  color: #FFFFFF;
-  padding: 8px 12px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  box-shadow: var(--shadow-sm);
-}
-
-.btn-submit:hover:not(:disabled) {
-  background: var(--brand-purple-light);
-  transform: translateY(-1px);
-}
-
-.btn-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Animations */
-@keyframes floatMascot {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
-}
-
-@keyframes pulseLive {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
-}
-
-@keyframes pulseRecording {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.9); }
-}
-
-@keyframes typingBounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
-}
-
-@media (max-width: 600px) {
-  .chat-widget-wrapper {
-    height: 100% !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-    border-radius: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-  }
-
-  .chat-widget-wrapper.is-expanded {
-    height: 100% !important;
-    height: 100dvh !important;
-    max-height: 100dvh !important;
-  }
-
-  /* Hide expand/collapse and feature tips buttons on mobile */
-  .resize-toggle-btn,
-  .tips-toggle-btn {
-    display: none !important;
-  }
-
-  .chat-header {
-    padding: 8px 10px;
-    gap: 6px;
-  }
-
-  .header-brand-info {
-    gap: 2px;
-  }
-
-  .header-status {
-    display: none;
-  }
-
-  .header-pills-group .pill-label {
-    display: none;
-  }
-
-  .header-actions {
-    gap: 4px;
-  }
-
-  .header-tools-group {
-    gap: 4px;
-  }
-
-  .handoff-btn,
-  .auth-toggle-btn {
-    padding: 4px 7px;
-  }
-
-  .clear-chat-btn,
-  .close-widget-btn,
-  .theme-toggle-btn {
-    width: 32px;
-    height: 32px;
-    font-size: 0.85rem;
-  }
-
-  .chat-feed {
-    padding: 10px 8px;
-    gap: 10px;
-  }
-
-  .chat-footer {
-    margin: 4px 8px env(safe-area-inset-bottom, 8px);
-    padding: 4px 8px;
-  }
-
-  .chat-input-field {
-    font-size: 16px !important;
-    padding: 8px 6px;
-  }
-
-  .input-disclaimer {
-    font-size: 0.62rem;
-    padding: 2px 8px 6px;
-    line-height: 1.3;
-  }
-
-  .quick-prompts-grid {
-    grid-template-columns: 1fr !important;
-    gap: 6px;
-  }
-
-  .quick-prompt-chip {
-    padding: 8px 10px;
-    font-size: 0.78rem;
-  }
-
-  .advisor-standby-banner {
-    padding: 6px 10px;
-    margin: 4px 8px;
-    font-size: 0.72rem;
-  }
-
-  .btn-standby-connect {
-    padding: 3px 8px;
-    font-size: 0.70rem;
-  }
-
-  .pplx-voice-stage {
-    padding: 16px 12px;
-    max-width: 100%;
-  }
-
-  .pplx-orb-container {
-    width: 170px;
-    height: 170px;
-    top: 34%;
-  }
-
-  .pplx-text-zone {
-    width: 95%;
-  }
-
-  .pplx-actions-row {
-    bottom: 24px;
-    gap: 36px;
-  }
+@media (prefers-reduced-motion: reduce) {
+  .xo-hero-mascot img, .typing-dots i, .voice-intro-text, .typing-indicator, .orb-heartbeat { animation: none !important; }
 }
 </style>

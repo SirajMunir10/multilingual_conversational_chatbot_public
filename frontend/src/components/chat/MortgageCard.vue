@@ -1,866 +1,321 @@
 <template>
-  <div class="mortgage-card glass-card" :class="{ 'dbr-exceeded': isDbrExceeded }">
-    <!-- Card Header with Mandatory Badge (Rule 10) -->
+  <div class="mortgage-card" :class="['verdict-' + (data.verdict || 'none'), { 'dbr-exceeded': dbr && dbr.within_cap === false }]">
     <div class="card-header">
       <div class="header-left">
-        <span class="calc-icon">{{ isAffordability ? '📊' : '🧮' }}</span>
-        <h4 class="calc-title">
-          {{ isAffordability ? 'Mortgage Affordability Estimate' : 'Mortgage Payment & EMI Estimate' }}
-        </h4>
+        <span class="calc-icon"><XoIcon name="calculator" :size="18" /></span>
+        <h4 class="calc-title">{{ isCheck ? (data.calculation_type === 'affordability' ? tr('afford_title') : tr('elig_title')) : tr('emi_title') }}</h4>
       </div>
-      <!-- Rule 10 Mandatory Label: "estimates, not offers" -->
-      <span class="badge-estimates-not-offers">estimates, not offers</span>
+      <span v-if="isCheck && data.verdict && data.verdict !== 'can_borrow'" class="verdict-badge">{{ tr('verdict_' + data.verdict) }}</span>
+      <span v-else class="badge-estimates-not-offers">{{ tr('estimates_not_offers') }}</span>
     </div>
 
-    <!-- Primary Metric Spotlight -->
-    <div class="metric-spotlight">
-      <div class="spotlight-content">
-        <span class="spotlight-label">
-          {{ isAffordability ? 'Max Estimated Monthly Payment' : 'Estimated Monthly Installment (EMI)' }}
-        </span>
-        <div class="spotlight-value text-lime">
-          AED {{ formatNumber(monthlyInstallment) }}
-          <span class="per-month">/ month</span>
-        </div>
+    <!-- Eligibility / affordability (approved build logic: gates, ceilings, verdict) -->
+    <template v-if="isCheck">
+      <div class="metric-spotlight">
+        <template v-if="data.verdict === 'not_eligible'">
+          <span class="spotlight-label">{{ tr('checks') }}</span>
+          <div class="spotlight-value fail">{{ tr('gate_' + data.failed_gate) }} — {{ tr('gate_fail') }}</div>
+        </template>
+        <template v-else>
+          <span class="spotlight-label">{{ data.verdict === 'can_borrow' ? tr('verdict_can_borrow') : tr('eligible_loan') }}</span>
+          <div class="spotlight-value">AED {{ aed(data.eligible_loan_aed) }}</div>
+          <p v-if="data.shortfall_aed > 0" class="shortfall">{{ tr('short_by') }} AED {{ aed(data.shortfall_aed) }} · {{ tr('tightest_limit') }}: {{ tr('limit_' + data.tightest_limit) }}</p>
+          <div class="spotlight-submetrics">
+            <div class="submetric-pill">
+              <span class="submetric-label">{{ tr('monthly_payment') }}</span>
+              <span class="submetric-val">AED {{ aed(data.instalment_aed) }}</span>
+            </div>
+            <div class="submetric-pill">
+              <span class="submetric-label">{{ tr('stress_payment', { rate: data.stress_rate_pct }) }}</span>
+              <span class="submetric-val">AED {{ aed(data.stress_instalment_aed) }}</span>
+            </div>
+            <div class="submetric-pill" v-if="data.max_property_price_aed">
+              <span class="submetric-label">{{ data.verdict === 'can_borrow' ? tr('max_price') : tr('property_price') }}</span>
+              <span class="submetric-val text-cyan">AED {{ aed(data.max_property_price_aed) }}</span>
+            </div>
+            <div class="submetric-pill">
+              <span class="submetric-label">{{ tr('rate_tenure') }}</span>
+              <span class="submetric-val">{{ data.interest_rate_pct }}% · {{ data.term_years }} {{ tr('years') }}</span>
+            </div>
+          </div>
+        </template>
       </div>
+      <p v-if="data.inputs?.residency === 'Non-resident'" class="card-note">{{ tr('note_non_resident') }}</p>
+    </template>
+
+    <!-- Monthly payment (EMI) -->
+    <div v-else class="metric-spotlight">
+      <span class="spotlight-label">{{ tr('monthly_payment') }}</span>
+      <div class="spotlight-value">AED {{ aed(data.instalment_aed) }}</div>
       <div class="spotlight-submetrics">
         <div class="submetric-pill">
-          <span class="submetric-label">Max Borrowing Capacity</span>
-          <span class="submetric-val text-cyan">AED {{ formatNumber(loanCapacity) }}</span>
+          <span class="submetric-label">{{ tr('loan_amount') }}</span>
+          <span class="submetric-val text-cyan">AED {{ aed(data.loan_amount_aed) }}</span>
         </div>
-        <div class="submetric-pill" v-if="propertyPrice">
-          <span class="submetric-label">Affordable Property Price</span>
-          <span class="submetric-val text-emerald">AED {{ formatNumber(propertyPrice) }}</span>
+        <div class="submetric-pill" v-if="data.down_payment_aed">
+          <span class="submetric-label">{{ tr('down_payment') }}</span>
+          <span class="submetric-val">AED {{ aed(data.down_payment_aed) }}</span>
         </div>
         <div class="submetric-pill">
-          <span class="submetric-label">Rate & Tenure</span>
-          <span class="submetric-val">{{ interestRate }}% · {{ tenureYears }} Yrs</span>
+          <span class="submetric-label">{{ tr('total_interest') }}</span>
+          <span class="submetric-val">AED {{ aed(data.total_interest_aed) }}</span>
+        </div>
+        <div class="submetric-pill">
+          <span class="submetric-label">{{ tr('rate_tenure') }}</span>
+          <span class="submetric-val">{{ data.interest_rate_pct }}% · {{ data.tenure_years }} {{ tr('years') }}</span>
         </div>
       </div>
     </div>
 
-    <!-- Compact Expand/Collapse Control Button -->
-    <button 
-      type="button" 
-      class="btn-toggle-mortgage-card" 
-      @click="isExpanded = !isExpanded"
-      :aria-expanded="isExpanded"
-      :title="isExpanded ? 'Collapse assessment details' : 'Expand full assessment (DBR gauge, fees, breakdown)'"
-    >
-      <span>{{ isExpanded ? '▲ Collapse Assessment Details' : '▼ Expand Full Assessment (DBR Gauge & Fee Breakdown)' }}</span>
+    <button type="button" class="btn-toggle-mortgage-card" @click="isExpanded = !isExpanded" :aria-expanded="isExpanded">
+      <span>{{ isExpanded ? tr('hide') : tr('details') }}</span>
+      <XoIcon name="chevronDown" :size="15" class="toggle-arrow" :class="{ rotated: isExpanded }" />
     </button>
 
-    <!-- Expanded Details Drawer (Smoothly revealed on click) -->
     <div class="mortgage-expanded-drawer" v-show="isExpanded">
-      <!-- Visual DBR Gauge (UAE Central Bank 50% Regulatory Cap) -->
-      <div class="dbr-gauge-box" v-if="dbrStatus">
-      <div class="dbr-gauge-header">
+      <template v-if="isCheck">
+        <div class="breakdown-body" v-if="data.gates?.length">
+          <div class="cost-row cost-heading"><span class="cost-label">{{ tr('checks') }}</span></div>
+          <div class="cost-row" v-for="g in data.gates" :key="g.gate">
+            <span class="cost-label">{{ tr('gate_' + g.gate) }}</span>
+            <span class="gate-chip" :class="g.result">{{ tr('gate_' + g.result) }}</span>
+          </div>
+        </div>
+        <div class="breakdown-body" v-if="data.ceilings_aed">
+          <div class="cost-row cost-heading"><span class="cost-label">{{ tr('limits_title') }}</span></div>
+          <div class="cost-row" v-for="(value, key) in data.ceilings_aed" :key="key" :class="{ tightest: key === data.tightest_limit }">
+            <span class="cost-label">{{ tr('limit_' + key) }}<template v-if="key === 'ltv' && data.ltv_applied_pct"> ({{ data.ltv_applied_pct }}%)</template></span>
+            <span class="cost-value">AED {{ aed(value) }}</span>
+          </div>
+        </div>
+      </template>
+
+      <div class="dbr-gauge-box" v-if="dbrPct !== null">
         <div class="dbr-title-row">
-          <span class="dbr-title">Debt Burden Ratio (DBR)</span>
-          <span class="dbr-badge" :class="dbrBadgeClass">
-            {{ isDbrExceeded ? 'Exceeds 50% Cap' : 'Within Central Bank Limit' }}
-          </span>
+          <span class="dbr-title">{{ tr('debt_after') }}</span>
+          <span class="dbr-badge" :class="dbr.within_cap === false ? 'badge-danger' : 'badge-success'">{{ dbrPct }}% / {{ dbr.max_ratio_pct }}%</span>
         </div>
-        <span class="dbr-reg-note">UAE Central Bank Max: 50%</span>
-      </div>
-
-      <!-- DBR Progress Track -->
-      <div class="dbr-progress-track">
-        <div 
-          class="dbr-progress-bar"
-          :style="{ 
-            width: `${Math.min(projectedDbrPct, 100)}%`,
-            backgroundColor: dbrBarColor
-          }"
-        ></div>
-        <!-- 50% Cap Marker Line -->
-        <div class="dbr-cap-marker" title="UAE Central Bank 50% Cap">
-          <span class="marker-flag">50% Max Cap</span>
+        <div class="dbr-progress-track">
+          <div class="dbr-progress-bar" :style="{ width: `${Math.min(dbrPct, 100)}%` }"></div>
         </div>
       </div>
 
-      <div class="dbr-readouts">
-        <span class="dbr-current" v-if="currentDbrPct > 0">
-          Existing Commitments: <strong>{{ currentDbrPct }}%</strong>
-        </span>
-        <span class="dbr-projected">
-          Projected Total DBR: <strong>{{ projectedDbrPct }}%</strong>
-        </span>
-      </div>
-    </div>
-
-    <!-- Purchase Costs Breakdown (Expandable Drawer) -->
-    <div class="breakdown-section" v-if="upfrontCosts">
-      <button 
-        type="button" 
-        class="toggle-section-btn" 
-        @click="showCosts = !showCosts"
-        :aria-expanded="showCosts"
-      >
-        <span>💼 Upfront Purchase Costs & Fees Breakdown</span>
-        <span class="toggle-icon">{{ showCosts ? '▲' : '▼' }}</span>
-      </button>
-
-      <div class="breakdown-body" v-if="showCosts">
-        <div class="cost-row">
-          <span class="cost-label">Down Payment (Equity)</span>
-          <span class="cost-value font-mono">AED {{ formatNumber(upfrontCosts.down_payment_aed) }}</span>
-        </div>
-        <div class="cost-row">
-          <span class="cost-label">DLD Transfer Fee (4% + admin)</span>
-          <span class="cost-value font-mono">AED {{ formatNumber(upfrontCosts.dld_transfer_fee_aed) }}</span>
-        </div>
-        <div class="cost-row">
-          <span class="cost-label">Agency Broker Fee (2% + VAT)</span>
-          <span class="cost-value font-mono">AED {{ formatNumber(upfrontCosts.agency_broker_fee_aed) }}</span>
-        </div>
-        <div class="cost-row">
-          <span class="cost-label">Mortgage Registration (0.25% + admin)</span>
-          <span class="cost-value font-mono">AED {{ formatNumber(upfrontCosts.mortgage_registration_fee_aed) }}</span>
-        </div>
-        <div class="cost-row">
-          <span class="cost-label">Bank Processing & Valuation</span>
-          <span class="cost-value font-mono">
-            AED {{ formatNumber(upfrontCosts.bank_processing_fee_aed + upfrontCosts.property_valuation_fee_aed) }}
-          </span>
-        </div>
-        <div class="cost-divider"></div>
-        <div class="cost-row total-row">
-          <span class="cost-label font-bold">Total Upfront Cash Required</span>
-          <span class="cost-value text-lime font-bold font-mono">
-            AED {{ formatNumber(upfrontCosts.total_cash_required_at_purchase_aed) }}
-          </span>
+      <div class="breakdown-section" v-if="cash">
+        <div class="breakdown-body">
+          <div class="cost-row cost-heading"><span class="cost-label">{{ tr('cash_upfront') }}</span></div>
+          <div class="cost-row" v-for="item in cash.items" :key="item.item">
+            <span class="cost-label">{{ tr('cash_' + item.item) }}</span>
+            <span class="cost-value" v-if="item.amount_aed !== undefined">AED {{ aed(item.amount_aed) }}</span>
+            <span class="cost-value" v-else>AED {{ aed(item.min_aed) }}–{{ aed(item.max_aed) }}</span>
+          </div>
+          <div class="cost-divider"></div>
+          <div class="cost-row total-row">
+            <span class="cost-label font-bold">{{ tr('total') }}</span>
+            <span class="cost-value font-bold">AED {{ aed(cash.total_min_aed) }}–{{ aed(cash.total_max_aed) }}</span>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Amortization Schedule (Collapsible) -->
-    <div class="amortization-section" v-if="amortizationSample && amortizationSample.length">
-      <button 
-        type="button" 
-        class="toggle-section-btn" 
-        @click="showAmortization = !showAmortization"
-        :aria-expanded="showAmortization"
-      >
-        <span>📅 Amortization Schedule (Sample Years 1–5)</span>
-        <span class="toggle-icon">{{ showAmortization ? '▲' : '▼' }}</span>
-      </button>
+      <div class="breakdown-section" v-if="costs">
+        <div class="breakdown-body">
+          <div class="cost-row cost-heading"><span class="cost-label font-bold">{{ tr('purchase_costs') }} ({{ costs.emirate }})</span></div>
+          <div class="cost-row" v-for="item in costs.items" :key="item.item">
+            <span class="cost-label">{{ item.item }}</span>
+            <span class="cost-value">AED {{ aed(item.amount_aed) }}</span>
+          </div>
+        </div>
+      </div>
 
-      <div class="amortization-body" v-if="showAmortization">
+      <div class="amortization-section" v-if="data.amortization_schedule?.length">
         <table class="amort-table">
           <thead>
-            <tr>
-              <th>Year</th>
-              <th>Principal Paid</th>
-              <th>Interest Paid</th>
-              <th>Remaining Balance</th>
-            </tr>
+            <tr><th>#</th><th>Principal</th><th>Interest</th><th>Balance</th></tr>
           </thead>
           <tbody>
-            <tr v-for="row in amortizationSample" :key="row.year">
+            <tr v-for="row in data.amortization_schedule" :key="row.year">
               <td class="font-bold">{{ row.year }}</td>
-              <td class="text-emerald font-mono">AED {{ formatNumber(row.principal_paid) }}</td>
-              <td class="text-ruby font-mono">AED {{ formatNumber(row.interest_paid) }}</td>
-              <td class="text-cyan font-mono">AED {{ formatNumber(row.remaining_balance) }}</td>
+              <td class="text-emerald">{{ aed(row.principal_paid_aed) }}</td>
+              <td class="text-ruby">{{ aed(row.interest_paid_aed) }}</td>
+              <td class="text-cyan">{{ aed(row.remaining_balance_aed) }}</td>
             </tr>
           </tbody>
         </table>
       </div>
+
+      <div class="distribution-section" v-if="data.principal_share_pct">
+        <div class="distribution-bar-track">
+          <div class="dist-bar principal-bar" :style="{ width: `${data.principal_share_pct}%` }"></div>
+          <div class="dist-bar interest-bar" :style="{ width: `${data.interest_share_pct}%` }"></div>
+        </div>
+      </div>
+
+      <p class="assumptions-line" v-if="data.assumptions?.length">{{ tr('assumptions') }}: {{ data.assumptions.join(' · ') }}</p>
     </div>
 
-    <!-- Principal vs Interest Breakdown Bar (for EMI calculations) -->
-    <div class="distribution-section" v-if="breakdownPct">
-      <div class="distribution-header">
-        <span>Principal vs Interest Distribution</span>
-        <span>{{ breakdownPct.principal_pct }}% Principal / {{ breakdownPct.interest_pct }}% Interest</span>
-      </div>
-      <div class="distribution-bar-track">
-        <div 
-          class="dist-bar principal-bar" 
-          :style="{ width: `${breakdownPct.principal_pct}%` }"
-          title="Principal portion"
-        ></div>
-        <div 
-          class="dist-bar interest-bar" 
-          :style="{ width: `${breakdownPct.interest_pct}%` }"
-          title="Interest portion"
-        ></div>
-      </div>
-    </div>
-
-    </div><!-- /mortgage-expanded-drawer -->
-
-    <!-- Rule 10 Mandatory Disclaimer Block: "estimate only, subject to lender approval" -->
     <div class="mandatory-disclaimer-box" role="note">
-      <span class="disclaimer-icon">⚠️</span>
-      <p class="disclaimer-text">
-        <strong>Disclaimer:</strong> estimate only, subject to lender approval. All calculation outputs are indicative estimates and not formal loan offers. Actual terms, rates, and qualification depend on comprehensive credit assessment by UAE Central Bank licensed partner institutions.
-      </p>
+      <XoIcon name="info" :size="15" class="disclaimer-icon" />
+      <p class="disclaimer-text">{{ tr('estimate_only') }}</p>
     </div>
 
-    <!-- FR-15 Direct Jump to Matching Properties Action Button -->
-    <div class="card-actions" v-if="propertyPrice || loanCapacity">
-      <button 
-        type="button" 
-        class="btn-jump-properties"
-        @click="handleJumpToProperties"
-        id="btn-mortgage-jump-properties"
-      >
-        <span>🏢 View Matching Properties in Budget (~AED {{ formatNumber(recommendedBudget) }})</span>
-        <span class="action-arrow">↗</span>
+    <div class="card-actions" v-if="data.verdict === 'can_borrow' && data.max_property_price_aed > 0">
+      <button type="button" class="btn-jump-properties"
+              @click="$emit('ask', tr('show_matching_prompt', { budget: aed(data.max_property_price_aed) }))">
+        <span>{{ tr('show_matching') }}</span>
+        <XoIcon name="arrowDown" :size="15" class="action-arrow" />
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
+import { t, formatAed } from '../../i18n'
+import XoIcon from '../shared/XoIcon.vue'
 
 const props = defineProps({
-  data: {
-    type: Object,
-    required: true
-  }
+  data: { type: Object, required: true },
+  language: { type: String, default: 'en' }
 })
+defineEmits(['ask'])
 
-const emit = defineEmits(['jump-to-properties'])
-
-// Collapsible card state (compact preview by default)
 const isExpanded = ref(false)
-const showCosts = ref(false)
-const showAmortization = ref(false)
+const tr = (key, vars) => t(props.language, key, vars)
+const aed = (v) => formatAed(v, props.language)
 
-const isAffordability = computed(() => {
-  return props.data.calculation_type === 'affordability' || !!props.data.affordability_summary
+// Eligibility and affordability share one result shape (verdict, eligible loan, gates, ceilings).
+const isCheck = computed(() => ['affordability', 'eligibility'].includes(props.data.calculation_type) && 'verdict' in props.data)
+const dbr = computed(() => props.data.debt_burden || null)
+const dbrPct = computed(() => {
+  const d = dbr.value
+  if (!d) return null
+  const v = d.after_loan_pct ?? d.projected_ratio_pct
+  return v === null || v === undefined ? null : v
 })
-
-const summary = computed(() => {
-  return props.data.affordability_summary || null
-})
-
-const monthlyInstallment = computed(() => {
-  if (summary.value) {
-    return summary.value.max_allowable_monthly_emi_aed || summary.value.max_dbr_allowable_installment_aed || 0
-  }
-  return props.data.periodic_installment_aed || 0
-})
-
-const loanCapacity = computed(() => {
-  if (summary.value) {
-    return summary.value.max_borrowing_capacity_aed || 0
-  }
-  return props.data.loan_amount_aed || 0
-})
-
-const propertyPrice = computed(() => {
-  if (summary.value) {
-    return summary.value.max_property_price_aed || 0
-  }
-  return props.data.loan_amount_aed ? Math.round(props.data.loan_amount_aed * 1.25) : 0
-})
-
-const interestRate = computed(() => {
-  if (summary.value) {
-    return summary.value.assumed_interest_rate_pct || 4.49
-  }
-  return props.data.interest_rate_pct || 4.49
-})
-
-const tenureYears = computed(() => {
-  if (summary.value) {
-    return summary.value.tenure_years || 25
-  }
-  return props.data.tenure_years || 25
-})
-
-const dbrStatus = computed(() => {
-  return props.data.dbr_status || null
-})
-
-const currentDbrPct = computed(() => {
-  return dbrStatus.value?.current_dbr_pct || 0
-})
-
-const projectedDbrPct = computed(() => {
-  return dbrStatus.value?.projected_dbr_pct || 0
-})
-
-const isDbrExceeded = computed(() => {
-  return dbrStatus.value?.dbr_cap_exceeded || projectedDbrPct.value > 50.0
-})
-
-const dbrBadgeClass = computed(() => {
-  if (isDbrExceeded.value) return 'badge-danger'
-  if (projectedDbrPct.value > 40) return 'badge-warning'
-  return 'badge-success'
-})
-
-const dbrBarColor = computed(() => {
-  if (isDbrExceeded.value) return 'var(--ruby-primary, #f43f5e)'
-  if (projectedDbrPct.value > 40) return 'var(--gold-primary, #d4af37)'
-  return 'var(--emerald-primary, #10b981)'
-})
-
-const upfrontCosts = computed(() => {
-  return props.data.upfront_costs_breakdown || null
-})
-
-const amortizationSample = computed(() => {
-  return props.data.amortization_sample || []
-})
-
-const breakdownPct = computed(() => {
-  return props.data.breakdown_pct || null
-})
-
-const recommendedBudget = computed(() => {
-  if (props.data.jump_to_properties?.recommended_budget_max) {
-    return props.data.jump_to_properties.recommended_budget_max
-  }
-  return propertyPrice.value || loanCapacity.value
-})
-
-const handleJumpToProperties = () => {
-  emit('jump-to-properties', recommendedBudget.value)
-}
-
-const formatNumber = (num) => {
-  if (!num && num !== 0) return '0'
-  return Math.round(Number(num)).toLocaleString()
-}
+const cash = computed(() => props.data.cash_upfront || null)
+const costs = computed(() => props.data.purchase_costs || null)
 </script>
 
 <style scoped>
+/* Colours come from the widget tokens (--w-*) defined on .xo-widget in ChatWidget.vue */
 .mortgage-card {
-  width: 100%;
-  border-radius: var(--radius-md);
-  padding: 14px;
-  margin-top: 10px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-purple);
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  color: var(--text-primary);
-  transition: all var(--transition-normal);
+  display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 8px; padding: 14px;
+  background: var(--w-bg, #fff); color: var(--w-ink, #0f172a);
+  border: 1px solid var(--w-line, rgba(15, 23, 42, 0.08)); border-radius: 18px;
+  box-shadow: 0 10px 24px -16px rgba(38, 10, 74, 0.35);
+  font-variant-numeric: tabular-nums;
+}
+.mortgage-card.dbr-exceeded { border-color: rgba(244, 63, 94, 0.5); }
+
+.card-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.calc-icon {
+  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; flex: none;
+  background: linear-gradient(135deg, #5c039b, #7c2cf0); color: #fff;
+}
+.calc-title { margin: 0; font-family: var(--font-heading); font-size: 0.95rem; font-weight: 700; }
+.badge-estimates-not-offers {
+  padding: 3px 9px; border-radius: 999px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  color: var(--w-brand, #5c039b); background: var(--w-chip, rgba(92, 3, 155, 0.06));
 }
 
-.mortgage-card.dbr-exceeded {
-  border-color: rgba(244, 63, 94, 0.6);
-  box-shadow: 0 4px 16px rgba(244, 63, 94, 0.15);
+.metric-spotlight {
+  padding: 14px; border-radius: 14px;
+  background: linear-gradient(135deg, rgba(124, 44, 240, 0.07), rgba(3, 164, 244, 0.07));
 }
+.spotlight-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--w-ink-2, #64748b); }
+.spotlight-value { margin-top: 2px; font-family: var(--font-heading); font-size: 1.7rem; font-weight: 800; line-height: 1.15; color: #15803d; }
+[data-theme="dark"] .spotlight-value { color: #86ef3c; }
+.spotlight-submetrics {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--w-line, rgba(15, 23, 42, 0.08));
+}
+.submetric-pill { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.submetric-label { font-size: 0.7rem; color: var(--w-ink-2, #64748b); }
+.submetric-val { font-size: 0.86rem; font-weight: 700; color: var(--w-ink, #0f172a); overflow-wrap: anywhere; }
+.submetric-val.text-cyan { color: #0284c7; }
+[data-theme="dark"] .submetric-val.text-cyan { color: #38bdf8; }
 
 .btn-toggle-mortgage-card {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 7px 12px;
-  background: rgba(92, 3, 155, 0.06);
-  border: 1px dashed var(--border-purple);
-  border-radius: var(--radius-sm);
-  color: var(--brand-purple);
-  font-size: 0.76rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all var(--transition-fast);
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 8px 12px;
+  border: 1px solid var(--w-line, rgba(15, 23, 42, 0.08)); border-radius: 12px; cursor: pointer;
+  background: transparent; color: var(--w-brand, #5c039b); font-size: 0.78rem; font-weight: 600;
+  transition: background 150ms ease;
 }
+.btn-toggle-mortgage-card:hover { background: var(--w-chip, rgba(92, 3, 155, 0.06)); }
+.toggle-arrow { transition: transform 200ms ease; }
+.toggle-arrow.rotated { transform: rotate(180deg); }
 
-.btn-toggle-mortgage-card:hover {
-  background: var(--brand-purple);
-  color: #fff;
-  border-style: solid;
-}
+.mortgage-expanded-drawer { display: flex; flex-direction: column; gap: 12px; }
+.dbr-gauge-box { display: flex; flex-direction: column; gap: 6px; }
+.dbr-title-row { display: flex; align-items: center; justify-content: space-between; }
+.dbr-title { font-size: 0.76rem; font-weight: 700; color: var(--w-ink-2, #64748b); }
+.dbr-badge { padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+.badge-success { background: rgba(34, 197, 94, 0.14); color: #15803d; }
+.badge-danger { background: rgba(244, 63, 94, 0.14); color: #be123c; }
+.dbr-progress-track { height: 6px; border-radius: 999px; background: var(--w-line, rgba(15, 23, 42, 0.08)); overflow: hidden; }
+.dbr-progress-bar { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #22c55e, #03a4f4); }
+.dbr-exceeded .dbr-progress-bar { background: linear-gradient(90deg, #f59e0b, #f43f5e); }
 
-[data-theme="dark"] .btn-toggle-mortgage-card {
-  color: var(--brand-lime-vivid);
-  border-color: var(--brand-purple-soft);
-  background: rgba(92, 3, 155, 0.15);
-}
+.breakdown-body { display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem; }
+.cost-row { display: flex; justify-content: space-between; gap: 12px; }
+.cost-label { color: var(--w-ink-2, #64748b); }
+.cost-value { font-weight: 600; text-align: end; white-space: nowrap; }
+.cost-heading .cost-label, .font-bold { font-weight: 700; color: var(--w-ink, #0f172a); }
+.cost-divider { height: 1px; background: var(--w-line, rgba(15, 23, 42, 0.08)); margin: 2px 0; }
+.total-row .cost-value { color: #15803d; }
+[data-theme="dark"] .total-row .cost-value { color: #86ef3c; }
 
-[data-theme="dark"] .btn-toggle-mortgage-card:hover {
-  background: var(--brand-purple);
-  color: #fff;
-}
-
-.mortgage-expanded-drawer {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  animation: slideDownFade 0.25s ease-out;
-}
-
-@keyframes slideDownFade {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Header */
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.calc-icon {
-  font-size: 1.25rem;
-}
-
-.calc-title {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  font-family: var(--font-heading);
-}
-
-/* Mandatory Label (Rule 10) */
-.badge-estimates-not-offers {
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 3px 10px;
-  border-radius: var(--radius-full);
-  background: rgba(92, 3, 155, 0.08);
-  color: var(--brand-purple);
-  border: 1px solid var(--border-purple);
-}
-
-[data-theme="dark"] .badge-estimates-not-offers {
-  background: rgba(92, 3, 155, 0.25);
-  color: var(--brand-cyan);
-}
-
-/* Spotlight */
-.metric-spotlight {
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.spotlight-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.spotlight-label {
-  font-size: 0.74rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-}
-
-.spotlight-value {
-  font-size: 1.55rem;
-  font-weight: 800;
-  font-family: var(--font-heading);
-  letter-spacing: -0.02em;
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  color: var(--brand-purple);
-}
-
-[data-theme="dark"] .spotlight-value {
-  color: var(--brand-lime-vivid);
-}
-
-.per-month {
-  font-size: 0.82rem;
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-.spotlight-submetrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.submetric-pill {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.submetric-label {
-  font-size: 0.70rem;
-  color: var(--text-muted);
-}
-
-.submetric-val {
-  font-size: 0.86rem;
-  font-weight: 600;
-  font-family: monospace;
-}
-
-/* DBR Gauge */
-.dbr-gauge-box {
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.dbr-gauge-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.76rem;
-}
-
-.dbr-title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.dbr-title {
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.dbr-reg-note {
-  font-size: 0.70rem;
-  color: var(--text-muted);
-}
-
-.dbr-badge {
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: var(--radius-full);
-}
-
-.badge-success {
-  background: rgba(22, 163, 74, 0.12);
-  color: var(--brand-lime);
-  border: 1px solid var(--border-lime);
-}
-
-.badge-warning {
-  background: rgba(234, 179, 8, 0.12);
-  color: #B45309;
-  border: 1px solid rgba(234, 179, 8, 0.35);
-}
-
-.badge-danger {
-  background: rgba(244, 63, 94, 0.12);
-  color: #E11D48;
-  border: 1px solid rgba(244, 63, 94, 0.35);
-}
-
-.dbr-progress-track {
-  position: relative;
-  width: 100%;
-  height: 8px;
-  background: var(--border-prominent);
-  border-radius: var(--radius-full);
-  overflow: visible;
-}
-
-.dbr-progress-bar {
-  height: 100%;
-  border-radius: var(--radius-full);
-  transition: width var(--transition-smooth);
-}
-
-.dbr-cap-marker {
-  position: absolute;
-  left: 50%;
-  top: -4px;
-  bottom: -4px;
-  width: 2px;
-  background: #E11D48;
-  box-shadow: 0 0 6px rgba(225, 29, 72, 0.4);
-}
-
-.marker-flag {
-  position: absolute;
-  top: -18px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: #E11D48;
-  white-space: nowrap;
-}
-
-.dbr-readouts {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  margin-top: 4px;
-}
-
-/* Expandable breakdown sections */
-.breakdown-section, .amortization-section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.toggle-section-btn {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  color: var(--text-secondary);
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.toggle-section-btn:hover {
-  background: var(--bg-surface-hover);
-  color: var(--text-primary);
-}
-
-.toggle-icon {
-  font-size: 0.65rem;
-  color: var(--brand-purple);
-}
-
-[data-theme="dark"] .toggle-icon {
-  color: var(--brand-cyan);
-}
-
-.breakdown-body {
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 0.76rem;
-}
-
-.cost-row {
-  display: flex;
-  justify-content: space-between;
-  color: var(--text-secondary);
-}
-
-.cost-divider {
-  height: 1px;
-  background: var(--border-subtle);
-  margin: 4px 0;
-}
-
-.total-row {
-  font-size: 0.85rem;
-}
-
-/* Amortization Table */
-.amort-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.72rem;
-  text-align: left;
-}
-
-.amort-table th, .amort-table td {
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
+.amortization-section { max-height: 220px; overflow: auto; border: 1px solid var(--w-line, rgba(15, 23, 42, 0.08)); border-radius: 12px; }
+.amort-table { width: 100%; border-collapse: collapse; font-size: 0.74rem; }
 .amort-table th {
-  color: var(--text-muted);
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.66rem;
+  position: sticky; top: 0; padding: 6px 8px; text-align: end; font-weight: 600;
+  background: var(--w-feed, #f7f6fb); color: var(--w-ink-2, #64748b);
 }
+.amort-table th:first-child, .amort-table td:first-child { text-align: start; }
+.amort-table td { padding: 5px 8px; text-align: end; border-top: 1px solid var(--w-line, rgba(15, 23, 42, 0.08)); }
+.text-emerald { color: #15803d; }
+.text-ruby { color: #be123c; }
+.text-cyan { color: #0284c7; }
+[data-theme="dark"] .text-emerald { color: #86ef3c; }
+[data-theme="dark"] .text-ruby { color: #fb7185; }
+[data-theme="dark"] .text-cyan { color: #38bdf8; }
 
-/* Distribution Bar */
-.distribution-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
+.distribution-bar-track { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--w-line, rgba(15, 23, 42, 0.08)); }
+.principal-bar { background: #22c55e; }
+.interest-bar { background: #f43f5e; }
+.assumptions-line { margin: 0; font-size: 0.72rem; color: var(--w-ink-2, #64748b); }
 
-.distribution-header {
-  display: flex;
-  justify-content: space-between;
-}
+.verdict-badge { padding: 4px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: rgba(34, 197, 94, 0.14); color: #15803d; }
+.verdict-eligible_lower .verdict-badge { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+.verdict-not_eligible .verdict-badge { background: rgba(244, 63, 94, 0.14); color: #be123c; }
+.verdict-can_borrow .verdict-badge { background: rgba(3, 164, 244, 0.12); color: #0284c7; }
+[data-theme="dark"] .verdict-badge { color: #86ef3c; }
+[data-theme="dark"] .verdict-eligible_lower .verdict-badge { color: #fbbf24; }
+[data-theme="dark"] .verdict-not_eligible .verdict-badge { color: #fb7185; }
+[data-theme="dark"] .verdict-can_borrow .verdict-badge { color: #38bdf8; }
+.spotlight-value.fail { font-size: 1.05rem; color: #be123c; }
+.shortfall { margin: 4px 0 0; font-size: 0.78rem; color: #b45309; }
+.card-note { margin: 0; font-size: 0.76rem; color: var(--w-ink-2, #64748b); }
+.gate-chip { padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; }
+.gate-chip.pass { background: rgba(34, 197, 94, 0.14); color: #15803d; }
+.gate-chip.review { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+.gate-chip.fail { background: rgba(244, 63, 94, 0.14); color: #be123c; }
+.cost-row.tightest .cost-label, .cost-row.tightest .cost-value { color: var(--w-brand, #5c039b); font-weight: 700; }
+.mandatory-disclaimer-box { display: flex; align-items: center; gap: 8px; color: var(--w-ink-2, #64748b); }
+.disclaimer-icon { flex: none; }
+.disclaimer-text { margin: 0; font-size: 0.74rem; }
 
-.distribution-bar-track {
-  width: 100%;
-  height: 8px;
-  display: flex;
-  border-radius: var(--radius-full);
-  overflow: hidden;
-  background: var(--border-prominent);
-}
-
-.dist-bar.principal-bar {
-  background: var(--brand-lime);
-}
-
-.dist-bar.interest-bar {
-  background: #E11D48;
-}
-
-/* Mandatory Disclaimer Banner (Rule 10) */
-.mandatory-disclaimer-box {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  background: rgba(92, 3, 155, 0.05);
-  border: 1px solid var(--border-purple);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-}
-
-[data-theme="dark"] .mandatory-disclaimer-box {
-  background: rgba(92, 3, 155, 0.12);
-}
-
-.disclaimer-icon {
-  font-size: 0.95rem;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.disclaimer-text {
-  margin: 0;
-  font-size: 0.72rem;
-  line-height: 1.4;
-  color: var(--text-muted);
-}
-
-.disclaimer-text strong {
-  color: var(--brand-purple);
-}
-
-[data-theme="dark"] .disclaimer-text strong {
-  color: var(--brand-cyan);
-}
-
-/* Action Button (FR-15) */
-.card-actions {
-  display: flex;
-  margin-top: 4px;
-}
-
+.card-actions { display: flex; }
 .btn-jump-properties {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: linear-gradient(135deg, var(--brand-purple-light), var(--brand-purple));
-  color: #FFFFFF;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-sm);
-  padding: 10px 16px;
-  font-size: 0.84rem;
-  font-weight: 700;
-  font-family: var(--font-heading);
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-fast);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px 14px;
+  border: 0; border-radius: 12px; cursor: pointer;
+  background: linear-gradient(135deg, #5c039b, #7c2cf0); color: #fff; font-size: 0.82rem; font-weight: 600;
 }
+.btn-jump-properties:active { transform: scale(0.98); }
+.action-arrow { transform: rotate(-90deg); }
+[dir="rtl"] .action-arrow { transform: rotate(90deg); }
 
-.btn-jump-properties:hover {
-  background: linear-gradient(135deg, var(--brand-purple-vibrant), var(--brand-purple-light));
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
-.action-arrow {
-  font-size: 1rem;
-  transition: transform var(--transition-fast);
-}
-
-.btn-jump-properties:hover .action-arrow {
-  transform: translateX(2px) translateY(-2px);
-}
-
-/* Text color utilities */
-.text-lime { color: var(--brand-lime); }
-.text-gold { color: var(--brand-purple); }
-[data-theme="dark"] .text-gold { color: var(--brand-lime-vivid); }
-.text-cyan { color: var(--brand-cyan); }
-.text-emerald { color: var(--brand-lime); }
-.text-ruby { color: #E11D48; }
-.font-mono { font-family: monospace; }
-.font-bold { font-weight: 700; }
-
-/* Responsive adjustments */
-@media (max-width: 480px) {
-  .spotlight-value {
-    font-size: 1.25rem;
-    flex-wrap: wrap;
-  }
-  
-  .spotlight-submetrics {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
-  
-  .dbr-readouts {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-  
-  .btn-jump-properties {
-    font-size: 0.75rem;
-    padding: 8px 12px;
-    height: auto;
-    text-align: center;
-  }
-  
-  .btn-jump-properties span:first-child {
-    white-space: normal;
-  }
-
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-  }
-
-  .badge-estimates-not-offers {
-    align-self: flex-start;
-    font-size: 0.65rem;
-  }
+@container (max-width: 340px) {
+  .spotlight-submetrics { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
