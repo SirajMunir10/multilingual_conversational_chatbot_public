@@ -1,0 +1,123 @@
+/* Converted from components/chat/MortgageCard.vue (Vue scoped styles). Class names unchanged. */
+/* Colours come from the widget tokens (--w-*) defined on .xo-widget in ChatWidget.vue */
+.mortgage-card {
+  display: flex; flex-direction: column; gap: 12px; width: 100%; margin-top: 8px; padding: 14px;
+  background: var(--w-bg, #fff); color: var(--w-ink, #0f172a);
+  border: 1px solid var(--w-line, rgba(15, 23, 42, 0.08)); border-radius: 18px;
+  box-shadow: 0 10px 24px -16px rgba(38, 10, 74, 0.35);
+  font-variant-numeric: tabular-nums;
+}
+.mortgage-card.dbr-exceeded { border-color: rgba(244, 63, 94, 0.5); }
+
+.card-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.mortgage-card .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.calc-icon {
+  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; flex: none;
+  background: linear-gradient(135deg, #5c039b, #7c2cf0); color: #fff;
+}
+.calc-title { margin: 0; font-family: var(--font-heading); font-size: 0.95rem; font-weight: 700; }
+.badge-estimates-not-offers {
+  padding: 3px 9px; border-radius: 999px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  color: var(--w-brand, #5c039b); background: var(--w-chip, rgba(92, 3, 155, 0.06));
+}
+
+.metric-spotlight {
+  padding: 14px; border-radius: 14px;
+  background: linear-gradient(135deg, rgba(124, 44, 240, 0.07), rgba(3, 164, 244, 0.07));
+}
+.spotlight-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--w-ink-2, #64748b); }
+.spotlight-value { margin-top: 2px; font-family: var(--font-heading); font-size: 1.7rem; font-weight: 800; line-height: 1.15; color: #15803d; }
+[data-theme="dark"] .spotlight-value { color: #86ef3c; }
+.spotlight-submetrics {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--w-line, rgba(15, 23, 42, 0.08));
+}
+.submetric-pill { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.submetric-label { font-size: 0.7rem; color: var(--w-ink-2, #64748b); }
+.submetric-val { font-size: 0.86rem; font-weight: 700; color: var(--w-ink, #0f172a); overflow-wrap: anywhere; }
+.submetric-val.text-cyan { color: #0284c7; }
+[data-theme="dark"] .submetric-val.text-cyan { color: #38bdf8; }
+
+.btn-toggle-mortgage-card {
+  display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 8px 12px;
+  border: 1px solid var(--w-line, rgba(15, 23, 42, 0.08)); border-radius: 12px; cursor: pointer;
+  background: transparent; color: var(--w-brand, #5c039b); font-size: 0.78rem; font-weight: 600;
+  transition: background 150ms ease;
+}
+.btn-toggle-mortgage-card:hover { background: var(--w-chip, rgba(92, 3, 155, 0.06)); }
+.toggle-arrow { transition: transform 200ms ease; }
+.toggle-arrow.rotated { transform: rotate(180deg); }
+
+.mortgage-expanded-drawer { display: flex; flex-direction: column; gap: 12px; }
+.dbr-gauge-box { display: flex; flex-direction: column; gap: 6px; }
+.dbr-title-row { display: flex; align-items: center; justify-content: space-between; }
+.dbr-title { font-size: 0.76rem; font-weight: 700; color: var(--w-ink-2, #64748b); }
+.dbr-badge { padding: 2px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+.badge-success { background: rgba(34, 197, 94, 0.14); color: #15803d; }
+.badge-danger { background: rgba(244, 63, 94, 0.14); color: #be123c; }
+.dbr-progress-track { height: 6px; border-radius: 999px; background: var(--w-line, rgba(15, 23, 42, 0.08)); overflow: hidden; }
+.dbr-progress-bar { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #22c55e, #03a4f4); }
+.dbr-exceeded .dbr-progress-bar { background: linear-gradient(90deg, #f59e0b, #f43f5e); }
+
+.breakdown-body { display: flex; flex-direction: column; gap: 6px; font-size: 0.8rem; }
+.cost-row { display: flex; justify-content: space-between; gap: 12px; }
+.cost-label { color: var(--w-ink-2, #64748b); }
+.cost-value { font-weight: 600; text-align: end; white-space: nowrap; }
+.cost-heading .cost-label, .font-bold { font-weight: 700; color: var(--w-ink, #0f172a); }
+.cost-divider { height: 1px; background: var(--w-line, rgba(15, 23, 42, 0.08)); margin: 2px 0; }
+.total-row .cost-value { color: #15803d; }
+[data-theme="dark"] .total-row .cost-value { color: #86ef3c; }
+
+.amortization-section { max-height: 220px; overflow: auto; border: 1px solid var(--w-line, rgba(15, 23, 42, 0.08)); border-radius: 12px; }
+.amort-table { width: 100%; border-collapse: collapse; font-size: 0.74rem; }
+.amort-table th {
+  position: sticky; top: 0; padding: 6px 8px; text-align: end; font-weight: 600;
+  background: var(--w-feed, #f7f6fb); color: var(--w-ink-2, #64748b);
+}
+.amort-table th:first-child, .amort-table td:first-child { text-align: start; }
+.amort-table td { padding: 5px 8px; text-align: end; border-top: 1px solid var(--w-line, rgba(15, 23, 42, 0.08)); }
+.text-emerald { color: #15803d; }
+.text-ruby { color: #be123c; }
+.text-cyan { color: #0284c7; }
+[data-theme="dark"] .text-emerald { color: #86ef3c; }
+[data-theme="dark"] .text-ruby { color: #fb7185; }
+[data-theme="dark"] .text-cyan { color: #38bdf8; }
+
+.distribution-bar-track { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--w-line, rgba(15, 23, 42, 0.08)); }
+.principal-bar { background: #22c55e; }
+.interest-bar { background: #f43f5e; }
+.assumptions-line { margin: 0; font-size: 0.72rem; color: var(--w-ink-2, #64748b); }
+
+.verdict-badge { padding: 4px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: rgba(34, 197, 94, 0.14); color: #15803d; }
+.verdict-eligible_lower .verdict-badge { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+.verdict-not_eligible .verdict-badge { background: rgba(244, 63, 94, 0.14); color: #be123c; }
+.verdict-can_borrow .verdict-badge { background: rgba(3, 164, 244, 0.12); color: #0284c7; }
+[data-theme="dark"] .verdict-badge { color: #86ef3c; }
+[data-theme="dark"] .verdict-eligible_lower .verdict-badge { color: #fbbf24; }
+[data-theme="dark"] .verdict-not_eligible .verdict-badge { color: #fb7185; }
+[data-theme="dark"] .verdict-can_borrow .verdict-badge { color: #38bdf8; }
+.spotlight-value.fail { font-size: 1.05rem; color: #be123c; }
+.shortfall { margin: 4px 0 0; font-size: 0.78rem; color: #b45309; }
+.card-note { margin: 0; font-size: 0.76rem; color: var(--w-ink-2, #64748b); }
+.gate-chip { padding: 1px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; }
+.gate-chip.pass { background: rgba(34, 197, 94, 0.14); color: #15803d; }
+.gate-chip.review { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+.gate-chip.fail { background: rgba(244, 63, 94, 0.14); color: #be123c; }
+.cost-row.tightest .cost-label, .cost-row.tightest .cost-value { color: var(--w-brand, #5c039b); font-weight: 700; }
+.mandatory-disclaimer-box { display: flex; align-items: center; gap: 8px; color: var(--w-ink-2, #64748b); }
+.disclaimer-icon { flex: none; }
+.disclaimer-text { margin: 0; font-size: 0.74rem; }
+
+.card-actions { display: flex; }
+.btn-jump-properties {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 10px 14px;
+  border: 0; border-radius: 12px; cursor: pointer;
+  background: linear-gradient(135deg, #5c039b, #7c2cf0); color: #fff; font-size: 0.82rem; font-weight: 600;
+}
+.btn-jump-properties:active { transform: scale(0.98); }
+.action-arrow { transform: rotate(-90deg); }
+[dir="rtl"] .action-arrow { transform: rotate(90deg); }
+
+@container (max-width: 340px) {
+  .spotlight-submetrics { grid-template-columns: minmax(0, 1fr); }
+}

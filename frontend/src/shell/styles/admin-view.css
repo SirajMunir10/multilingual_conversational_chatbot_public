@@ -1,0 +1,250 @@
+/* Converted from views/AdminView.vue (Vue scoped styles). Class names unchanged. */
+.admin-view-container {
+  display: flex;
+  min-height: 800px;
+  max-width: 1400px;
+  margin: 0 auto;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.admin-sidebar {
+  width: 300px;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+[dir="rtl"] .admin-sidebar {
+  border-right: none;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.admin-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.admin-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--brand-purple-light), var(--brand-purple));
+  color: #fff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.role-badge {
+  font-size: 0.75rem;
+  color: var(--brand-purple);
+  background: rgba(92, 3, 155, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+[data-theme="dark"] .role-badge {
+  color: var(--brand-cyan);
+  background: rgba(3, 164, 244, 0.15);
+}
+
+.admin-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+
+[dir="rtl"] .admin-nav-item {
+  text-align: right;
+}
+
+.admin-nav-item:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.admin-nav-item.active {
+  background: var(--bg-surface-elevated);
+  color: var(--brand-purple);
+  border-left: 3px solid var(--brand-purple);
+}
+
+[dir="rtl"] .admin-nav-item.active {
+  border-left: none;
+  border-right: 3px solid var(--brand-purple);
+}
+
+[data-theme="dark"] .admin-nav-item.active {
+  color: var(--brand-cyan);
+  border-color: var(--brand-cyan);
+}
+
+.admin-content {
+  flex: 1;
+  padding: 32px;
+  background: var(--bg-primary);
+}
+
+.content-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.content-header h2 {
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.section-desc {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.admin-status-pill {
+  font-size: 0.8rem;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-prominent);
+  color: var(--text-secondary);
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.metric-card {
+  padding: 20px;
+}
+
+.metric-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.metric-value {
+  display: block;
+  font-family: var(--font-heading);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.metric-trend {
+  font-size: 0.8rem;
+}
+
+.metric-trend.positive {
+  color: #34d399;
+}
+
+.metric-trend.neutral {
+  color: var(--text-muted);
+}
+
+.module-placeholder {
+  padding: 40px;
+  text-align: center;
+  max-width: 600px;
+  margin: 40px auto 0;
+}
+
+.placeholder-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+}
+
+.module-placeholder h4 {
+  font-size: 1.25rem;
+  margin-bottom: 12px;
+  color: var(--gold-light);
+}
+
+.module-placeholder p {
+  font-size: 0.925rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .admin-view-container {
+    flex-direction: column;
+    margin: 8px;
+    border-radius: var(--radius-md);
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: 16px 12px;
+  }
+
+  .admin-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .admin-nav-item {
+    flex: 1 1 45%;
+    padding: 8px 10px;
+    font-size: 0.80rem;
+  }
+
+  .admin-content {
+    padding: 16px 12px;
+  }
+
+  .content-header {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .admin-grid {
+    grid-template-columns: 1fr;
+  }
+}

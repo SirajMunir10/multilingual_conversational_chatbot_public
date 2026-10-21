@@ -16,7 +16,7 @@ All model names come from environment variables. See [`.env.example`](.env.examp
 ## How it works
 
 ```
-Browser widget (Vue 3)
+Browser widget (Next.js / React)
   ├─ POST /api/chat/stream  (SSE: session → status → tokens → final)
   ├─ WS   /api/voice/stt    (24 kHz PCM → gpt-live-transcribe → live captions)
   ├─ POST /api/handoff/confirm (advisor callback card: user confirms or edits → saved to the PostgreSQL lead store)
@@ -71,15 +71,17 @@ cp .env.example backend/.env        # add your keys
 cd backend && pip install -r requirements.txt
 uvicorn app.main:app --port 8000
 
-cd frontend && npm install && npm run dev   # http://localhost:3000 (proxies /api and the voice WebSocket)
+cd frontend && npm install && npm run dev   # http://localhost:3000 (proxies /api; live voice connects to ws://127.0.0.1:8000, see frontend/.env.development)
 ```
+
+`npm run build` writes a static site to `frontend/out/`, which nginx (Docker) or Vercel serves.
 
 With Docker: set `POSTGRES_PASSWORD` and your keys in `.env`, then run `docker compose up --build`.
 
 ### Deployment notes
 
 - **Backend (Render):** set every variable from `.env.example`. `ALLOWED_ORIGINS` must include the frontend origin, for example `https://xoto-blitz.vercel.app`. Set `DATABASE_URL`, or leads are kept in memory only.
-- **Frontend (Vercel):** set `VITE_API_WS_BASE=wss://<backend-host>`. Vercel rewrites cannot proxy WebSockets, and live voice connects directly to the backend.
+- **Frontend (Vercel):** set `NEXT_PUBLIC_API_WS_BASE=wss://<backend-host>` (the old `VITE_API_WS_BASE` is still read). Vercel rewrites cannot proxy WebSockets, and live voice connects directly to the backend. The project's framework preset is Next.js (`frontend/vercel.json`).
 - **Off-plan links:** set `OFFPLAN_LISTING_URL_TEMPLATE` (for example `https://xoto.ae/<path>/{slug}`) to show "View details". Without it, no link is shown.
 
 ## Tests
@@ -98,5 +100,7 @@ The 69 offline tests cover:
 ## Repository
 
 - `backend/app/` holds the FastAPI app: `orchestrator/` (engine, tools, sessions), `services/`, `gateways/`, `voice/`, `routers/`, `core/`, `db/` and `data/`.
-- `frontend/src/` holds the Vue widget: `components/chat/`, `composables/useVoice.js` (live STT), `composables/useSpeech.js` (streamed TTS playback), `composables/useWordHighlight.js` (marks the spoken word), `components/chat/VoiceOrb.vue` (3D voice orb), `i18n/ui.json` (15-language UI text), `services/api.js` and `utils/markdown.js`.
+- `frontend/src/xo/` holds the widget, self-contained so it can be moved into another Next.js site: `components/` (`ChatWidget.jsx`, `MessageItem.jsx`, `MortgageCard.jsx`, `HandoffCard.jsx`, `VoiceOrb.jsx` for the 3D voice orb, …), `hooks/useVoice.js` and `lib/voice.js` (live STT), `lib/speech.js` (streamed TTS playback), `lib/wordHighlight.js` (marks the spoken word), `i18n/ui.json` (15-language UI text), `lib/api.js`, `lib/markdown.js` and `styles/`.
+- `frontend/src/shell/` holds the demo page around the widget (header, landing page, admin preview); `frontend/src/app/` is the Next.js entry.
+- `e2e/` holds the frontend tests (Playwright, simulated backend): desktop, Android and iPhone, 13 screen sizes and screenshot comparison. Run `cd e2e && npm install && npx playwright install && BASE_URL=http://localhost:3000 npm test`.
 - `docs/IMPLEMENTATION_PLAN.md` is the remediation plan these changes follow.

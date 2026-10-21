@@ -1,0 +1,53 @@
+/* Converted from components/chat/HandoffCard.vue (Vue scoped styles). Class names unchanged. */
+/* Colours come from the widget tokens (--w-*) defined on .xo-widget in ChatWidget.vue */
+.handoff-card {
+  display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding: 14px;
+  background: var(--w-bg, #fff); color: var(--w-ink, #0f172a);
+  border: 1px solid rgba(124, 44, 240, 0.28); border-radius: 18px;
+  box-shadow: 0 10px 24px -16px rgba(38, 10, 74, 0.35);
+}
+.handoff-card.is-saved { border-color: rgba(34, 197, 94, 0.4); }
+.handoff-card.is-expired { opacity: 0.6; }
+.hc-head { display: flex; align-items: center; gap: 10px; }
+.hc-icon {
+  display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 10px;
+  background: linear-gradient(135deg, #5c039b, #7c2cf0); color: #fff;
+}
+.is-saved .hc-icon { background: linear-gradient(135deg, #16a34a, #22c55e); }
+.hc-title { display: flex; flex-direction: column; min-width: 0; }
+.hc-title strong { font-size: 0.9rem; font-weight: 650; }
+.hc-title small { font-size: 0.72rem; color: var(--w-ink-2, #64748b); font-variant-numeric: tabular-nums; }
+
+.hc-rows { display: grid; gap: 6px; margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--w-feed, #f7f6fb); font-size: 0.84rem; }
+.hc-rows div { display: flex; justify-content: space-between; gap: 12px; }
+.hc-rows dt { color: var(--w-ink-2, #64748b); }
+.hc-rows dd { margin: 0; font-weight: 600; text-align: end; overflow-wrap: anywhere; }
+
+.hc-form { display: flex; flex-direction: column; gap: 10px; }
+.hc-form label { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 0.74rem; color: var(--w-ink-2, #64748b); }
+.hc-form-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.hc-form input, .hc-form select {
+  width: 100%; padding: 9px 11px; border: 1px solid var(--w-line, rgba(15, 23, 42, 0.12)); border-radius: 10px;
+  background: var(--w-bg, #fff); color: var(--w-ink, #0f172a); font: inherit; font-size: 0.9rem;
+}
+.hc-form input:focus, .hc-form select:focus { outline: none; border-color: rgba(124, 44, 240, 0.55); box-shadow: 0 0 0 3px var(--w-ring, rgba(124, 44, 240, 0.14)); }
+.hc-form input[aria-invalid="true"] { border-color: #dc2626; }
+.hc-form small { font-size: 0.7rem; }
+
+.hc-error { margin: 0; font-size: 0.78rem; color: #dc2626; }
+.hc-note { margin: 0; font-size: 0.74rem; color: var(--w-ink-2, #64748b); }
+.hc-actions { display: flex; gap: 8px; }
+.hc-btn {
+  flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 8px 12px;
+  border-radius: 12px; cursor: pointer; font-size: 0.84rem; font-weight: 600; transition: transform 150ms ease, background 150ms ease;
+}
+.hc-btn:active:not(:disabled) { transform: scale(0.97); }
+.hc-btn:disabled { opacity: 0.65; cursor: default; }
+.hc-btn.ghost { border: 1px solid var(--w-line, rgba(15, 23, 42, 0.12)); background: transparent; color: var(--w-ink, #0f172a); }
+.hc-btn.ghost:hover:not(:disabled) { background: var(--w-chip, rgba(92, 3, 155, 0.06)); }
+.hc-btn.primary { border: 0; background: linear-gradient(135deg, #5c039b, #7c2cf0); color: #fff; box-shadow: 0 6px 14px -6px rgba(92, 3, 155, 0.6); }
+.visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+@container (max-width: 340px) {
+  .hc-form-row { grid-template-columns: minmax(0, 1fr); }
+}
