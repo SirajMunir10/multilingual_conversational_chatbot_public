@@ -4,6 +4,7 @@ import unittest
 from unittest import mock
 
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from app.core.config import settings
 from app.core.security import issue_token, rate_limiter, redact_payment_data, verify_token
@@ -74,6 +75,34 @@ class TestSecurity(unittest.TestCase):
             codes = [self.client.get("/api/mortgage/products").status_code for _ in range(3)]
             rate_limiter._hits.clear()
         self.assertEqual(codes[-1], 429)
+
+    def _stt(self, origin):
+        """Opens the live-transcription socket from a site; returns "accepted" or the close code."""
+        async def relay(ws, language, session_id):
+            await ws.accept()
+            await ws.send_json({"type": "ready"})
+            await ws.close()
+        with mock.patch("app.voice.stt_service.relay", side_effect=relay):
+            try:
+                with self.client.websocket_connect("/api/voice/stt?language=en", headers={"origin": origin}) as ws:
+                    ws.receive_json()
+                return "accepted"
+            except WebSocketDisconnect as exc:
+                return exc.code
+
+    def test_voice_socket_only_accepts_allowed_sites(self):
+        with mock.patch.object(settings, "ALLOWED_ORIGINS", ["https://xoto-blitz.vercel.app"]):
+            rate_limiter._hits.clear()
+            self.assertEqual(self._stt("https://xoto-blitz.vercel.app"), "accepted")
+            self.assertEqual(self._stt("https://evil-example.com"), 1008)
+
+    def test_voice_socket_rate_limit(self):
+        with mock.patch.object(settings, "ALLOWED_ORIGINS", ["https://xoto-blitz.vercel.app"]), \
+                mock.patch.object(settings, "RATE_LIMIT_ENABLED", True), mock.patch.object(settings, "RATE_LIMIT_PER_MINUTE", 2):
+            rate_limiter._hits.clear()
+            results = [self._stt("https://xoto-blitz.vercel.app") for _ in range(3)]
+            rate_limiter._hits.clear()
+        self.assertEqual(results, ["accepted", "accepted", 1013])
 
     def test_unhandled_errors_do_not_leak(self):
         with mock.patch("app.services.mortgage_service.MortgageCalculationService.get_products", side_effect=RuntimeError("secret detail")):

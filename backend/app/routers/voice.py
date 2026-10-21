@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.core.security import enforce_rate_limit, rate_limiter
+from app.core.security import client_ip, enforce_rate_limit, rate_limiter
 from app.voice import stt_service
 from app.voice.tts_service import TTSService, TTSUnavailable
 
@@ -54,6 +54,16 @@ async def speak_timed(payload: SpeakRequest):
 
 @router.websocket("/stt")
 async def speech_to_text(websocket: WebSocket, language: Optional[str] = None, session_id: Optional[str] = None):
-    # Allow all valid domain connections
+    """Live transcription with gpt-live-transcribe. Send binary PCM16 (24 kHz mono) frames, then {"type":"commit"}.
+
+    CORS does not cover WebSockets, so the allowed sites are checked here. To use voice from another site,
+    add it to that server's ALLOWED_ORIGINS instead of removing this check."""
+    origin = websocket.headers.get("origin")
+    if origin and settings.ALLOWED_ORIGINS and origin not in settings.ALLOWED_ORIGINS:
+        await websocket.close(code=1008)
+        return
+    # Every session spends transcription credit, so it shares the per-visitor limit with the other paid endpoints.
+    if settings.RATE_LIMIT_ENABLED and not rate_limiter.allow(f"stt:{client_ip(websocket)}", settings.RATE_LIMIT_PER_MINUTE):
+        await websocket.close(code=1013)
+        return
     await stt_service.relay(websocket, language, session_id)
-    return
