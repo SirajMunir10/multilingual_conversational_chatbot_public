@@ -122,7 +122,9 @@ class ConversationOrchestrator:
             "stream_options": {"include_usage": True},
             "max_completion_tokens": settings.LLM_MAX_OUTPUT_TOKENS,
         }
-        if settings.LLM_REASONING_EFFORT and settings.LLM_REASONING_EFFORT != "none":
+        # "none" must be sent explicitly: if it is left out, gpt-6-luna uses its default reasoning level,
+        # which OpenAI rejects together with function tools (HTTP 400 on every turn).
+        if settings.LLM_REASONING_EFFORT:
             kwargs["reasoning_effort"] = settings.LLM_REASONING_EFFORT
         if allow_tools:
             kwargs["tools"] = tools.tool_schemas()

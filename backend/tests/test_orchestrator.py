@@ -36,6 +36,16 @@ class TestOrchestrator(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(types[-1], "final")
         self.assertEqual(events[-1]["text"], "Hello, how can I help with UAE property?")
 
+    async def test_reasoning_effort_none_is_sent_with_tools(self):
+        # gpt-6-luna rejects tools unless reasoning_effort is explicitly "none" (leaving it out is not the same).
+        client = FakeClient([text_turn("Hi!")])
+        self.use(client)
+        with mock.patch("app.orchestrator.orchestrator.settings.LLM_REASONING_EFFORT", "none"):
+            await collect(O.stream_turn("hi"))
+        call = client.chat.completions.calls[0]
+        self.assertIn("tools", call)
+        self.assertEqual(call.get("reasoning_effort"), "none")
+
     async def test_tool_loop_returns_cards_and_remembers_results(self):
         client = FakeClient([tool_turn([{"name": "search_properties", "args": {"location": "JVC"}}]), text_turn("1. Test Residence in JVC.")])
         self.use(client)
