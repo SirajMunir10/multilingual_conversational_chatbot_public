@@ -1,0 +1,56 @@
+// Text chat: sending, streaming, markdown safety, session, persistence, clearing, scrolling.
+const { test, expect } = require('@playwright/test')
+const { openApp, send } = require('./support/mock')
+
+test.describe('chat', () => {
+  test('sends with Enter and the button; renders the reply; keeps the session id', async ({ page }) => {
+    const log = await openApp(page)
+    const reply = await send(page, 'hello')
+    await expect(page.locator('.message-wrapper.user .plain-text').last()).toHaveText('hello')
+    await expect(reply.locator('.md')).toHaveText('Hi! I can help with UAE property, mortgages, renting or XOTO services.')
+    expect(log.chat[0]).toMatchObject({ message: 'hello', session_id: null, ui_language: 'en', channel: 'text' })
+    await page.locator('#chat-text-input').fill('second')
+    await expect(page.locator('.send-btn')).toBeEnabled()
+    await page.locator('.send-btn').click()
+    await expect(page.locator('.message-wrapper.user')).toHaveCount(2)
+    await expect.poll(() => log.chat.length).toBe(2)
+    expect(log.chat[1].session_id).toBe('sess_test')
+  })
+
+  test('markdown renders lists and bold; HTML in replies is never executed', async ({ page }) => {
+    await openApp(page)
+    const reply = await send(page, 'xss test')
+    await expect(reply.locator('.md strong')).toHaveText('markdown')
+    await expect(reply.locator('.md img')).toHaveCount(0)
+    await expect(reply.locator('.md script')).toHaveCount(0)
+    expect(await page.evaluate(() => window.__xss)).toBeUndefined()
+    await expect(reply.locator('.md')).toContainText('<img src=x')
+    const list = await send(page, 'long answer')
+    await expect(list.locator('.md ol li')).toHaveCount(14)
+  })
+
+  test('conversation survives a reload and is cleared by the clear button', async ({ page }) => {
+    const log = await openApp(page)
+    await send(page, 'hello')
+    await page.reload()
+    await page.locator('.xo-widget').waitFor()
+    await expect(page.locator('.message-wrapper.user')).toHaveCount(1)
+    await expect(page.locator('.xo-hero')).toHaveCount(0)
+    await page.locator('.clear-chat-btn').click()
+    await expect(page.locator('.message-wrapper')).toHaveCount(1)
+    await expect(page.locator('.xo-hero')).toBeVisible()
+    await send(page, 'again')
+    expect(log.chat.at(-1).session_id).toBeNull()
+  })
+
+  test('jump-to-latest appears when scrolled up and scrolls back down', async ({ page }) => {
+    await openApp(page)
+    await send(page, 'long answer')
+    await send(page, 'long answer')
+    await page.locator('.chat-feed').evaluate((el) => { el.scrollTop = 0; el.dispatchEvent(new Event('scroll')) })
+    await expect(page.locator('.jump-to-latest-btn')).toBeVisible()
+    await page.locator('.jump-to-latest-btn').click()
+    await expect(page.locator('.jump-to-latest-btn')).toBeHidden()
+    await expect.poll(() => page.locator('.chat-feed').evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThan(80)
+  })
+})

@@ -1,0 +1,13 @@
+{
+  "name": "xo-e2e",
+  "private": true,
+  "description": "End-to-end browser tests for the XO frontend (runs against any build via BASE_URL; backend is simulated).",
+  "scripts": {
+    "test": "playwright test",
+    "test:update-baseline": "playwright test --update-snapshots",
+    "report": "playwright show-report report"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.48.2"
+  }
+}

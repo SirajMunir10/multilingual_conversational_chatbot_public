@@ -1,0 +1,100 @@
+{
+ "default_language": "en",
+ "languages": [
+  {
+   "code": "en",
+   "name": "English",
+   "native": "English",
+   "dir": "ltr"
+  },
+  {
+   "code": "ar",
+   "name": "Arabic",
+   "native": "العربية",
+   "dir": "rtl"
+  },
+  {
+   "code": "hi",
+   "name": "Hindi",
+   "native": "हिन्दी",
+   "dir": "ltr"
+  },
+  {
+   "code": "ur",
+   "name": "Urdu",
+   "native": "اردو",
+   "dir": "rtl"
+  },
+  {
+   "code": "fr",
+   "name": "French",
+   "native": "Français",
+   "dir": "ltr"
+  },
+  {
+   "code": "es",
+   "name": "Spanish",
+   "native": "Español",
+   "dir": "ltr"
+  },
+  {
+   "code": "de",
+   "name": "German",
+   "native": "Deutsch",
+   "dir": "ltr"
+  },
+  {
+   "code": "zh",
+   "name": "Chinese",
+   "native": "简体中文",
+   "dir": "ltr"
+  },
+  {
+   "code": "tl",
+   "name": "Tagalog",
+   "native": "Filipino",
+   "dir": "ltr"
+  },
+  {
+   "code": "fa",
+   "name": "Persian",
+   "native": "فارسی",
+   "dir": "rtl"
+  },
+  {
+   "code": "bn",
+   "name": "Bengali",
+   "native": "বাংলা",
+   "dir": "ltr"
+  },
+  {
+   "code": "ta",
+   "name": "Tamil",
+   "native": "தமிழ்",
+   "dir": "ltr"
+  },
+  {
+   "code": "pa",
+   "name": "Punjabi",
+   "native": "ਪੰਜਾਬੀ",
+   "dir": "ltr"
+  },
+  {
+   "code": "ml",
+   "name": "Malayalam",
+   "native": "മലയാളം",
+   "dir": "ltr"
+  },
+  {
+   "code": "or",
+   "name": "Odia",
+   "native": "ଓଡ଼ିଆ",
+   "dir": "ltr"
+  }
+ ],
+ "voice": {
+  "sample_rate": 24000,
+  "silence_submit_ms": 2000,
+  "max_session_sec": 120
+ }
+}

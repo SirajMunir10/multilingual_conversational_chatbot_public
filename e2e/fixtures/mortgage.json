@@ -1,0 +1,274 @@
+{
+ "eligibility": {
+  "calculation_type": "eligibility",
+  "label": "estimates, not offers",
+  "disclaimer": "estimate only, subject to lender approval",
+  "rule_version": "v3.0.0",
+  "inputs": {
+   "residency": "Expat resident",
+   "age": 35,
+   "employment_type": "salaried",
+   "monthly_income_aed": 35000.0,
+   "monthly_loan_instalments_aed": 2000.0,
+   "credit_card_limits_aed": 20000.0,
+   "interest_rate_pct": 4.5,
+   "tenure_years": 25,
+   "property_price_aed": 2500000.0,
+   "property_status": "ready",
+   "purpose": "home",
+   "has_outstanding_mortgage": false
+  },
+  "gates": [
+   {
+    "gate": "applicant",
+    "result": "pass",
+    "rule": "Age 21 or over and gross monthly income at least AED 15,000 (banks range from AED 10,000 to 15,000)"
+   },
+   {
+    "gate": "term",
+    "result": "pass",
+    "term_years": 25,
+    "rule": "Loan must end by age 65 (salaried); maximum 25 years"
+   },
+   {
+    "gate": "debt_burden",
+    "result": "pass",
+    "rule": "All monthly debts including the new instalment within 50% of income"
+   }
+  ],
+  "notes": [],
+  "assumptions": [
+   "an agent is used"
+  ],
+  "interest_rate_pct": 4.5,
+  "stress_rate_pct": 6.5,
+  "term_years": 25,
+  "income": {
+   "salary_aed": 35000.0,
+   "recognised_rent_aed": 0.0,
+   "total_aed": 35000.0
+  },
+  "existing_debts_aed": 3000.0,
+  "requested_loan_aed": 2250000.0,
+  "shortfall_aed": 250000.0,
+  "property_value_aed": 2500000.0,
+  "down_payment_aed": 250000.0,
+  "ltv_applied_pct": 80.0,
+  "ltv_case": "Expat, first home, value below AED 5 million",
+  "max_property_price_aed": 2500000.0,
+  "verdict": "eligible_lower",
+  "reason": "The requested loan is above the eligible loan by AED 250,000. The tightest limit is the ltv.",
+  "eligible_loan_aed": 2000000.0,
+  "max_loan_aed": 2000000.0,
+  "loan_amount_aed": 2000000.0,
+  "ceilings_aed": {
+   "debt_burden": 2147489.07,
+   "income_multiple": 2940000.0,
+   "ltv": 2000000.0
+  },
+  "tightest_limit": "ltv",
+  "instalment_aed": 11116.65,
+  "stress_instalment_aed": 13504.14,
+  "debt_burden": {
+   "max_ratio_pct": 50.0,
+   "after_loan_pct": 40.33,
+   "within_cap": true
+  },
+  "cash_upfront": {
+   "items": [
+    {
+     "item": "down_payment",
+     "amount_aed": 250000.0,
+     "how": "The amount the buyer pays"
+    },
+    {
+     "item": "transfer_fee",
+     "amount_aed": 100000.0,
+     "how": "4% of the property price (Dubai)"
+    },
+    {
+     "item": "mortgage_registration",
+     "amount_aed": 5000.0,
+     "how": "0.25% of the loan"
+    },
+    {
+     "item": "bank_arrangement_fee",
+     "min_aed": 0.0,
+     "max_aed": 20000.0,
+     "how": "Up to 1% of the loan"
+    },
+    {
+     "item": "agent_commission",
+     "amount_aed": 52500.0,
+     "how": "2% of the price + VAT, if an agent is used"
+    }
+   ],
+   "total_min_aed": 407500.0,
+   "total_max_aed": 427500.0,
+   "note": "Each item is an estimate; the bank's offer and the emirate's fee schedule decide the final amounts."
+  }
+ },
+ "affordability": {
+  "calculation_type": "affordability",
+  "label": "estimates, not offers",
+  "disclaimer": "estimate only, subject to lender approval",
+  "rule_version": "v3.0.0",
+  "inputs": {
+   "residency": "Expat resident",
+   "age": 35,
+   "employment_type": "salaried",
+   "monthly_income_aed": 35000.0,
+   "monthly_loan_instalments_aed": 2000.0,
+   "credit_card_limits_aed": 20000.0,
+   "interest_rate_pct": 3.8,
+   "tenure_years": 25,
+   "property_price_aed": null,
+   "property_status": "ready",
+   "purpose": "home",
+   "has_outstanding_mortgage": null
+  },
+  "gates": [
+   {
+    "gate": "applicant",
+    "result": "pass",
+    "rule": "Age 21 or over and gross monthly income at least AED 15,000 (banks range from AED 10,000 to 15,000)"
+   },
+   {
+    "gate": "term",
+    "result": "pass",
+    "term_years": 25,
+    "rule": "Loan must end by age 65 (salaried); maximum 25 years"
+   },
+   {
+    "gate": "debt_burden",
+    "result": "pass",
+    "rule": "All monthly debts including the new instalment within 50% of income"
+   }
+  ],
+  "notes": [],
+  "assumptions": [
+   "3.8% interest rate (benchmark)",
+   "25-year term requested",
+   "an agent is used"
+  ],
+  "interest_rate_pct": 3.8,
+  "stress_rate_pct": 5.8,
+  "term_years": 25,
+  "income": {
+   "salary_aed": 35000.0,
+   "recognised_rent_aed": 0.0,
+   "total_aed": 35000.0
+  },
+  "existing_debts_aed": 3000.0,
+  "implied_property_price_aed": 2867283.54,
+  "max_property_price_aed": 2867283.54,
+  "verdict": "can_borrow",
+  "reason": "The buyer can borrow up to AED 2,293,827.",
+  "eligible_loan_aed": 2293826.83,
+  "max_loan_aed": 2293826.83,
+  "loan_amount_aed": 2293826.83,
+  "ceilings_aed": {
+   "debt_burden": 2293826.83,
+   "income_multiple": 2940000.0
+  },
+  "tightest_limit": "debt_burden",
+  "instalment_aed": 11855.79,
+  "stress_instalment_aed": 14500.0,
+  "debt_burden": {
+   "max_ratio_pct": 50.0,
+   "after_loan_pct": 42.45,
+   "within_cap": true
+  },
+  "cash_upfront": {
+   "items": [
+    {
+     "item": "down_payment",
+     "amount_aed": 573456.71,
+     "how": "The amount the buyer pays"
+    },
+    {
+     "item": "transfer_fee",
+     "amount_aed": 114691.34,
+     "how": "4% of the property price (Dubai)"
+    },
+    {
+     "item": "mortgage_registration",
+     "amount_aed": 5734.57,
+     "how": "0.25% of the loan"
+    },
+    {
+     "item": "bank_arrangement_fee",
+     "min_aed": 0.0,
+     "max_aed": 22938.27,
+     "how": "Up to 1% of the loan"
+    },
+    {
+     "item": "agent_commission",
+     "amount_aed": 60212.95,
+     "how": "2% of the price + VAT, if an agent is used"
+    }
+   ],
+   "total_min_aed": 754095.57,
+   "total_max_aed": 777033.84,
+   "note": "Each item is an estimate; the bank's offer and the emirate's fee schedule decide the final amounts."
+  }
+ },
+ "emi": {
+  "calculation_type": "emi",
+  "label": "estimates, not offers",
+  "disclaimer": "estimate only, subject to lender approval",
+  "rule_version": "v3.0.0",
+  "property_price_aed": 1500000.0,
+  "down_payment_aed": 300000.0,
+  "ltv_applied_pct": 80.0,
+  "loan_amount_aed": 1200000.0,
+  "interest_rate_pct": 3.8,
+  "tenure_years": 25,
+  "frequency": "monthly",
+  "instalment_aed": 6202.28,
+  "monthly_equivalent_aed": 6202.28,
+  "stress_rate_pct": 5.8,
+  "stress_instalment_aed": 7585.58,
+  "total_repayment_aed": 1860683.62,
+  "total_interest_aed": 660683.62,
+  "principal_share_pct": 64.49,
+  "interest_share_pct": 35.51,
+  "amortization_schedule": [
+   {
+    "year": 1,
+    "principal_paid_aed": 29334.76,
+    "interest_paid_aed": 45092.59,
+    "remaining_balance_aed": 1170665.24
+   },
+   {
+    "year": 2,
+    "principal_paid_aed": 30469.1,
+    "interest_paid_aed": 43958.24,
+    "remaining_balance_aed": 1140196.14
+   },
+   {
+    "year": 3,
+    "principal_paid_aed": 31647.31,
+    "interest_paid_aed": 42780.04,
+    "remaining_balance_aed": 1108548.83
+   },
+   {
+    "year": 4,
+    "principal_paid_aed": 32871.07,
+    "interest_paid_aed": 41556.27,
+    "remaining_balance_aed": 1075677.76
+   },
+   {
+    "year": 5,
+    "principal_paid_aed": 34142.16,
+    "interest_paid_aed": 40285.19,
+    "remaining_balance_aed": 1041535.6
+   }
+  ],
+  "assumptions": [
+   "3.8% interest rate (benchmark)",
+   "25-year term",
+   "minimum 20% down payment"
+  ]
+ }
+}

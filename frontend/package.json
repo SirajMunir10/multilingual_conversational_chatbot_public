@@ -1,19 +1,16 @@
 {
   "name": "xo-frontend",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "preview": "npx --yes serve@14.2.4 out -l 4173"
   },
   "dependencies": {
-    "markdown-it": "^14.1.0",
-    "vue": "^3.5.12"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-vue": "^5.1.4",
-    "vite": "^5.4.9"
+    "markdown-it": "14.1.0",
+    "next": "16.3.8",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
   }
 }
