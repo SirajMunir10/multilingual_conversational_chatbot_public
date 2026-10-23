@@ -7,10 +7,20 @@ from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.core.security import client_ip, enforce_rate_limit, rate_limiter
+from app.core.usage_tracker import UsageTracker
+from app.db.conversation_store import ConversationStore
 from app.voice import stt_service
 from app.voice.tts_service import TTSService, TTSUnavailable
 
 router = APIRouter(prefix="/api/voice", tags=["Voice"])
+
+
+def _record_speech_cost(session_id: Optional[str]) -> None:
+    """Speech is produced after the reply is saved; adds its cost to the conversation (PRD FR-31 cost per conversation)."""
+    if session_id:
+        total = UsageTracker.summary(session_id).get("cost_usd", {}).get("total")
+        if total:
+            ConversationStore.save_in_background(ConversationStore.update_cost(session_id, total))
 
 
 class SpeakRequest(BaseModel):
@@ -32,6 +42,7 @@ async def speak(payload: SpeakRequest):
         yield first
         async for chunk in stream:
             yield chunk
+        _record_speech_cost(payload.session_id)
     return StreamingResponse(body(), media_type="audio/mpeg")
 
 
@@ -49,6 +60,7 @@ async def speak_timed(payload: SpeakRequest):
         yield json.dumps(first, ensure_ascii=False) + "\n"
         async for chunk in stream:
             yield json.dumps(chunk, ensure_ascii=False) + "\n"
+        _record_speech_cost(payload.session_id)
     return StreamingResponse(body(), media_type="application/x-ndjson", headers={"Cache-Control": "no-store"})
 
 

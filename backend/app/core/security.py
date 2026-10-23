@@ -5,7 +5,7 @@ import json
 import re
 import time
 from collections import defaultdict, deque
-from typing import Deque, Dict, Optional
+from typing import Any, Deque, Dict, Optional
 
 from fastapi import Header, HTTPException, Request, status
 
@@ -32,18 +32,25 @@ def _b64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
-def issue_token(user_id: str, ttl_sec: int = 3600) -> str:
-    """Issues an HS256 token. Used by the identity provider integration and tests."""
+# Admin sign-in tokens carry this audience, so they are never accepted as a visitor identity (and vice versa).
+ADMIN_AUDIENCE = "xo-admin"
+
+
+def issue_token(user_id: str, ttl_sec: int = 3600, audience: Optional[str] = None, claims: Optional[Dict[str, Any]] = None) -> str:
+    """Issues an HS256 token. Used by the identity provider integration, the admin sign-in and tests."""
     if not settings.JWT_SECRET:
         raise RuntimeError("JWT_SECRET is not configured")
+    body: Dict[str, Any] = {**(claims or {}), "sub": user_id, "exp": int(time.time()) + ttl_sec}
+    if audience:
+        body["aud"] = audience
     header = _b64url_encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode())
-    payload = _b64url_encode(json.dumps({"sub": user_id, "exp": int(time.time()) + ttl_sec}).encode())
+    payload = _b64url_encode(json.dumps(body).encode())
     signature = hmac.new(settings.JWT_SECRET.encode(), f"{header}.{payload}".encode(), hashlib.sha256).digest()
     return f"{header}.{payload}.{_b64url_encode(signature)}"
 
 
-def verify_token(token: str) -> Optional[str]:
-    """Returns the user id for a valid, unexpired HS256 token, otherwise None."""
+def verify_claims(token: str, audience: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Returns the claims of a valid, unexpired HS256 token issued for exactly this audience, otherwise None."""
     if not token or not settings.JWT_SECRET:
         return None
     try:
@@ -55,12 +62,17 @@ def verify_token(token: str) -> Optional[str]:
         if not hmac.compare_digest(expected, _b64url_decode(sig_b64)):
             return None
         payload = json.loads(_b64url_decode(payload_b64))
-        if int(payload.get("exp", 0)) < time.time():
+        if int(payload.get("exp", 0)) < time.time() or payload.get("aud") != audience or not payload.get("sub"):
             return None
-        sub = payload.get("sub")
-        return str(sub) if sub else None
+        return payload
     except Exception:
         return None
+
+
+def verify_token(token: str) -> Optional[str]:
+    """Returns the visitor's user id for a valid, unexpired HS256 token, otherwise None. Admin tokens are rejected."""
+    claims = verify_claims(token)
+    return str(claims["sub"]) if claims else None
 
 
 def optional_user(authorization: Optional[str] = Header(None)) -> Optional[str]:
@@ -68,12 +80,6 @@ def optional_user(authorization: Optional[str] = Header(None)) -> Optional[str]:
     if not authorization or not authorization.lower().startswith("bearer "):
         return None
     return verify_token(authorization.split(" ", 1)[1].strip())
-
-
-def require_admin(x_admin_key: Optional[str] = Header(None, alias="X-Admin-Key")) -> None:
-    """FastAPI dependency protecting back-office endpoints (transcripts, leads, usage)."""
-    if not settings.ADMIN_API_KEY or not x_admin_key or not hmac.compare_digest(x_admin_key, settings.ADMIN_API_KEY):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin authentication required.")
 
 
 # ---------------------------------------------------------------------------
@@ -133,14 +139,25 @@ class RateLimiter:
     def __init__(self) -> None:
         self._hits: Dict[str, Deque[float]] = defaultdict(deque)
 
-    def allow(self, key: str, limit: int, window_sec: float = 60.0) -> bool:
+    def _recent(self, key: str, window_sec: float) -> Deque[float]:
         now = time.monotonic()
         bucket = self._hits[key]
         while bucket and now - bucket[0] > window_sec:
             bucket.popleft()
+        return bucket
+
+    def blocked(self, key: str, limit: int, window_sec: float) -> bool:
+        """True once `limit` events were recorded for `key` within the window; records nothing itself."""
+        return len(self._recent(key, window_sec)) >= limit
+
+    def record(self, key: str) -> None:
+        self._hits[key].append(time.monotonic())
+
+    def allow(self, key: str, limit: int, window_sec: float = 60.0) -> bool:
+        bucket = self._recent(key, window_sec)
         if len(bucket) >= limit:
             return False
-        bucket.append(now)
+        bucket.append(time.monotonic())
         if len(self._hits) > 20000:
             for stale in [k for k, v in self._hits.items() if not v]:
                 self._hits.pop(stale, None)

@@ -12,6 +12,7 @@ from app.core.config import load_config
 from app.gateways.inventory_gateway import Listing
 from app.gateways.services_gateway import ServicesGateway
 from app.orchestrator.session_store import SessionContext
+from app.services import escalation
 from app.services.account_service import AccountService
 from app.services.handoff_service import HandoffService
 from app.services.mortgage_service import (AffordabilityInput, EligibilityInput, EMIInput, MortgageCalculationService,
@@ -104,7 +105,7 @@ TOOL_SCHEMAS: List[Dict[str, Any]] = [
         "full_name": {"type": "string"}, "phone": {"type": "string", "description": "As the user typed it; local UAE numbers are accepted."},
         "preferred_language": {"type": "string", "description": "Language for the call, as a language code (e.g. en, ar, hi). Defaults to the conversation language."},
         "consent_confirmed": {"type": "boolean", "description": "True only if the user explicitly agreed to be contacted."},
-        "team": {"type": "string", "enum": ["mortgage", "sales", "support"]},
+        "team": {"type": "string", "enum": list(escalation.TEAM_KEYS)},
         "summary": {"type": "string", "description": "One-line summary of what the user needs."},
     }, ["full_name", "phone", "consent_confirmed"]),
     _fn("set_language", "Switch the conversation language when the user writes in or asks for another supported language.",
@@ -230,7 +231,12 @@ async def _offers(session: SessionContext, args: Dict[str, Any]) -> ToolResult:
 
 
 async def _kb(session: SessionContext, args: Dict[str, Any]) -> ToolResult:
-    return await RAGService.retrieve(args.get("query", ""), session.session_id), {}
+    result = await RAGService.retrieve(args.get("query", ""), session.session_id)
+    if result.get("status") == "not_found":
+        # The escalation rules (FR-29) decide whether, and after how many misses, XO offers an advisor.
+        session.kb_misses += 1
+        result = {**result, "instruction": escalation.low_confidence_instruction(session.kb_misses)}
+    return result, {}
 
 
 async def _services(session: SessionContext, args: Dict[str, Any]) -> ToolResult:

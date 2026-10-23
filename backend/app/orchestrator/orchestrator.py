@@ -5,6 +5,7 @@ listing and fact comes from a tool. Replies are streamed token by token (PRD §7
 import difflib
 import json
 import logging
+import secrets
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
@@ -12,9 +13,11 @@ from app.core.audit import AuditService
 from app.core.config import load_config, settings
 from app.core.security import redact_payment_data
 from app.core.usage_tracker import UsageTracker
+from app.db.conversation_store import ConversationStore
 from app.llm.client import LLMService
 from app.orchestrator import tools
 from app.orchestrator.session_store import SessionContext, SessionStore
+from app.services import escalation, prompt_profile
 
 logger = logging.getLogger("xo.orchestrator")
 
@@ -100,7 +103,8 @@ def localized_message(language: str, key: str) -> str:
 class ConversationOrchestrator:
 
     @classmethod
-    def _messages(cls, session: SessionContext, user_text: str, channel: str) -> List[Dict[str, Any]]:
+    def _messages(cls, session: SessionContext, user_text: str, channel: str,
+                  notes: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         messages: List[Dict[str, Any]] = [{"role": "system", "content": LLMService.system_prompt(session.language, session.language_locked)}]
         if channel == "voice":
             messages.append({"role": "system", "content": VOICE_NOTE})
@@ -110,6 +114,8 @@ class ConversationOrchestrator:
         if session.user_id:
             messages.append({"role": "system", "content": "The user is signed in; account tools will return their own data."})
         messages.extend(session.history)
+        for note in notes or []:
+            messages.append({"role": "system", "content": note})
         messages.append({"role": "user", "content": user_text})
         return messages
 
@@ -153,10 +159,27 @@ class ConversationOrchestrator:
         SessionStore.add_transcript(session, "user", text)
         session.current_user_text = text
 
-        messages = cls._messages(session, text, channel)
+        # Banned topics (FR-25) are refused in code, before the model runs.
+        topic = prompt_profile.banned_topic(text)
+        if topic:
+            reply = prompt_profile.banned_reply(topic, session.language)
+            SessionStore.append_history(session, [{"role": "user", "content": text}, {"role": "assistant", "content": reply}])
+            SessionStore.add_transcript(session, "assistant", reply)
+            turn_id = cls._save_turn(session, channel, text, reply, ["guardrail"], started)
+            yield {"type": "token", "text": reply}
+            yield {"type": "final", "session_id": session.session_id, "language": session.language, "text": reply,
+                   "tools": ["guardrail"], "turn_id": turn_id}
+            return
+
+        # Escalation rules (FR-29) that match before this turn become notes to the model; each is offered once.
+        notes = escalation.turn_notes(session, text)
+        offered = [n["id"] for n in notes if n["id"] != "frustration"]
+        session.escalations_offered = session.escalations_offered + offered
+
+        messages = cls._messages(session, text, channel, [n["note"] for n in notes])
         turn_messages: List[Dict[str, Any]] = [{"role": "user", "content": text}]
         ui: Dict[str, Any] = {}
-        tools_used: List[str] = []
+        tools_used: List[str] = [f"escalation:{rule_id}" for rule_id in offered]
         final_text = ""
         first_token_at: Optional[float] = None
 
@@ -232,6 +255,7 @@ class ConversationOrchestrator:
                     yield {"type": "token", "text": "\n\n"}
         except Exception as exc:
             logger.exception("LLM turn failed: %s", exc)
+            cls._save_turn(session, channel, text, None, tools_used, started)
             yield {"type": "error", "message": localized_message(session.language, "error_generic")}
             return
 
@@ -245,8 +269,26 @@ class ConversationOrchestrator:
                                details={"tools": tools_used, "language": session.language, "channel": channel,
                                         "first_token_sec": round(first_token_at - started, 2) if first_token_at else None,
                                         "total_sec": round(elapsed, 2)})
+        turn_id = cls._save_turn(session, channel, text, final_text, tools_used, started)
         yield {"type": "final", "session_id": session.session_id, "language": session.language, "text": final_text,
-               "tools": tools_used, **ui}
+               "tools": tools_used, "turn_id": turn_id, **ui}
+
+    @staticmethod
+    def _save_turn(session: SessionContext, channel: str, user_text: str, reply: Optional[str], tools_used: List[str],
+                   started: float) -> Optional[str]:
+        """Keeps the turn for admin review and analytics (FR-26, FR-31), in the background.
+        Returns the reply's id, which the widget sends back with a thumbs up/down."""
+        turn_id = secrets.token_hex(8) if reply is not None else None
+        if turn_id:
+            session.turn_ids = (session.turn_ids + [turn_id])[-200:]
+        if session.preview:
+            return turn_id
+        cost = UsageTracker.summary(session.session_id).get("cost_usd", {}).get("total", 0.0)
+        ConversationStore.save_in_background(ConversationStore.record_turn(
+            session.session_id, language=session.language, channel=channel, user_text=user_text, reply=reply,
+            tools=list(dict.fromkeys(tools_used)), latency_ms=int((time.monotonic() - started) * 1000), cost_usd=cost,
+            turn_id=turn_id))
+        return turn_id
 
     @classmethod
     async def process_turn(cls, message: str, **kwargs: Any) -> Dict[str, Any]:

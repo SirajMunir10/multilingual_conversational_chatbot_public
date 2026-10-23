@@ -231,7 +231,10 @@
    "cash_agent_commission": "Agent commission",
    "total": "Total",
    "debt_after": "Debt burden after the loan",
-   "note_non_resident": "Non-resident: standard 50% LTV; some banks lend up to 65%."
+   "note_non_resident": "Non-resident: standard 50% LTV; some banks lend up to 65%.",
+   "rate_helpful": "Helpful",
+   "rate_not_helpful": "Not helpful",
+   "rated_thanks": "Thanks for the feedback"
   },
   "ar": {
    "welcome": "مرحباً، أنا XO. اسألني عن العقارات والتمويل العقاري والإيجار في الإمارات أو عن خدمات XOTO.",
@@ -356,7 +359,10 @@
    "cash_agent_commission": "عمولة الوسيط",
    "total": "الإجمالي",
    "debt_after": "عبء الدين بعد التمويل",
-   "note_non_resident": "غير المقيم: نسبة تمويل قياسية 50%، وبعض البنوك حتى 65%."
+   "note_non_resident": "غير المقيم: نسبة تمويل قياسية 50%، وبعض البنوك حتى 65%.",
+   "rate_helpful": "مفيد",
+   "rate_not_helpful": "غير مفيد",
+   "rated_thanks": "شكرًا على ملاحظتك"
   },
   "hi": {
    "welcome": "नमस्ते, मैं XO हूँ। यूएई प्रॉपर्टी, होम लोन, किराये या XOTO सेवाओं के बारे में पूछें।",
@@ -481,7 +487,10 @@
    "cash_agent_commission": "एजेंट कमीशन",
    "total": "कुल",
    "debt_after": "लोन के बाद कर्ज़ भार",
-   "note_non_resident": "नॉन-रेज़िडेंट: मानक 50% LTV; कुछ बैंक 65% तक देते हैं।"
+   "note_non_resident": "नॉन-रेज़िडेंट: मानक 50% LTV; कुछ बैंक 65% तक देते हैं।",
+   "rate_helpful": "उपयोगी",
+   "rate_not_helpful": "उपयोगी नहीं",
+   "rated_thanks": "आपकी प्रतिक्रिया के लिए धन्यवाद"
   },
   "ur": {
    "welcome": "سلام، میں XO ہوں۔ یو اے ای کی پراپرٹی، مارگیج، کرائے یا XOTO سروسز کے بارے میں پوچھیں۔",
@@ -606,7 +615,10 @@
    "cash_agent_commission": "ایجنٹ کمیشن",
    "total": "کل",
    "debt_after": "قرض کے بعد قرض کا بوجھ",
-   "note_non_resident": "نان ریزیڈنٹ: معیاری 50% LTV؛ کچھ بینک 65% تک دیتے ہیں۔"
+   "note_non_resident": "نان ریزیڈنٹ: معیاری 50% LTV؛ کچھ بینک 65% تک دیتے ہیں۔",
+   "rate_helpful": "مفید",
+   "rate_not_helpful": "مفید نہیں",
+   "rated_thanks": "آپ کی رائے کا شکریہ"
   },
   "fr": {
    "welcome": "Bonjour, je suis XO. Posez-moi vos questions sur l'immobilier, les prêts, la location aux EAU ou les services XOTO.",
@@ -731,7 +743,10 @@
    "cash_agent_commission": "Commission d'agence",
    "total": "Total",
    "debt_after": "Endettement après le prêt",
-   "note_non_resident": "Non-résident : quotité standard de 50 % ; certaines banques vont jusqu'à 65 %."
+   "note_non_resident": "Non-résident : quotité standard de 50 % ; certaines banques vont jusqu'à 65 %.",
+   "rate_helpful": "Utile",
+   "rate_not_helpful": "Pas utile",
+   "rated_thanks": "Merci pour votre avis"
   },
   "es": {
    "welcome": "Hola, soy XO. Pregúntame sobre propiedades, hipotecas, alquiler en los EAU o servicios de XOTO.",
@@ -856,7 +871,10 @@
    "cash_agent_commission": "Comisión de agencia",
    "total": "Total",
    "debt_after": "Endeudamiento tras el préstamo",
-   "note_non_resident": "No residente: LTV estándar del 50%; algunos bancos llegan al 65%."
+   "note_non_resident": "No residente: LTV estándar del 50%; algunos bancos llegan al 65%.",
+   "rate_helpful": "Útil",
+   "rate_not_helpful": "No útil",
+   "rated_thanks": "Gracias por tu opinión"
   },
   "de": {
    "welcome": "Hallo, ich bin XO. Fragen Sie mich zu Immobilien, Finanzierung, Miete in den VAE oder zu XOTO-Services.",
@@ -981,7 +999,10 @@
    "cash_agent_commission": "Maklerprovision",
    "total": "Summe",
    "debt_after": "Schuldenquote nach dem Kredit",
-   "note_non_resident": "Nicht ansässig: Standard 50 % Beleihung; manche Banken bis 65 %."
+   "note_non_resident": "Nicht ansässig: Standard 50 % Beleihung; manche Banken bis 65 %.",
+   "rate_helpful": "Hilfreich",
+   "rate_not_helpful": "Nicht hilfreich",
+   "rated_thanks": "Danke für dein Feedback"
   },
   "zh": {
    "welcome": "你好，我是 XO。可以问我阿联酋的房产、房贷、租房或 XOTO 服务。",
@@ -1106,7 +1127,10 @@
    "cash_agent_commission": "中介佣金",
    "total": "合计",
    "debt_after": "贷款后负债比",
-   "note_non_resident": "非居民：标准贷款成数 50%，部分银行最高 65%。"
+   "note_non_resident": "非居民：标准贷款成数 50%，部分银行最高 65%。",
+   "rate_helpful": "有帮助",
+   "rate_not_helpful": "没有帮助",
+   "rated_thanks": "感谢您的反馈"
   },
   "tl": {
    "welcome": "Hi, ako si XO. Magtanong tungkol sa property, mortgage, pag-upa sa UAE o mga serbisyo ng XOTO.",
@@ -1231,7 +1255,10 @@
    "cash_agent_commission": "Komisyon ng ahente",
    "total": "Kabuuan",
    "debt_after": "Debt burden pagkatapos ng loan",
-   "note_non_resident": "Non-resident: karaniwang 50% LTV; may mga bangkong hanggang 65%."
+   "note_non_resident": "Non-resident: karaniwang 50% LTV; may mga bangkong hanggang 65%.",
+   "rate_helpful": "Nakatulong",
+   "rate_not_helpful": "Hindi nakatulong",
+   "rated_thanks": "Salamat sa iyong feedback"
   },
   "fa": {
    "welcome": "سلام، من XO هستم. درباره املاک، وام مسکن، اجاره در امارات یا خدمات XOTO بپرسید.",
@@ -1356,7 +1383,10 @@
    "cash_agent_commission": "کمیسیون مشاور",
    "total": "جمع",
    "debt_after": "نسبت بدهی پس از وام",
-   "note_non_resident": "غیرمقیم: نسبت استاندارد 50%؛ برخی بانک‌ها تا 65%."
+   "note_non_resident": "غیرمقیم: نسبت استاندارد 50%؛ برخی بانک‌ها تا 65%.",
+   "rate_helpful": "مفید بود",
+   "rate_not_helpful": "مفید نبود",
+   "rated_thanks": "از بازخورد شما سپاسگزاریم"
   },
   "bn": {
    "welcome": "হ্যালো, আমি XO। সংযুক্ত আরব আমিরাতের প্রপার্টি, মর্টগেজ, ভাড়া বা XOTO সেবা নিয়ে জিজ্ঞাসা করুন।",
@@ -1481,7 +1511,10 @@
    "cash_agent_commission": "এজেন্ট কমিশন",
    "total": "মোট",
    "debt_after": "ঋণের পর ঋণ বোঝা",
-   "note_non_resident": "নন-রেসিডেন্ট: সাধারণ 50% LTV; কিছু ব্যাংক 65% পর্যন্ত দেয়।"
+   "note_non_resident": "নন-রেসিডেন্ট: সাধারণ 50% LTV; কিছু ব্যাংক 65% পর্যন্ত দেয়।",
+   "rate_helpful": "সহায়ক",
+   "rate_not_helpful": "সহায়ক নয়",
+   "rated_thanks": "আপনার মতামতের জন্য ধন্যবাদ"
   },
   "ta": {
    "welcome": "வணக்கம், நான் XO. யுஏஇ சொத்துகள், வீட்டுக் கடன், வாடகை அல்லது XOTO சேவைகள் பற்றி கேளுங்கள்.",
@@ -1606,7 +1639,10 @@
    "cash_agent_commission": "முகவர் கமிஷன்",
    "total": "மொத்தம்",
    "debt_after": "கடனுக்குப் பின் கடன் சுமை",
-   "note_non_resident": "வெளிநாட்டவர்: வழக்கமான 50% LTV; சில வங்கிகள் 65% வரை."
+   "note_non_resident": "வெளிநாட்டவர்: வழக்கமான 50% LTV; சில வங்கிகள் 65% வரை.",
+   "rate_helpful": "பயனுள்ளது",
+   "rate_not_helpful": "பயனில்லை",
+   "rated_thanks": "உங்கள் கருத்துக்கு நன்றி"
   },
   "pa": {
    "welcome": "ਸਤ ਸ੍ਰੀ ਅਕਾਲ, ਮੈਂ XO ਹਾਂ। UAE ਦੀ ਪ੍ਰਾਪਰਟੀ, ਮੌਰਗੇਜ, ਕਿਰਾਏ ਜਾਂ XOTO ਸੇਵਾਵਾਂ ਬਾਰੇ ਪੁੱਛੋ।",
@@ -1731,7 +1767,10 @@
    "cash_agent_commission": "ਏਜੰਟ ਕਮਿਸ਼ਨ",
    "total": "ਕੁੱਲ",
    "debt_after": "ਕਰਜ਼ੇ ਤੋਂ ਬਾਅਦ ਕਰਜ਼ਾ ਬੋਝ",
-   "note_non_resident": "ਨਾਨ-ਰੈਜ਼ੀਡੈਂਟ: ਆਮ 50% LTV; ਕੁਝ ਬੈਂਕ 65% ਤੱਕ ਦਿੰਦੇ ਹਨ।"
+   "note_non_resident": "ਨਾਨ-ਰੈਜ਼ੀਡੈਂਟ: ਆਮ 50% LTV; ਕੁਝ ਬੈਂਕ 65% ਤੱਕ ਦਿੰਦੇ ਹਨ।",
+   "rate_helpful": "ਮਦਦਗਾਰ",
+   "rate_not_helpful": "ਮਦਦਗਾਰ ਨਹੀਂ",
+   "rated_thanks": "ਤੁਹਾਡੀ ਰਾਇ ਲਈ ਧੰਨਵਾਦ"
   },
   "ml": {
    "welcome": "ഹലോ, ഞാൻ XO ആണ്. യുഎഇ പ്രോപ്പർട്ടി, മോർട്ട്ഗേജ്, വാടക അല്ലെങ്കിൽ XOTO സേവനങ്ങളെക്കുറിച്ച് ചോദിക്കൂ.",
@@ -1856,7 +1895,10 @@
    "cash_agent_commission": "ഏജന്റ് കമ്മീഷൻ",
    "total": "ആകെ",
    "debt_after": "ലോണിന് ശേഷമുള്ള കടബാധ്യത",
-   "note_non_resident": "നോൺ-റെസിഡന്റ്: സാധാരണ 50% LTV; ചില ബാങ്കുകൾ 65% വരെ."
+   "note_non_resident": "നോൺ-റെസിഡന്റ്: സാധാരണ 50% LTV; ചില ബാങ്കുകൾ 65% വരെ.",
+   "rate_helpful": "സഹായകരം",
+   "rate_not_helpful": "സഹായകരമല്ല",
+   "rated_thanks": "നിങ്ങളുടെ അഭിപ്രായത്തിന് നന്ദി"
   },
   "or": {
    "welcome": "ନମସ୍କାର, ମୁଁ XO। UAE ସମ୍ପତ୍ତି, ମର୍ଟଗେଜ୍, ଭଡ଼ା କିମ୍ବା XOTO ସେବା ବିଷୟରେ ପଚାରନ୍ତୁ।",
@@ -1981,7 +2023,10 @@
    "cash_agent_commission": "ଏଜେଣ୍ଟ କମିଶନ",
    "total": "ମୋଟ",
    "debt_after": "ଋଣ ପରେ ଋଣ ଭାର",
-   "note_non_resident": "ଅଣ-ବାସିନ୍ଦା: ସାଧାରଣ 50% LTV; କିଛି ବ୍ୟାଙ୍କ 65% ପର୍ଯ୍ୟନ୍ତ।"
+   "note_non_resident": "ଅଣ-ବାସିନ୍ଦା: ସାଧାରଣ 50% LTV; କିଛି ବ୍ୟାଙ୍କ 65% ପର୍ଯ୍ୟନ୍ତ।",
+   "rate_helpful": "ସହାୟକ",
+   "rate_not_helpful": "ସହାୟକ ନୁହେଁ",
+   "rated_thanks": "ଆପଣଙ୍କ ମତାମତ ପାଇଁ ଧନ୍ୟବାଦ"
   }
  }
 }

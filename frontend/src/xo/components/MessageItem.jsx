@@ -21,7 +21,7 @@ function formatTime(iso) {
  * Memoised: during streaming only the message being written re-renders. The markdown HTML is set only
  * when its text changes, so the spoken-word marks added by the voice mode stay in place.
  */
-function MessageItem({ message, language = 'en', onAsk, onHandoffUpdate }) {
+function MessageItem({ message, language = 'en', onAsk, onHandoffUpdate, onRate }) {
   const [expanded, setExpanded] = useState({})
   const toggle = (id) => setExpanded((e) => ({ ...e, [id]: !e[id] }))
   const tr = (key, vars) => t(language, key, vars)
@@ -43,6 +43,15 @@ function MessageItem({ message, language = 'en', onAsk, onHandoffUpdate }) {
     const ranged = p.price_to && p.price_to !== p.price_from
     return `${ranged ? tr('from') + ' ' : ''}AED ${aed(p.price_from)}`
   }
+
+  const rateable = message.role === 'assistant' && meta.turn_id && !message.isStreaming && !message.isError
+  const rating = meta.rating || null
+  const timestamp = (
+    <span className="message-timestamp">
+      {message.viaVoice && <XoIcon name="mic" size={11} />}
+      {message.timestamp ? formatTime(message.timestamp) : ''}
+    </span>
+  )
 
   const properties = meta.property_results || []
   const hasRich = properties.length || meta.mortgage_result || handoff
@@ -157,10 +166,22 @@ function MessageItem({ message, language = 'en', onAsk, onHandoffUpdate }) {
                        onUpdate={meta.handoff_draft ? (patch) => onHandoffUpdate?.(message.id, patch) : undefined} />
         )}
 
-        <span className="message-timestamp">
-          {message.viaVoice && <XoIcon name="mic" size={11} />}
-          {message.timestamp ? formatTime(message.timestamp) : ''}
-        </span>
+        {rateable ? (
+          <div className="message-footer">
+            {timestamp}
+            {/* Thumbs up/down on a finished XO reply (FR-26) */}
+            <span className="message-rating" role="group" aria-label={`${tr('rate_helpful')} / ${tr('rate_not_helpful')}`}>
+              {[['up', 'thumbUp', 'rate_helpful'], ['down', 'thumbDown', 'rate_not_helpful']].map(([value, icon, label]) => (
+                <button key={value} type="button" className={cx('rating-btn', rating === value && 'is-active')}
+                        aria-pressed={rating === value} aria-label={tr(label)} title={tr(label)}
+                        onClick={() => onRate?.(message.id, value)}>
+                  <XoIcon name={icon} size={13} />
+                </button>
+              ))}
+              <span className="rating-thanks" role="status">{rating ? tr('rated_thanks') : ''}</span>
+            </span>
+          </div>
+        ) : timestamp}
       </div>
     </div>
   )

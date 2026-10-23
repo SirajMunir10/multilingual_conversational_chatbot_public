@@ -1,8 +1,10 @@
 import json
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -81,6 +83,11 @@ class AppSettings(BaseModel):
     # Security
     ADMIN_API_KEY: str = Field(default_factory=lambda: _env("ADMIN_API_KEY", ""))
     JWT_SECRET: str = Field(default_factory=lambda: _env("JWT_SECRET", ""))
+    # Admin module (PRD FR-30). The first Admin account is created from these when no admin user exists yet.
+    ADMIN_BOOTSTRAP_EMAIL: str = Field(default_factory=lambda: _env("ADMIN_BOOTSTRAP_EMAIL", ""))
+    ADMIN_BOOTSTRAP_PASSWORD: str = Field(default_factory=lambda: _env("ADMIN_BOOTSTRAP_PASSWORD", ""))
+    ADMIN_SESSION_HOURS: int = Field(default_factory=lambda: _env_int("ADMIN_SESSION_HOURS", 12))
+    ADMIN_LOGIN_ATTEMPTS_PER_15_MIN: int = Field(default_factory=lambda: _env_int("ADMIN_LOGIN_ATTEMPTS_PER_15_MIN", 8))
     RATE_LIMIT_PER_MINUTE: int = Field(default_factory=lambda: _env_int("RATE_LIMIT_PER_MINUTE", 30))
     RATE_LIMIT_ENABLED: bool = Field(default_factory=lambda: _env_bool("RATE_LIMIT_ENABLED", True))
     # Phone numbers typed without a country code are read as numbers from this region (ISO 3166 code).
@@ -117,8 +124,64 @@ def _load_json(name: str) -> Dict[str, Any]:
         return json.load(f)
 
 
+# Versions published in the admin module (PRD FR-25, FR-27, FR-29) replace the built-in files above; they are set by
+# app.admin.config_store. A preview applies a draft to one request only (a ContextVar), so visitors never see drafts.
+_published: Dict[str, Any] = {}
+_preview: ContextVar[Optional[Dict[str, Any]]] = ContextVar("config_preview", default=None)
+_merged_locales: Dict[str, Any] = {}
+
+
+def override(name: str) -> Optional[Any]:
+    """The admin's draft (in a preview) or published version of `name`, or None to use the built-in file."""
+    previewing = _preview.get()
+    if previewing and name in previewing:
+        return previewing[name]
+    return _published.get(name)
+
+
+def set_published(name: str, data: Optional[Any]) -> None:
+    if data is None:
+        _published.pop(name, None)
+    else:
+        _published[name] = data
+    _merged_locales.clear()
+
+
+@contextmanager
+def preview(overrides: Dict[str, Any]) -> Iterator[None]:
+    """Uses the given drafts instead of the published versions until the block ends (this request only)."""
+    token = _preview.set({**(_preview.get() or {}), **overrides})
+    try:
+        yield
+    finally:
+        _preview.reset(token)
+
+
+def _with_messages(locales: Dict[str, Any], messages: Dict[str, Dict[str, str]]) -> Dict[str, Any]:
+    key = f"{id(locales)}:{id(messages)}"
+    if key not in _merged_locales:
+        merged = {**locales, "locales": {code: {**loc, "messages": {**loc.get("messages", {}), **messages.get(code, {})}}
+                                         for code, loc in locales["locales"].items()}}
+        _merged_locales.clear()
+        _merged_locales[key] = merged
+    return _merged_locales[key]
+
+
 def load_config(name: str) -> Dict[str, Any]:
-    """Loads a versioned business configuration table from data/config (admin-editable, PRD FR-27)."""
+    """A business configuration table (PRD FR-27): the version published in the admin module, else the built-in file.
+    Canned replies edited in the admin ("messages") are merged into the locales table."""
+    data = override(name)
+    if data is None:
+        data = _load_json(name)
+    if name == "locales":
+        messages = override("messages")
+        if messages:
+            data = _with_messages(data, messages)
+    return data
+
+
+def builtin_config(name: str) -> Dict[str, Any]:
+    """The built-in file, ignoring any admin version (the seed and the fallback)."""
     return _load_json(name)
 
 

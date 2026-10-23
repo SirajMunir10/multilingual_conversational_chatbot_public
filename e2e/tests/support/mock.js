@@ -58,7 +58,7 @@ function tokens(text) {
  * Returns a log of what the widget sent, for assertions.
  */
 async function installMocks(page, { transcript = 'Show me homes in Dubai Marina' } = {}) {
-  const log = { chat: [], speak: [], confirm: [], sttSockets: 0, sttCommits: 0 }
+  const log = { chat: [], speak: [], confirm: [], feedback: [], sttSockets: 0, sttCommits: 0 }
   let advisorCount = 0
 
   await page.clock.setFixedTime(FIXED_TIME)
@@ -105,6 +105,9 @@ async function installMocks(page, { transcript = 'Show me homes in Dubai Marina'
         advisorCount += 1
         extra.handoff_draft = { draft_id: `draft-${advisorCount}`, name: 'Rahul Sharma', phone: '+971 50 123 4567', preferred_language: 'en', team: 'mortgage', status: 'review' }
       }
+      // Messages containing "rate" get a reply id, so the reply shows thumbs up/down (FR-26); "rate-fail" ids are refused.
+      const lower = (body.message || '').toLowerCase()
+      if (lower.includes('rate')) extra.turn_id = lower.includes('rate-fail') ? 'ffffffffffffffff' : `a1b2c3d4e5f6${String(log.chat.length).padStart(4, '0')}`
       const text = REPLIES[kind]
       const events = [{ type: 'session', session_id: 'sess_test', language: lang }, ...status, ...tokens(text),
         { type: 'final', session_id: 'sess_test', language: lang, text, tools: status.map((s) => s.tool), ...extra }]
@@ -118,6 +121,13 @@ async function installMocks(page, { transcript = 'Show me homes in Dubai Marina'
       if (body.draft_id !== `draft-${advisorCount}`) return route.fulfill({ json: { lead_saved: false, error: 'draft_expired' } })
       return route.fulfill({ json: { lead_saved: true, ticket_id: 'XO-261019-ABC123', team: body.team, name: body.full_name.trim(),
         phone: body.phone, preferred_language: body.preferred_language, status: 'saved' } })
+    }
+
+    if (p.endsWith('/api/chat/feedback')) {
+      const body = req.postDataJSON()
+      log.feedback.push(body)
+      if (body.turn_id === 'ffffffffffffffff') return route.fulfill({ status: 500, json: { detail: 'internal_error' } })
+      return route.fulfill({ json: { status: 'saved', rating: body.rating } })
     }
 
     if (p.endsWith('/api/voice/speak-timed')) {

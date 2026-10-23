@@ -251,7 +251,8 @@ export default function ChatWidget({
           results_are_alternatives: finalEvent.results_are_alternatives || null,
           mortgage_result: finalEvent.mortgage_result || null,
           handoff_data: finalEvent.handoff_data || null,
-          handoff_draft: finalEvent.handoff_draft || null
+          handoff_draft: finalEvent.handoff_draft || null,
+          turn_id: finalEvent.turn_id || null
         }
       }))
       if (finalEvent.handoff_draft) {
@@ -299,6 +300,26 @@ export default function ChatWidget({
 
   const handoffUpdate = useCallback((messageId, patch) => {
     updateMessage(messageId, (m) => ({ metadata: { ...m.metadata, handoff_draft: { ...m.metadata.handoff_draft, ...patch } } }))
+  }, [updateMessage])
+
+  // Thumbs up/down on an XO reply (PRD FR-26). Shown at once; put back if the server could not save it.
+  const rateReply = useCallback(async (messageId, rating) => {
+    const message = messagesRef.current.find((m) => m.id === messageId)
+    const turnId = message?.metadata?.turn_id
+    if (!turnId) return
+    const previous = message.metadata.rating || null
+    const next = previous === rating ? null : rating
+    updateMessage(messageId, (m) => ({ metadata: { ...m.metadata, rating: next } }))
+    try {
+      const res = await fetch(apiUrl('/api/chat/feedback'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId.current, turn_id: turnId, rating: next })
+      })
+      if (!res.ok) throw new Error(String(res.status))
+    } catch (e) {
+      updateMessage(messageId, (m) => ({ metadata: { ...m.metadata, rating: previous } }))
+    }
   }, [updateMessage])
 
   const sendRef = useRef(sendMessage)
@@ -702,7 +723,7 @@ export default function ChatWidget({
 
             {messages.map((msg) => (msg.kind === 'divider'
               ? <div key={msg.id} className="lang-divider" role="separator"><span dir="auto">{msg.content}</span></div>
-              : !msg.hidden && <MessageItem key={msg.id} message={msg} language={currentLanguage} onAsk={sendQuickPrompt} onHandoffUpdate={handoffUpdate} />
+              : !msg.hidden && <MessageItem key={msg.id} message={msg} language={currentLanguage} onAsk={sendQuickPrompt} onHandoffUpdate={handoffUpdate} onRate={rateReply} />
             ))}
 
             {isTyping && (
