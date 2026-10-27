@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { adminApi, errorMessage } from '../lib/api'
 import Icon from '../components/Icon'
-import { Badge, Button, Card, EmptyState, Field, Modal, Notice, PageHeader, Switch, TagInput, Tabs, formatDateTime, timeAgo, useToast } from '../components/ui'
+import { Badge, Button, Card, EmptyState, Field, Modal, Notice, PageHeader, Switch, TagInput, Tabs, formatDate, formatDateTime, timeAgo, useToast } from '../components/ui'
 
 const SOURCES = { builtin: 'Built-in', manual: 'Written here', review: 'From a review', upload: 'Uploaded file', web: 'Web page' }
 const ACTIONS = { builtin: 'Built-in version', published: 'Published', retired: 'Removed from XO', restored: 'Restored', reviewed: 'Marked as reviewed' }
@@ -79,8 +79,12 @@ function EntryList({ onOpen }) {
           <Button type="submit" variant="ghost" icon="search">Search</Button>
         </form>
         {error && <Notice tone="error">{error}</Notice>}
-        {filters.status === 'due' && counts?.overdue > 0 && (
-          <Notice tone="warning">{counts.overdue} {counts.overdue === 1 ? 'entry is' : 'entries are'} past the review date. Open each one, check it is still correct, and mark it reviewed or update it.</Notice>
+        {filters.status === 'due' && (counts?.overdue > 0 || counts?.never_reviewed > 0) && (
+          <Notice tone="warning">
+            {[counts.overdue > 0 && `${counts.overdue} ${counts.overdue === 1 ? 'entry is' : 'entries are'} past the review date`,
+              counts.never_reviewed > 0 && `${counts.never_reviewed} ${counts.never_reviewed === 1 ? 'has' : 'have'} never been reviewed`].filter(Boolean).join(' and ')}.
+            {' '}Open each one, check it is still correct, and mark it reviewed or update it.
+          </Notice>
         )}
         <Card flush title={data ? `${data.items.length} ${data.items.length === 1 ? 'entry' : 'entries'}` : 'Entries'}
           subtitle={counts && `${counts.indexed} entries are searchable by XO right now`}>
@@ -90,7 +94,7 @@ function EntryList({ onOpen }) {
           {data && data.items.length > 0 && (
             <div className="xa-table-wrap">
               <table className="xa-table xa-table-click">
-                <thead><tr><th scope="col">Entry</th><th scope="col">Tags</th><th scope="col">Last change</th><th scope="col">Review</th></tr></thead>
+                <thead><tr><th scope="col">Entry</th><th scope="col">Tags</th><th scope="col">Last change</th><th scope="col">Last reviewed</th><th scope="col">Next review</th></tr></thead>
                 <tbody>
                   {data.items.map((a) => (
                     <tr key={a.id} onClick={() => onOpen(a.id)}>
@@ -104,12 +108,10 @@ function EntryList({ onOpen }) {
                       <td className="xa-small xa-nowrap">
                         {a.version === 0 ? <span className="xa-muted">Built-in</span> : <>{timeAgo(a.published_at)}<div className="xa-muted">{a.published_by}</div></>}
                       </td>
-                      <td className="xa-nowrap">
-                        {a.status === 'RETIRED' ? <Badge tone="muted">Removed</Badge>
-                          : a.overdue ? <Badge tone="warning" icon="history">Overdue</Badge>
-                            : a.due ? <Badge tone="info">Due soon</Badge>
-                              : <span className="xa-small xa-muted">{a.review_by ? `By ${a.review_by}` : 'No date'}</span>}
+                      <td className="xa-small xa-nowrap">
+                        {a.last_reviewed ? formatDate(a.last_reviewed) : <span className="xa-muted">Never</span>}
                       </td>
+                      <td className="xa-nowrap"><ReviewStatus entry={a} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -119,6 +121,29 @@ function EntryList({ onOpen }) {
         </Card>
       </div>
       <aside className="xa-editor-side"><TryQuestion /></aside>
+    </div>
+  )
+}
+
+const days = (n) => `${n} ${n === 1 ? 'day' : 'days'}`
+
+/** Where an entry is on its review cycle: overdue (with the missed date and by how long), due soon, or on schedule. */
+function ReviewStatus({ entry: a }) {
+  if (a.status === 'RETIRED') return <Badge tone="muted">Removed</Badge>
+  if (a.never_reviewed) return <Badge tone="info">Needs first review</Badge>
+  if (!a.review_by) return <span className="xa-small xa-muted">No date</span>
+  if (a.overdue) {
+    return (
+      <div className="xa-review-cell">
+        <Badge tone="warning" icon="history">Overdue {days(a.overdue_days)}</Badge>
+        <span className="xa-small xa-muted">Was due {formatDate(a.review_by)}</span>
+      </div>
+    )
+  }
+  return (
+    <div className="xa-review-cell">
+      {a.due && <Badge tone="info">Due soon</Badge>}
+      <span className={`xa-small${a.due ? ' xa-muted' : ''}`}>{formatDate(a.review_by)}</span>
     </div>
   )
 }
@@ -287,7 +312,9 @@ function EntryEditor({ id, onBack, onNavigate }) {
                     onChange={(v) => set('disclaimer_flag')(v ? 'YES' : 'NO')} />
                 </div>
               )}
-              <Field label="Review by" hint="You are reminded when the date is near. Six months from today if left empty.">
+              <Field label="Review by" hint={entry
+                ? `You are reminded ${days(entry.due_soon_days)} before. Publishing counts as a review: the next one is ${days(entry.review_every_days)} later unless you pick a date.`
+                : 'Left empty, it is set one review cycle from today.'}>
                 {(a) => <input {...a} type="date" value={form.review_by || ''} onChange={(e) => set('review_by')(e.target.value || null)} style={{ maxWidth: 220 }} />}
               </Field>
             </fieldset>
@@ -299,14 +326,18 @@ function EntryEditor({ id, onBack, onNavigate }) {
             <Card title="Status">
               <ul className="xa-check-list">
                 <li><Icon name={retired ? 'close' : 'checkCircle'} size={16} />{retired ? 'Not used by XO' : 'Live: XO answers from it'}</li>
-                <li><Icon name="history" size={16} />{entry.data.review_by ? `${entry.overdue ? 'Review was due' : 'Review by'} ${entry.data.review_by}` : 'No review date'}
-                  {entry.data.last_reviewed && <span className="xa-muted"> (last {entry.data.last_reviewed})</span>}</li>
+                <li><Icon name="checkCircle" size={16} />{entry.last_reviewed ? `Last reviewed ${formatDate(entry.last_reviewed)}` : 'Never reviewed'}</li>
+                <li><Icon name="history" size={16} />
+                  {entry.never_reviewed ? 'Needs a first review'
+                    : !entry.review_by ? 'No review date'
+                      : entry.overdue ? <span>Review was due {formatDate(entry.review_by)} <strong className="xa-text-warn">({days(entry.overdue_days)} overdue)</strong></span>
+                        : `Next review by ${formatDate(entry.review_by)}`}</li>
                 {entry.data.source?.url && <li><Icon name="link" size={16} /><a href={entry.data.source.url} target="_blank" rel="noreferrer noopener">{entry.data.source.url}</a></li>}
                 {entry.data.source?.file && <li><Icon name="file" size={16} />{entry.data.source.file}</li>}
               </ul>
               {!retired && (
                 <div className="xa-row" style={{ marginBlockStart: 14 }}>
-                  <Button variant="ghost" size="sm" icon="checkCircle" disabled={changed || busy} onClick={() => act('reviewed', undefined, 'Marked as reviewed. Next review in six months.')}>Still correct</Button>
+                  <Button variant="ghost" size="sm" icon="checkCircle" disabled={changed || busy} onClick={() => act('reviewed', undefined, `Marked as reviewed. Next review in ${days(entry.review_every_days)}.`)}>Still correct</Button>
                   <Button variant="danger-ghost" size="sm" icon="trash" disabled={busy} onClick={() => setConfirm({ kind: 'retire' })}>Remove from XO</Button>
                 </div>
               )}

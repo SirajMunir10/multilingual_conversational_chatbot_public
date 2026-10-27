@@ -55,7 +55,7 @@ class AdminTestCase(unittest.TestCase):
 
     def setUp(self):
         patches = [mock.patch.object(settings, "JWT_SECRET", "test-secret-for-admin-tests"),
-                   mock.patch.object(settings, "ADMIN_API_KEY", "test-admin-key"),
+                   mock.patch.object(settings, "ADMIN_API_KEY", "test-admin-key-0123456789abcdef-0123456789"),
                    mock.patch.object(users_module, "PBKDF2_ITERATIONS", 1000)]
         for p in patches:
             p.start()
@@ -207,7 +207,7 @@ class TestRolePermissions(AdminTestCase):
         client = TestClient(app)
         for method, path, _ in ENDPOINTS:
             body = {"monthly_usd": 100, "alert_pct": 80} if method == "PUT" else None
-            self.assertEqual(client.request(method, path, json=body, headers={"X-Admin-Key": "test-admin-key"}).status_code, 200, path)
+            self.assertEqual(client.request(method, path, json=body, headers={"X-Admin-Key": "test-admin-key-0123456789abcdef-0123456789"}).status_code, 200, path)
 
     def test_analyst_is_read_only(self):
         self.make_user(Role.READ_ONLY_ANALYST)

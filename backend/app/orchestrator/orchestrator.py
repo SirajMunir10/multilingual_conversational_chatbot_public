@@ -141,10 +141,29 @@ class ConversationOrchestrator:
         return await LLMService.client().chat.completions.create(**kwargs)
 
     @classmethod
-    async def stream_turn(cls, message: str, session_id: Optional[str] = None, user_id: Optional[str] = None,
-                          selected_language: Optional[str] = None, ui_language: Optional[str] = None,
-                          channel: str = "text") -> AsyncGenerator[Dict[str, Any], None]:
-        """Yields events: session, status, token, final, error."""
+    async def stream_turn(cls, message: str, **kwargs: Any) -> AsyncGenerator[Dict[str, Any], None]:
+        """Yields events: session, status, token, final, error.
+
+        What XO says in a turn becomes the conversation's speech allowance: the voice endpoints speak only that much
+        text, so they cannot be used to voice arbitrary text."""
+        session: Optional[SessionContext] = None
+        streamed = 0
+        async for event in cls._turn_events(message, **kwargs):
+            if event["type"] == "session":
+                session = SessionStore.get(event["session_id"])
+                if session:
+                    session.speech_allowance += settings.TTS_ALLOWANCE_PER_TURN
+            elif session and event["type"] == "token":
+                streamed += len(event["text"])
+                session.speech_allowance += len(event["text"])
+            elif session and event["type"] == "final":
+                session.speech_allowance += max(0, len(event.get("text") or "") - streamed)
+            yield event
+
+    @classmethod
+    async def _turn_events(cls, message: str, session_id: Optional[str] = None, user_id: Optional[str] = None,
+                           selected_language: Optional[str] = None, ui_language: Optional[str] = None,
+                           channel: str = "text") -> AsyncGenerator[Dict[str, Any], None]:
         started = time.monotonic()
         locales = load_config("locales")["locales"]
         session = SessionStore.get_or_create(session_id, user_id=user_id,

@@ -43,6 +43,11 @@ def item(name: str):
     return spec
 
 
+def _upgraded(name: str, record: Dict[str, Any]) -> Dict[str, Any]:
+    """A stored version brought up to date with the current built-in parts it must not change (e.g. locked rules)."""
+    return {**record, "data": ITEMS[name].upgrade(record["data"])}
+
+
 class ConfigStore:
     _versions: Dict[str, List[Dict[str, Any]]] = {}
     _drafts: Dict[str, Dict[str, Any]] = {}
@@ -60,6 +65,7 @@ class ConfigStore:
 
     @classmethod
     def _apply(cls, name: str, version: int, data: Any) -> None:
+        data = ITEMS[name].upgrade(data)
         errors = ITEMS[name].validate(data)
         if errors:
             logger.error("Version %s of %s is invalid and was not applied: %s", version, name, "; ".join(errors[:3]))
@@ -103,9 +109,9 @@ class ConfigStore:
                 "SELECT version, data, note, published_by, published_at FROM config_versions WHERE item = $1 ORDER BY version DESC LIMIT 1",
                 name)
             if row:
-                return {**{k: _iso(v) for k, v in dict(row).items()}, "data": _json(row["data"])}
+                return _upgraded(name, {**{k: _iso(v) for k, v in dict(row).items()}, "data": _json(row["data"])})
         elif cls._versions.get(name):
-            return {k: _iso(v) for k, v in cls._versions[name][-1].items()}
+            return _upgraded(name, {k: _iso(v) for k, v in cls._versions[name][-1].items()})
         return {"version": 0, "data": spec.seed(), "note": "Built-in", "published_by": None, "published_at": None}
 
     @classmethod
@@ -114,9 +120,9 @@ class ConfigStore:
         if Database.pool:
             row = await Database.pool.fetchrow(
                 "SELECT data, base_version, updated_by, updated_at FROM config_drafts WHERE item = $1", name)
-            return {**{k: _iso(v) for k, v in dict(row).items()}, "data": _json(row["data"])} if row else None
+            return _upgraded(name, {**{k: _iso(v) for k, v in dict(row).items()}, "data": _json(row["data"])}) if row else None
         found = cls._drafts.get(name)
-        return {k: _iso(v) for k, v in found.items()} if found else None
+        return _upgraded(name, {k: _iso(v) for k, v in found.items()}) if found else None
 
     @classmethod
     async def versions(cls, name: str) -> List[Dict[str, Any]]:
@@ -139,11 +145,11 @@ class ConfigStore:
                 "SELECT version, data, note, published_by, published_at FROM config_versions WHERE item = $1 AND version = $2",
                 name, number)
             if row:
-                return {**{k: _iso(v) for k, v in dict(row).items()}, "data": _json(row["data"])}
+                return _upgraded(name, {**{k: _iso(v) for k, v in dict(row).items()}, "data": _json(row["data"])})
         else:
             for entry in cls._versions.get(name, []):
                 if entry["version"] == number:
-                    return {k: _iso(v) for k, v in entry.items()}
+                    return _upgraded(name, {k: _iso(v) for k, v in entry.items()})
         raise ConfigError("version_not_found")
 
     # ---- writes ----

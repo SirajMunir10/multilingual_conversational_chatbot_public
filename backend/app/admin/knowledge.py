@@ -25,7 +25,9 @@ logger = logging.getLogger("xo.knowledge")
 _DATA = os.path.join(os.path.dirname(__file__), "..", "data", "knowledge_base")
 TYPES = ("article", "glossary")
 STATUSES = ("ACTIVE", "PARTIALLY_ACTIVE", "RETIRED")
-REVIEW_EVERY_DAYS = 182
+# Every entry is re-checked 30 days after its last review; "due soon" is the last week before that date.
+REVIEW_EVERY_DAYS = 30
+DUE_SOON_DAYS = 7
 REFRESH_SECONDS = 30
 
 
@@ -40,14 +42,18 @@ def _slug(text: str) -> str:
 
 
 def _date(value: Any) -> Optional[str]:
-    """ISO date from '23/03/2026', '2026-03-23' or a date; None when absent or unreadable."""
+    """ISO date from '23/03/2026', '2026-03-23' or a date; None when absent or unreadable. A note after the date
+    ('16/10/2026 — aligned with ...') is ignored."""
     if not value:
         return None
     if isinstance(value, (date, datetime)):
         return value.strftime("%Y-%m-%d")
+    match = re.match(r"\s*(\d{4}-\d{2}-\d{2}|\d{1,2}/\d{1,2}/\d{4})", str(value))
+    if not match:
+        return None
     for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
         try:
-            return datetime.strptime(str(value).strip(), fmt).strftime("%Y-%m-%d")
+            return datetime.strptime(match.group(1), fmt).strftime("%Y-%m-%d")
         except ValueError:
             pass
     return None
@@ -55,6 +61,23 @@ def _date(value: Any) -> Optional[str]:
 
 def plus_days(iso: Optional[str], days: int) -> Optional[str]:
     return (datetime.strptime(iso, "%Y-%m-%d") + timedelta(days=days)).strftime("%Y-%m-%d") if iso else None
+
+
+def review_state(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Where an entry stands on its review cycle. An entry that was never reviewed counts as due (it needs a first
+    check) but not as overdue, since it never had a deadline."""
+    review_by, last = data.get("review_by"), data.get("last_reviewed")
+    state = {"last_reviewed": last, "review_by": review_by, "due": False, "overdue": False, "overdue_days": 0,
+             "never_reviewed": False}
+    if data.get("status") == "RETIRED":
+        return state
+    today = date.today()
+    if not review_by:
+        state.update(due=not last, never_reviewed=not last)
+        return state
+    days_left = (datetime.strptime(review_by, "%Y-%m-%d").date() - today).days
+    state.update(due=days_left <= DUE_SOON_DAYS, overdue=days_left < 0, overdue_days=max(0, -days_left))
+    return state
 
 
 def normalize(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -235,12 +258,6 @@ class KnowledgeStore:
         if not row:
             raise KnowledgeError("version_not_found")
         return row
-
-    @classmethod
-    def due_for_review(cls, entry: Dict[str, Any], within_days: int = 30) -> bool:
-        review_by = entry["data"].get("review_by")
-        return bool(review_by and entry["data"]["status"] != "RETIRED"
-                    and review_by <= (date.today() + timedelta(days=within_days)).isoformat())
 
     # ---- Writing ----
 

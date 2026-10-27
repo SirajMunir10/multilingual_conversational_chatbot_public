@@ -20,6 +20,8 @@ class ConfigItem:
     permission: str
     seed: Callable[[], Any]
     validate: Callable[[Any], List[str]]
+    # Brings a stored version up to date with built-in parts it may not change (applied whenever one is read).
+    upgrade: Callable[[Any], Any] = lambda data: data
 
 
 def _get(data: Any, path: str) -> Any:
@@ -223,7 +225,8 @@ ITEMS: Dict[str, ConfigItem] = {item.name: item for item in (
     ConfigItem("mortgage_rules", "Lending rules", P.RULES_EDIT, lambda: builtin_config("mortgage_rules"), validate_rules),
     ConfigItem("fees", "Fees", P.RULES_EDIT, lambda: builtin_config("fees"), validate_fees),
     ConfigItem("bank_products", "Bank products", P.RULES_EDIT, lambda: builtin_config("bank_products"), validate_products),
-    ConfigItem(prompt_profile.PROFILE_ITEM, "XO's instructions", P.PROMPTS_EDIT, prompt_profile.builtin_profile, prompt_profile.validate),
+    ConfigItem(prompt_profile.PROFILE_ITEM, "XO's instructions", P.PROMPTS_EDIT, prompt_profile.builtin_profile, prompt_profile.validate,
+               prompt_profile.with_current_locks),
     ConfigItem("messages", "Canned replies", P.PROMPTS_EDIT, seed_messages, validate_messages),
     ConfigItem(escalation.ITEM, "Escalation rules", P.ESCALATION_EDIT, escalation.builtin_rules, escalation.validate),
 )}

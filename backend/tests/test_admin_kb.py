@@ -93,7 +93,9 @@ class TestEntries(KbTestCase):
         self.assertEqual((body["counts"]["live"], body["counts"]["indexed"], body["counts"]["retired"]), (75, 75, 0))
         art = editor.get("/api/admin/kb/articles/art_1").json()
         self.assertEqual((art["version"], art["source"], art["versions"][-1]["version"]), (0, "builtin", 0))
-        self.assertEqual(art["data"]["review_by"], "2026-09-21")  # reviewed 23/03/2026, "review every 6 months"
+        self.assertEqual((art["data"]["last_reviewed"], art["data"]["review_by"]), ("2026-03-23", "2026-04-22"))  # 30-day cycle
+        # A note after the date in the KB file ("16/10/2026 — aligned with ...") keeps the date.
+        self.assertEqual(editor.get("/api/admin/kb/articles/art_9").json()["last_reviewed"], "2026-10-16")
 
     def test_new_entry_is_answerable_from_the_next_question(self):
         editor = self.client_for(Role.CONTENT_EDITOR)
@@ -163,10 +165,34 @@ class TestEntries(KbTestCase):
         editor = self.client_for(Role.CONTENT_EDITOR)
         with mock.patch("app.admin.knowledge.date", FixedDate), mock.patch("app.routers.admin_kb.date", FixedDate):
             due = editor.get("/api/admin/kb/articles?status=due").json()
-            self.assertEqual((len(due["items"]), due["counts"]["overdue"]), (42, 42))  # articles 9 and 10 and glossary terms have no review date
+            by_id = {i["id"]: i for i in due["items"]}
+            # 42 articles reviewed 23/03/2026 are overdue; the 31 glossary terms were never reviewed. Articles 9 and 10
+            # (reviewed 16/10/2026, next review 15/11/2026) are on schedule.
+            self.assertEqual((len(due["items"]), due["counts"]["overdue"], due["counts"]["never_reviewed"]), (73, 42, 31))
+            self.assertEqual([i["overdue"] for i in due["items"][:42]], [True] * 42)  # most urgent first
+            self.assertTrue(all(i["never_reviewed"] for i in due["items"][42:]))
+            self.assertEqual({k: by_id["art_1"][k] for k in ("overdue", "overdue_days", "review_by", "last_reviewed")},
+                             {"overdue": True, "overdue_days": 183, "review_by": "2026-04-22", "last_reviewed": "2026-03-23"})
+            gloss = next(i for i in due["items"] if i["type"] == "glossary")
+            self.assertEqual((gloss["never_reviewed"], gloss["overdue"], gloss["last_reviewed"]), (True, False, None))
+            self.assertNotIn("art_9", by_id)
+            self.assertEqual((by_id["art_1"]["review_every_days"], by_id["art_1"]["due_soon_days"]), (30, 7))
             res = editor.post("/api/admin/kb/articles/art_2/reviewed", headers=HEADERS)
-            self.assertEqual(res.json()["data"]["review_by"], "2027-04-22")
-            self.assertEqual(len(editor.get("/api/admin/kb/articles?status=due").json()["items"]), 41)
+            self.assertEqual((res.json()["data"]["last_reviewed"], res.json()["data"]["review_by"]), ("2026-10-22", "2026-11-21"))
+            self.assertEqual(len(editor.get("/api/admin/kb/articles?status=due").json()["items"]), 72)
+
+    def test_publishing_an_edit_counts_as_a_review(self):
+        editor = self.client_for(Role.CONTENT_EDITOR)
+        with mock.patch("app.admin.knowledge.date", FixedDate), mock.patch("app.routers.admin_kb.date", FixedDate):
+            art = editor.get("/api/admin/kb/articles/art_3").json()
+            res = editor.put("/api/admin/kb/articles/art_3", headers=HEADERS,
+                             json={"data": {**art["data"], "detail": art["data"]["detail"] + " Checked."}, "base_version": art["version"]})
+            self.assertEqual((res.json()["data"]["last_reviewed"], res.json()["data"]["review_by"]), ("2026-10-22", "2026-11-21"))
+            # A date the editor picks by hand is kept.
+            art = editor.get("/api/admin/kb/articles/art_3").json()
+            res = editor.put("/api/admin/kb/articles/art_3", headers=HEADERS,
+                             json={"data": {**art["data"], "review_by": "2027-01-31"}, "base_version": art["version"]})
+            self.assertEqual(res.json()["data"]["review_by"], "2027-01-31")
 
     def test_other_instances_pick_up_changes(self):
         admin = {"email": "a@xoto.ae", "role": "admin"}

@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.core.security import enforce_rate_limit, optional_user
+from app.core.security import enforce_paid_limit, enforce_rate_limit, optional_user
 from app.db.conversation_store import ConversationStore
 from app.orchestrator.orchestrator import ConversationOrchestrator, sse
 from app.orchestrator.session_store import SessionStore, is_valid_session_id
@@ -21,7 +21,7 @@ class ChatRequest(BaseModel):
     channel: str = Field("text", pattern="^(text|voice)$")
 
 
-@router.post("/stream", dependencies=[Depends(enforce_rate_limit)])
+@router.post("/stream", dependencies=[Depends(enforce_paid_limit)])
 async def stream_chat(payload: ChatRequest, request: Request, user_id: Optional[str] = Depends(optional_user)):
     """Server-Sent Events: session → status/token… → final (PRD §7 streaming)."""
     async def events():
@@ -52,7 +52,7 @@ async def feedback(payload: FeedbackRequest):
     return {"status": "saved", "rating": payload.rating}
 
 
-@router.post("/message", dependencies=[Depends(enforce_rate_limit)])
+@router.post("/message", dependencies=[Depends(enforce_paid_limit)])
 async def chat_message(payload: ChatRequest, user_id: Optional[str] = Depends(optional_user)):
     """Non-streaming variant returning the final event."""
     return await ConversationOrchestrator.process_turn(payload.message, session_id=payload.session_id, user_id=user_id,

@@ -93,6 +93,16 @@ class AppSettings(BaseModel):
     ADMIN_LOGIN_ATTEMPTS_PER_15_MIN: int = Field(default_factory=lambda: _env_int("ADMIN_LOGIN_ATTEMPTS_PER_15_MIN", 8))
     RATE_LIMIT_PER_MINUTE: int = Field(default_factory=lambda: _env_int("RATE_LIMIT_PER_MINUTE", 30))
     RATE_LIMIT_ENABLED: bool = Field(default_factory=lambda: _env_bool("RATE_LIMIT_ENABLED", True))
+    # Proxies in front of the API that append to X-Forwarded-For (the site's /api rewrite on Vercel, then Render).
+    # The visitor's address is read this many entries from the right, so a value the visitor typed in is never used.
+    TRUSTED_PROXY_HOPS: int = Field(default_factory=lambda: _env_int("TRUSTED_PROXY_HOPS", 2))
+    # Ceiling on paid calls (AI, speech) across all visitors together, per minute. It holds even if someone spreads
+    # requests over many addresses, so a flood can never run up an unbounded bill.
+    GLOBAL_PAID_CALLS_PER_MINUTE: int = Field(default_factory=lambda: _env_int("GLOBAL_PAID_CALLS_PER_MINUTE", 600))
+    # Speech is only produced for what XO says in a live conversation: characters of reply text plus this allowance
+    # per turn (the short "let me check" phrases).
+    TTS_ALLOWANCE_PER_TURN: int = Field(default_factory=lambda: _env_int("TTS_ALLOWANCE_PER_TURN", 160))
+    ENABLE_API_DOCS: bool = Field(default_factory=lambda: _env_bool("ENABLE_API_DOCS", False))
     # Phone numbers typed without a country code are read as numbers from this region (ISO 3166 code).
     PHONE_DEFAULT_REGION: str = Field(default_factory=lambda: _env("PHONE_DEFAULT_REGION", "AE"))
 

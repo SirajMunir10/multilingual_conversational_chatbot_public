@@ -4,7 +4,7 @@ import os
 os.environ.update({
     "OPENAI_API_KEY": os.environ.get("XO_LIVE_OPENAI_API_KEY", "test-key"),
     "ELEVENLABS_API_KEY": "",
-    "ADMIN_API_KEY": "test-admin-key",
+    "ADMIN_API_KEY": "test-admin-key-0123456789abcdef-0123456789",
     "JWT_SECRET": "test-jwt-secret",
     "DATABASE_URL": "",
     "RATE_LIMIT_ENABLED": "false",

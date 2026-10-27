@@ -2,6 +2,7 @@
 
 Content editors and up (kb.edit). Every change adds a version and is live from the next question; every change is
 in the activity log. Changing which websites may be added is an Admin task (integrations.manage)."""
+import asyncio
 import base64
 import binascii
 from datetime import date
@@ -13,7 +14,7 @@ from pydantic import BaseModel, Field
 from app.admin import permissions as P
 from app.admin.activity import ActivityLog
 from app.admin.auth import Actor, require
-from app.admin.knowledge import REVIEW_EVERY_DAYS, KnowledgeError, KnowledgeStore, normalize, plus_days
+from app.admin.knowledge import DUE_SOON_DAYS, REVIEW_EVERY_DAYS, KnowledgeError, KnowledgeStore, normalize, plus_days, review_state
 from app.admin.knowledge_text import IngestError, extract_file
 from app.admin.knowledge_web import ALLOWED_KEY, WebSources, allowed_domains, clean_domain
 from app.admin.reviews import ReviewError, ReviewStore
@@ -40,8 +41,7 @@ def _summary(article_id: str, entry: Dict[str, Any]) -> Dict[str, Any]:
             "status": d["status"], "tags": d.get("tags", []), "domain": d.get("domain"), "version": entry["version"],
             "source": d.get("source", {}).get("kind", "manual"), "published_by": entry.get("published_by"),
             "published_at": entry["published_at"].isoformat() if hasattr(entry.get("published_at"), "isoformat") else entry.get("published_at"),
-            "review_by": d.get("review_by"), "due": KnowledgeStore.due_for_review(entry),
-            "overdue": bool(d.get("review_by") and d["status"] != "RETIRED" and d["review_by"] < date.today().isoformat())}
+            **review_state(d), "review_every_days": REVIEW_EVERY_DAYS, "due_soon_days": DUE_SOON_DAYS}
 
 
 @router.get("/articles")
@@ -62,11 +62,15 @@ async def list_articles(q: Optional[str] = Query(None, max_length=200), type: Op
         items = [i for i in items if i["due"]]
     if tag:
         items = [i for i in items if tag in i["tags"]]
-    items.sort(key=lambda i: (i["status"] == "RETIRED", -(i["version"] > 0), i["title"].lower()))
+    if status == "due":  # most urgent first: longest overdue, then never reviewed, then the nearest deadline
+        items.sort(key=lambda i: (not i["overdue"], -i["overdue_days"], not i["never_reviewed"], i["review_by"] or "", i["title"].lower()))
+    else:
+        items.sort(key=lambda i: (i["status"] == "RETIRED", -(i["version"] > 0), i["title"].lower()))
     all_items = [_summary(k, e) for k, e in entries.items()]
     return {"items": items, "counts": {
         "live": sum(i["status"] != "RETIRED" for i in all_items), "retired": sum(i["status"] == "RETIRED" for i in all_items),
         "due": sum(i["due"] for i in all_items), "overdue": sum(i["overdue"] for i in all_items),
+        "never_reviewed": sum(i["never_reviewed"] for i in all_items),
         "indexed": VectorDatabase.get_document_count()},
         "tags": sorted({t for i in all_items for t in i["tags"]})}
 
@@ -125,6 +129,11 @@ async def update_article(article_id: str, body: ArticleBody, actor: Actor = Depe
         if entry["data"]["status"] == "RETIRED":
             raise KnowledgeError("invalid", ["This entry is removed. Restore a version first."])
         data = {**body.data, "source": entry["data"].get("source", {"kind": "manual"})}
+        # Publishing an edit means someone just checked the entry: it counts as a review. A review date the editor
+        # picked by hand is kept; otherwise the next one is a full cycle from today.
+        today = date.today().isoformat()
+        picked = data.get("review_by") and data.get("review_by") != entry["data"].get("review_by")
+        data.update(last_reviewed=today, review_by=data["review_by"] if picked else plus_days(today, REVIEW_EVERY_DAYS))
         saved = await KnowledgeStore.save(article_id, data, actor, body.note, base_version=body.base_version)
     except KnowledgeError as exc:
         raise _kb_error(exc)
@@ -187,7 +196,8 @@ async def read_upload(body: UploadBody, actor: Actor = Depends(editor)):
     except (binascii.Error, ValueError):
         raise HTTPException(status_code=422, detail={"code": "bad_file", "errors": ["The file could not be read."]})
     try:
-        result = extract_file(body.filename, raw)
+        # Parsing a large PDF or Word file takes a while: it runs off the event loop so visitors' chats are not held up.
+        result = await asyncio.to_thread(extract_file, body.filename, raw)
     except IngestError as exc:
         raise _ingest_error(exc)
     return {"filename": body.filename, **result}

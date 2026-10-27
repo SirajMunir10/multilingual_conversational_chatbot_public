@@ -167,12 +167,47 @@ class RateLimiter:
 rate_limiter = RateLimiter()
 
 
-def client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "")
-    return forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+def client_ip(request: Any, direct: bool = False) -> str:
+    """The visitor's address. Each trusted proxy appends the address it received the request from, so the entry
+    TRUSTED_PROXY_HOPS from the right is the one our own proxies saw. Anything further left was sent by the visitor
+    and could be made up, so it is never used. `direct` is for connections that skip the site's proxy (live voice
+    connects straight to the API), which have one proxy fewer."""
+    entries = [e.strip() for e in request.headers.get("x-forwarded-for", "").split(",") if e.strip()]
+    hops = max(1, settings.TRUSTED_PROXY_HOPS - (1 if direct else 0))
+    if entries:
+        return entries[-hops] if len(entries) >= hops else entries[0]
+    return request.client.host if request.client else "unknown"
+
+
+def _too_many() -> HTTPException:
+    return HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests. Please wait a moment.")
+
+
+def allow_paid_call(key: str) -> bool:
+    """Per-visitor limit plus a ceiling shared by everyone, for anything that spends AI or speech credit."""
+    if not settings.RATE_LIMIT_ENABLED:
+        return True
+    if rate_limiter.blocked("paid:all", settings.GLOBAL_PAID_CALLS_PER_MINUTE, 60.0):
+        return False
+    if not rate_limiter.allow(key, settings.RATE_LIMIT_PER_MINUTE):
+        return False
+    rate_limiter.record("paid:all")
+    return True
 
 
 def enforce_rate_limit(request: Request) -> None:
-    """FastAPI dependency for endpoints that spend LLM/TTS/STT credit."""
+    """FastAPI dependency for public endpoints (calculators, search, callbacks): a per-visitor limit."""
     if settings.RATE_LIMIT_ENABLED and not rate_limiter.allow(client_ip(request), settings.RATE_LIMIT_PER_MINUTE):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests. Please wait a moment.")
+        raise _too_many()
+
+
+def enforce_paid_limit(request: Request) -> None:
+    """FastAPI dependency for endpoints that spend AI or speech credit (chat, speech)."""
+    if not allow_paid_call(client_ip(request)):
+        raise _too_many()
+
+
+def enforce_light_rate_limit(request: Request) -> None:
+    """For free but repeatable endpoints (warming connections): a visitor needs only a few a minute."""
+    if settings.RATE_LIMIT_ENABLED and not rate_limiter.allow(f"light:{client_ip(request)}", 6):
+        raise _too_many()

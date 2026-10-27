@@ -5,10 +5,13 @@ anything reaches the knowledge base, and the editor sees how many were removed."
 import csv
 import io
 import re
+import zipfile
 from html.parser import HTMLParser
 from typing import Any, Dict, List, Optional, Tuple
 
 MAX_FILE_BYTES = 8 * 1024 * 1024
+# A .docx is a zip: a small file can unpack to gigabytes. Its contents are measured before anything is opened.
+MAX_UNPACKED_BYTES = 60 * 1024 * 1024
 MAX_ENTRIES = 200
 CHUNK_CHARS = 1600
 
@@ -135,6 +138,13 @@ def _pdf(raw: bytes, name: str) -> Tuple[List[Dict[str, Any]], int]:
 
 def _docx(raw: bytes, name: str) -> Tuple[List[Dict[str, Any]], int]:
     import docx
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as package:
+            unpacked = sum(info.file_size for info in package.infolist())
+    except (zipfile.BadZipFile, ValueError):
+        raise IngestError("unreadable", "This Word file could not be read. Save it as .docx and try again.")
+    if unpacked > MAX_UNPACKED_BYTES:
+        raise IngestError("too_large", "This Word file is too large once opened. Split it into smaller files.")
     try:
         document = docx.Document(io.BytesIO(raw))
     except Exception:

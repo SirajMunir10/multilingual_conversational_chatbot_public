@@ -494,7 +494,7 @@ export default function ChatWidget({
     let saidFiller = false
     const spoken = speech.start({
       language: props.current.currentLanguage,
-      sessionId: sessionId.current,
+      sessionId: () => sessionId.current,
       onStart: () => {
         if (turn !== voiceTurn.current || !voiceModeRef.current) return
         audioStarted = true

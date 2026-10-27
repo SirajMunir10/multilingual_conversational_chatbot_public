@@ -224,6 +224,13 @@ export function formatDateTime(value) {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
+/** A calendar date ('2026-03-23') as '23 Mar 2026', read as a local date so it never shifts by a day. */
+export function formatDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '')
+  if (!m) return '—'
+  return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 export function timeAgo(value) {
   if (!value) return ''
   const s = Math.round((Date.now() - new Date(value).getTime()) / 1000)

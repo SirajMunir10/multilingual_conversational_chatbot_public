@@ -40,8 +40,19 @@ def builtin_profile() -> Dict[str, Any]:
     return {"persona": parts[0], "sections": sections, "journeys": [], "tone_by_language": {}, "banned_topics": []}
 
 
+def with_current_locks(profile: Any) -> Any:
+    """The profile with its locked sections replaced by the built-in text. Locked sections carry PRD rules, so a stored
+    copy can never change them, and improving them in the built-in file reaches every published version."""
+    if not isinstance(profile, dict) or not isinstance(profile.get("sections"), list):
+        return profile
+    locked = {s["id"]: s for s in builtin_profile()["sections"] if s["locked"]}
+    sections = [dict(locked[s["id"]]) if isinstance(s, dict) and s.get("id") in locked else s for s in profile["sections"]]
+    return {**profile, "sections": sections}
+
+
 def current_profile() -> Dict[str, Any]:
-    return override(PROFILE_ITEM) or builtin_profile()
+    published = override(PROFILE_ITEM)
+    return with_current_locks(published) if published else builtin_profile()
 
 
 def render_template(profile: Dict[str, Any], language: str) -> str:

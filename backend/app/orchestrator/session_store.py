@@ -46,6 +46,8 @@ class SessionContext(BaseModel):
     current_user_text: str = ""
     # Ids of this session's XO replies, so visitor thumbs are only accepted for real replies (FR-26).
     turn_ids: List[str] = Field(default_factory=list)
+    # Characters of XO's own replies not yet spoken; the voice endpoints spend from it (no free text-to-speech).
+    speech_allowance: int = 0
     # Escalation rules already offered in this conversation, and knowledge-base questions XO could not answer (FR-29).
     escalations_offered: List[str] = Field(default_factory=list)
     kb_misses: int = 0

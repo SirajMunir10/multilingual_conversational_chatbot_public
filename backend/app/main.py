@@ -22,10 +22,21 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger("xo.main")
 
 
+_PLACEHOLDERS = {"generate_a_long_random_value", "changeme", "change_me", "secret", "password", "admin"}
+
+
+def _warn_weak_secrets() -> None:
+    """Short or example secrets can be guessed; a guessed JWT_SECRET or ADMIN_API_KEY is full admin access."""
+    for name, value, minimum in (("JWT_SECRET", settings.JWT_SECRET, 32), ("ADMIN_API_KEY", settings.ADMIN_API_KEY, 32)):
+        if value and (len(value) < minimum or value.lower() in _PLACEHOLDERS):
+            logger.error("%s is too weak (use at least %d random characters, e.g. `openssl rand -hex 32`).", name, minimum)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting %s (%s) — LLM=%s STT=%s TTS=%s", settings.APP_NAME, settings.ENVIRONMENT,
                 settings.LLM_MODEL, settings.STT_MODEL, settings.TTS_MODEL)
+    _warn_weak_secrets()
     VectorDatabase.load()
     await Database.init()
     await LeadDatabaseService.init_db()
@@ -46,8 +57,47 @@ async def lifespan(app: FastAPI):
     await TTSService.close()
 
 
-app = FastAPI(title=settings.APP_NAME, version="2.0.0", lifespan=lifespan,
-              docs_url="/docs" if settings.ENVIRONMENT != "production" else None, redoc_url=None)
+# The interactive API docs list every endpoint and field; they are off unless ENABLE_API_DOCS is set (local work).
+app = FastAPI(title=settings.APP_NAME, version="2.0.0", lifespan=lifespan, redoc_url=None,
+              docs_url="/docs" if settings.ENABLE_API_DOCS else None,
+              openapi_url="/openapi.json" if settings.ENABLE_API_DOCS else None)
+
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Cross-Origin-Resource-Policy": "same-site",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+}
+
+
+class SecurityHeaders:
+    """The API only returns data, never pages: browsers are told not to render, frame or sniff it. Written as plain
+    ASGI so streamed replies (chat text, voice audio) pass through untouched."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        extra = dict(_SECURITY_HEADERS)
+        if settings.ENVIRONMENT == "production":
+            extra["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        if scope["path"].startswith("/api/admin"):
+            extra["Cache-Control"] = "no-store"  # personal data and transcripts are never cached
+
+        async def with_headers(message):
+            if message["type"] == "http.response.start":
+                present = {k.lower() for k, _ in message.get("headers", [])}
+                message["headers"] = [*message.get("headers", []),
+                                      *((k.lower().encode(), v.encode()) for k, v in extra.items() if k.lower().encode() not in present)]
+            await send(message)
+        await self.app(scope, receive, with_headers)
+
+
+app.add_middleware(SecurityHeaders)
 
 app.add_middleware(
     CORSMiddleware,

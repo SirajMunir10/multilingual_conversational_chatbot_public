@@ -34,6 +34,12 @@ def _actor(user: Dict[str, Any], via: str) -> Actor:
 _KEY_ACTOR = {"id": 0, "email": "admin-api-key", "name": "Admin API key", "role": Role.ADMIN}
 
 
+def api_key_usable() -> bool:
+    """The script key acts as a full Admin, so a short or example value (e.g. copied from .env.example) is refused."""
+    key = settings.ADMIN_API_KEY
+    return len(key) >= 32 and key.lower() != "generate_a_long_random_value"
+
+
 def session_ttl_sec() -> int:
     return max(1, settings.ADMIN_SESSION_HOURS) * 3600
 
@@ -55,7 +61,7 @@ def clear_session_cookie(response: Response) -> None:
 async def current_actor(request: Request) -> Actor:
     key = request.headers.get("x-admin-key")
     if key is not None:
-        if settings.ADMIN_API_KEY and hmac.compare_digest(key, settings.ADMIN_API_KEY):
+        if api_key_usable() and hmac.compare_digest(key, settings.ADMIN_API_KEY):
             return _actor(_KEY_ACTOR, "key")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Admin authentication required.")
 
