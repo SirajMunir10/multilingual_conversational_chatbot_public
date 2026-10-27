@@ -18,6 +18,8 @@ from app.llm.client import LLMService
 from app.orchestrator import tools
 from app.orchestrator.session_store import SessionContext, SessionStore
 from app.services import escalation, prompt_profile
+from app.services.brand_terms import normalize_transcript
+from app.services.language_script import foreign_script, script_matches, tidy_punctuation
 
 logger = logging.getLogger("xo.orchestrator")
 
@@ -91,7 +93,9 @@ def dedupe(text: str) -> str:
 
 
 VOICE_NOTE = ("This turn is a VOICE conversation: reply in at most two short spoken sentences, no lists, no markdown, "
-              "no listing numbers like #1. Write amounts with digits (e.g. AED 1,500,000); the voice engine reads them aloud.")
+              "no listing numbers like #1. Sound warm and natural, like a friendly advisor on the phone. "
+              "Write amounts with digits (e.g. AED 1,500,000); the voice engine reads them aloud. "
+              "The app already says a short \"let me check\" while tools run, so start your answer directly.")
 
 
 def localized_message(language: str, key: str) -> str:
@@ -108,9 +112,8 @@ class ConversationOrchestrator:
         messages: List[Dict[str, Any]] = [{"role": "system", "content": LLMService.system_prompt(session.language, session.language_locked)}]
         if channel == "voice":
             messages.append({"role": "system", "content": VOICE_NOTE})
-            if session.language_locked:
-                messages.append({"role": "system", "content": "The user's speech was transcribed automatically and may appear in a related script; "
-                                                              "keep replying in the session language unless they explicitly ask to switch."})
+            messages.append({"role": "system", "content": "The user's speech was transcribed automatically and may appear in a related script; "
+                                                          "keep replying in the session language unless they explicitly ask to switch."})
         if session.user_id:
             messages.append({"role": "system", "content": "The user is signed in; account tools will return their own data."})
         messages.extend(session.history)
@@ -149,9 +152,10 @@ class ConversationOrchestrator:
         if selected_language in locales:
             session.language = selected_language
             session.language_locked = True
+
+        text = normalize_transcript(redact_payment_data((message or "").strip())[: settings.MAX_MESSAGE_CHARS])
         yield {"type": "session", "session_id": session.session_id, "language": session.language}
 
-        text = redact_payment_data((message or "").strip())[: settings.MAX_MESSAGE_CHARS]
         if not text:
             yield {"type": "error", "message": localized_message(session.language, "error_generic")}
             return
@@ -180,8 +184,13 @@ class ConversationOrchestrator:
         turn_messages: List[Dict[str, Any]] = [{"role": "user", "content": text}]
         ui: Dict[str, Any] = {}
         tools_used: List[str] = [f"escalation:{rule_id}" for rule_id in offered]
-        final_text = ""
+        final_text = answer = ""
         first_token_at: Optional[float] = None
+        # The reply is checked for the right script before it is shown (and rewritten once if needed) when it is at risk
+        # of coming back in another language: the visitor wrote in another alphabet, or a language change was confirmed.
+        check_script = foreign_script(text, session.language)
+        rewritten = False
+        preambles: List[str] = []
 
         try:
             for step in range(settings.LLM_MAX_TOOL_STEPS + 1):
@@ -203,8 +212,8 @@ class ConversationOrchestrator:
                             first_token_at = time.monotonic()
                         content_parts.append(delta.content)
                         visible = guard.feed(delta.content)
-                        if visible:
-                            yield {"type": "token", "text": visible}
+                        if visible and not check_script:
+                            yield {"type": "token", "text": tidy_punctuation(visible, session.language)}
                     for tc in delta.tool_calls or []:
                         slot = calls.setdefault(tc.index, {"id": "", "name": "", "arguments": ""})
                         if tc.id:
@@ -217,7 +226,19 @@ class ConversationOrchestrator:
 
                 content = "".join(content_parts)
                 if not calls:
-                    final_text = guard.final()
+                    final_text = answer = guard.final()
+                    if preambles and not rewritten:
+                        # A spoken lead-in ("Let me check that.") stays part of the reply, so text and voice match.
+                        final_text = "\n\n".join(preambles + [final_text])
+                    if check_script and not rewritten and not script_matches(answer, session.language) \
+                            and step < settings.LLM_MAX_TOOL_STEPS:
+                        # Wrong script right after the visitor chose a language (e.g. Punjabi in Urdu letters): rewrite once.
+                        info = locales[session.language]
+                        messages.append({"role": "assistant", "content": answer})
+                        messages.append({"role": "system", "content": f"That reply was not written in {info['name']} script. "
+                                         f"Rewrite the same reply entirely in {info['name']}: {info.get('writing', '')}. Reply with the rewritten text only."})
+                        rewritten = True
+                        continue
                     break
 
                 assistant_msg = {"role": "assistant", "content": content or None, "tool_calls": [
@@ -229,6 +250,8 @@ class ConversationOrchestrator:
                 # then uses the affordability result just computed (FR-15).
                 ordered = sorted(calls.values(), key=lambda c: 0 if c["name"].startswith("calc_") else 1)
                 affordable_price: Optional[float] = None
+                switched_now = False
+                refused_switch_only = all(c["name"] == "set_language" for c in calls.values())
                 for c in ordered:
                     arguments = c["arguments"]
                     if c["name"] == "search_properties" and affordable_price:
@@ -244,22 +267,40 @@ class ConversationOrchestrator:
                         affordable_price = result["max_property_price_aed"]
                     tools_used.append(c["name"])
                     ui.update(payload)
+                    if c["name"] != "set_language" or result.get("status") != "not_switched":
+                        refused_switch_only = False
                     if c["name"] == "set_language" and result.get("status") == "switched":
                         # Lets voice clients speak the rest of this reply in the new language.
                         yield {"type": "language", "language": session.language}
+                        switched_now = True
                     tool_msg = {"role": "tool", "tool_call_id": c["id"], "content": tools.compact(result)}
                     messages.append(tool_msg)
                     turn_messages.append(tool_msg)
-                if content:
+                if refused_switch_only and content.strip():
+                    # The model answered and also asked to switch language, which the visitor did not ask for: its answer
+                    # stands (a second pass would only repeat it).
+                    answer = guard.final()
+                    final_text = answer if not check_script or script_matches(answer, session.language) else ""
+                    if final_text:
+                        break
+                if content.strip():
+                    preambles.append(content.strip())
+                if content and not check_script:
                     # Text emitted alongside tool calls is a preamble; keep it but start a new paragraph for the answer.
                     yield {"type": "token", "text": "\n\n"}
+                check_script = check_script or switched_now
         except Exception as exc:
             logger.exception("LLM turn failed: %s", exc)
             cls._save_turn(session, channel, text, None, tools_used, started)
             yield {"type": "error", "message": localized_message(session.language, "error_generic")}
             return
 
-        final_text = final_text.strip()
+        final_text = tidy_punctuation(final_text.strip(), session.language)
+        if check_script and answer.strip():
+            # The answer after a language switch, checked before showing (anything said before the switch was already shown).
+            yield {"type": "token", "text": tidy_punctuation(answer.strip(), session.language)}
+        if rewritten:
+            logger.info("Reply rewritten into %s script after a language switch", session.language)
         turn_messages.append({"role": "assistant", "content": final_text})
         SessionStore.append_history(session, turn_messages)
         SessionStore.add_transcript(session, "assistant", final_text)

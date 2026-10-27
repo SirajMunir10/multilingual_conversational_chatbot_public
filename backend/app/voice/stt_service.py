@@ -17,6 +17,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 
 from app.core.config import load_config, settings
 from app.core.usage_tracker import UsageTracker
+from app.services.brand_terms import normalize_transcript
 
 logger = logging.getLogger("xo.stt")
 
@@ -33,20 +34,26 @@ async def _connect_upstream():
         return await websockets.connect(settings.STT_REALTIME_URL, open_timeout=10, **options)
 
 _KEYWORDS_LIMIT = 40
+_PROMPT = ("A customer talking to XO, the voice assistant of XOTO (said \"X-oto\"), a UAE real estate and mortgage company. "
+           "They may speak English, Arabic, Hindi, Urdu, Punjabi or another language, often mixing in English property words.")
 
 
-def _session_update(language: Optional[str]) -> Dict[str, Any]:
-    transcription: Dict[str, Any] = {"model": settings.STT_MODEL, "delay": settings.STT_DELAY,
-                                     "prompt": "A customer talking to XOTO's UAE real estate and mortgage assistant."}
+def _session_update(language: Optional[str], noise_reduction: bool = True) -> Dict[str, Any]:
+    transcription: Dict[str, Any] = {"model": settings.STT_MODEL, "delay": settings.STT_DELAY, "prompt": _PROMPT}
     locales = load_config("locales")["locales"]
     stt_lang = (locales.get(language or "") or {}).get("stt_language")
-    if stt_lang:
+    # English is not forced: a visitor whose page is in English may start talking in Urdu or Arabic, and an English
+    # hint would make that first turn come back empty. Other languages are hinted for accuracy.
+    if stt_lang and stt_lang != "en":
         transcription["languages"] = [stt_lang]
     communities = load_config("communities")["communities"]
-    keywords = ["XOTO", "AED", "EMI", "DLD", "Ejari", "off-plan", "Golden Visa"] + [c["name"] for c in communities]
+    keywords = ["XO", "XOTO", "AED", "EMI", "DLD", "Ejari", "off-plan", "Golden Visa"] + [c["name"] for c in communities]
     transcription["keywords"] = keywords[:_KEYWORDS_LIMIT]
-    return {"type": "session.update", "session": {"type": "transcription", "audio": {"input": {
-        "format": {"type": "audio/pcm", "rate": settings.STT_SAMPLE_RATE}, "transcription": transcription, "turn_detection": None}}}}
+    audio_input: Dict[str, Any] = {"format": {"type": "audio/pcm", "rate": settings.STT_SAMPLE_RATE},
+                                   "transcription": transcription, "turn_detection": None}
+    if noise_reduction and settings.STT_NOISE_REDUCTION:
+        audio_input["noise_reduction"] = {"type": settings.STT_NOISE_REDUCTION}
+    return {"type": "session.update", "session": {"type": "transcription", "audio": {"input": audio_input}}}
 
 
 async def relay(client_ws: WebSocket, language: Optional[str], session_id: Optional[str]) -> None:
@@ -59,10 +66,13 @@ async def relay(client_ws: WebSocket, language: Optional[str], session_id: Optio
     started = time.monotonic()
     try:
         async with await _connect_upstream() as upstream:
-            await upstream.send(json.dumps(_session_update(language)))
+            current_language = language
+            noise_reduction = True
+            ready = False
+            await upstream.send(json.dumps(_session_update(current_language)))
 
             async def from_client() -> None:
-                nonlocal audio_bytes
+                nonlocal audio_bytes, current_language
                 while True:
                     msg = await client_ws.receive()
                     if msg.get("type") == "websocket.disconnect":
@@ -79,19 +89,29 @@ async def relay(client_ws: WebSocket, language: Optional[str], session_id: Optio
                         if data.get("type") == "commit":
                             await upstream.send(json.dumps({"type": "input_audio_buffer.commit"}))
                         elif data.get("type") == "language":
-                            await upstream.send(json.dumps(_session_update(data.get("language"))))
+                            current_language = data.get("language")
+                            await upstream.send(json.dumps(_session_update(current_language, noise_reduction)))
 
             async def from_upstream() -> None:
+                nonlocal noise_reduction, ready
                 async for raw in upstream:
                     ev = json.loads(raw)
                     kind = ev.get("type", "")
                     if kind == "conversation.item.input_audio_transcription.delta":
                         await client_ws.send_json({"type": "delta", "text": ev.get("delta", "")})
                     elif kind == "conversation.item.input_audio_transcription.completed":
-                        await client_ws.send_json({"type": "final", "text": ev.get("transcript", "")})
+                        await client_ws.send_json({"type": "final", "text": normalize_transcript(ev.get("transcript", ""))})
                     elif kind == "session.updated":
-                        await client_ws.send_json({"type": "ready"})
+                        if not ready:
+                            ready = True
+                            await client_ws.send_json({"type": "ready"})
                     elif kind == "error":
+                        if not ready and noise_reduction and settings.STT_NOISE_REDUCTION:
+                            # The provider refused the session settings: try once more without noise reduction.
+                            logger.warning("Transcription session refused (%s); retrying without noise reduction", ev.get("error"))
+                            noise_reduction = False
+                            await upstream.send(json.dumps(_session_update(current_language, noise_reduction=False)))
+                            continue
                         logger.warning("Realtime transcription error: %s", ev.get("error"))
                         await client_ws.send_json({"type": "error", "code": "stt_error"})
 

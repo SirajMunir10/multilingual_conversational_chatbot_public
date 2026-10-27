@@ -29,12 +29,13 @@ class LLMService:
         locales = load_config("locales")["locales"]
         info = locales.get(language, locales[load_config("locales")["default"]])
         rules = load_config("mortgage_rules")
-        mode = ("chosen by the user in the language menu; keep using it unless they write in or ask for another language"
-                if language_locked else "detected from the conversation")
+        mode = ("chosen by the user; keep using it unless they write in or ask for another language"
+                if language_locked else "the default for this conversation")
         # The instructions published in the admin module (FR-25), or the built-in file when none is published.
         return prompt_profile.fill(prompt_profile.render_template(prompt_profile.current_profile(), language), {
             "language_name": info["name"],
             "language_native": info["native"],
+            "language_writing": info.get("writing") or f"natural {info['name']} in its usual script",
             "language_mode": mode,
             "supported_languages": ", ".join(f"{v['name']}" for v in locales.values()),
             "default_tenure": rules["tenure"]["default_years"],

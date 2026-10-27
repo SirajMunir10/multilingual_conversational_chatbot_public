@@ -24,3 +24,10 @@ export async function fetchClientConfig() {
   }
   return null
 }
+
+/** Asks the backend to open its model and voice connections, so the first reply is quick. Fire and forget. */
+export function warmBackend() {
+  try {
+    fetch(apiUrl('/api/warm'), { method: 'POST', keepalive: true }).catch(() => {})
+  } catch (e) {}
+}

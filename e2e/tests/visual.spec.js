@@ -90,10 +90,20 @@ test.describe('visual parity', () => {
   test('voice dock in hold', async ({ page }) => {
     test.setTimeout(90_000)
     await openApp(page)
-    await page.evaluate(() => localStorage.setItem('xo_voice_intro_seen', '1'))
+    await page.evaluate(() => localStorage.setItem('xo_voice_turns', '2')) // a returning voice user: no mic hint
     await page.locator('.mic-btn').click()
     await expect(page.locator('.voice-dock.phase-hold')).toBeVisible({ timeout: 45_000 })
     await shot(page, 'voice-hold')
+  })
+
+  test('voice mic hint for a new user', async ({ page }) => {
+    test.setTimeout(90_000)
+    await openApp(page)
+    await page.locator('.mic-btn').click()
+    await expect(page.locator('.voice-dock.phase-hold')).toBeVisible({ timeout: 45_000 })
+    await expect(page.locator('.voice-coach')).toBeVisible()
+    await page.addStyleTag({ content: '.voice-coach-hand, .voice-orb-btn.is-coached::after { animation: none !important; }' })
+    await shot(page, 'voice-coach')
   })
 
   test('admin preview', async ({ page, isMobile }) => {

@@ -234,7 +234,12 @@
    "note_non_resident": "Non-resident: standard 50% LTV; some banks lend up to 65%.",
    "rate_helpful": "Helpful",
    "rate_not_helpful": "Not helpful",
-   "rated_thanks": "Thanks for the feedback"
+   "rated_thanks": "Thanks for the feedback",
+   "voice_coach_tap": "Tap the mic to speak",
+   "voice_coach_listening": "I'm listening — just speak",
+   "voice_filler_search": "Let me look that up.",
+   "voice_filler_calc": "Let me work that out.",
+   "voice_filler_check": "Let me check that for you."
   },
   "ar": {
    "welcome": "مرحباً، أنا XO. اسألني عن العقارات والتمويل العقاري والإيجار في الإمارات أو عن خدمات XOTO.",
@@ -362,7 +367,12 @@
    "note_non_resident": "غير المقيم: نسبة تمويل قياسية 50%، وبعض البنوك حتى 65%.",
    "rate_helpful": "مفيد",
    "rate_not_helpful": "غير مفيد",
-   "rated_thanks": "شكرًا على ملاحظتك"
+   "rated_thanks": "شكرًا على ملاحظتك",
+   "voice_coach_tap": "اضغط على الميكروفون للتحدث",
+   "voice_coach_listening": "أنا أستمع — تحدّث فقط",
+   "voice_filler_search": "دعني أبحث لك.",
+   "voice_filler_calc": "دعني أحسبها لك.",
+   "voice_filler_check": "دعني أتحقق من ذلك."
   },
   "hi": {
    "welcome": "नमस्ते, मैं XO हूँ। यूएई प्रॉपर्टी, होम लोन, किराये या XOTO सेवाओं के बारे में पूछें।",
@@ -490,7 +500,12 @@
    "note_non_resident": "नॉन-रेज़िडेंट: मानक 50% LTV; कुछ बैंक 65% तक देते हैं।",
    "rate_helpful": "उपयोगी",
    "rate_not_helpful": "उपयोगी नहीं",
-   "rated_thanks": "आपकी प्रतिक्रिया के लिए धन्यवाद"
+   "rated_thanks": "आपकी प्रतिक्रिया के लिए धन्यवाद",
+   "voice_coach_tap": "बोलने के लिए माइक पर टैप करें",
+   "voice_coach_listening": "मैं सुन रहा हूँ — बस बोलिए",
+   "voice_filler_search": "एक सेकंड, मैं देखता हूँ।",
+   "voice_filler_calc": "एक सेकंड, मैं हिसाब लगाता हूँ।",
+   "voice_filler_check": "एक सेकंड, मैं चेक करता हूँ।"
   },
   "ur": {
    "welcome": "سلام، میں XO ہوں۔ یو اے ای کی پراپرٹی، مارگیج، کرائے یا XOTO سروسز کے بارے میں پوچھیں۔",
@@ -618,7 +633,12 @@
    "note_non_resident": "نان ریزیڈنٹ: معیاری 50% LTV؛ کچھ بینک 65% تک دیتے ہیں۔",
    "rate_helpful": "مفید",
    "rate_not_helpful": "مفید نہیں",
-   "rated_thanks": "آپ کی رائے کا شکریہ"
+   "rated_thanks": "آپ کی رائے کا شکریہ",
+   "voice_coach_tap": "بولنے کے لیے مائیک پر ٹیپ کریں",
+   "voice_coach_listening": "میں سن رہا ہوں — بس بولیں",
+   "voice_filler_search": "ایک سیکنڈ، میں دیکھتا ہوں۔",
+   "voice_filler_calc": "ایک سیکنڈ، میں حساب لگاتا ہوں۔",
+   "voice_filler_check": "ایک سیکنڈ، میں چیک کرتا ہوں۔"
   },
   "fr": {
    "welcome": "Bonjour, je suis XO. Posez-moi vos questions sur l'immobilier, les prêts, la location aux EAU ou les services XOTO.",
@@ -746,7 +766,12 @@
    "note_non_resident": "Non-résident : quotité standard de 50 % ; certaines banques vont jusqu'à 65 %.",
    "rate_helpful": "Utile",
    "rate_not_helpful": "Pas utile",
-   "rated_thanks": "Merci pour votre avis"
+   "rated_thanks": "Merci pour votre avis",
+   "voice_coach_tap": "Touchez le micro pour parler",
+   "voice_coach_listening": "Je vous écoute — parlez simplement",
+   "voice_filler_search": "Je regarde ça pour vous.",
+   "voice_filler_calc": "Je fais le calcul.",
+   "voice_filler_check": "Je vérifie pour vous."
   },
   "es": {
    "welcome": "Hola, soy XO. Pregúntame sobre propiedades, hipotecas, alquiler en los EAU o servicios de XOTO.",
@@ -874,7 +899,12 @@
    "note_non_resident": "No residente: LTV estándar del 50%; algunos bancos llegan al 65%.",
    "rate_helpful": "Útil",
    "rate_not_helpful": "No útil",
-   "rated_thanks": "Gracias por tu opinión"
+   "rated_thanks": "Gracias por tu opinión",
+   "voice_coach_tap": "Toca el micrófono para hablar",
+   "voice_coach_listening": "Te escucho — solo habla",
+   "voice_filler_search": "Déjame buscarlo.",
+   "voice_filler_calc": "Déjame calcularlo.",
+   "voice_filler_check": "Déjame comprobarlo."
   },
   "de": {
    "welcome": "Hallo, ich bin XO. Fragen Sie mich zu Immobilien, Finanzierung, Miete in den VAE oder zu XOTO-Services.",
@@ -1002,7 +1032,12 @@
    "note_non_resident": "Nicht ansässig: Standard 50 % Beleihung; manche Banken bis 65 %.",
    "rate_helpful": "Hilfreich",
    "rate_not_helpful": "Nicht hilfreich",
-   "rated_thanks": "Danke für dein Feedback"
+   "rated_thanks": "Danke für dein Feedback",
+   "voice_coach_tap": "Tippen Sie aufs Mikrofon, um zu sprechen",
+   "voice_coach_listening": "Ich höre zu – sprechen Sie einfach",
+   "voice_filler_search": "Ich schaue kurz nach.",
+   "voice_filler_calc": "Ich rechne das kurz aus.",
+   "voice_filler_check": "Ich prüfe das kurz."
   },
   "zh": {
    "welcome": "你好，我是 XO。可以问我阿联酋的房产、房贷、租房或 XOTO 服务。",
@@ -1130,7 +1165,12 @@
    "note_non_resident": "非居民：标准贷款成数 50%，部分银行最高 65%。",
    "rate_helpful": "有帮助",
    "rate_not_helpful": "没有帮助",
-   "rated_thanks": "感谢您的反馈"
+   "rated_thanks": "感谢您的反馈",
+   "voice_coach_tap": "点击麦克风开始说话",
+   "voice_coach_listening": "我在听——请直接说",
+   "voice_filler_search": "我帮你查一下。",
+   "voice_filler_calc": "我帮你算一下。",
+   "voice_filler_check": "我帮你确认一下。"
   },
   "tl": {
    "welcome": "Hi, ako si XO. Magtanong tungkol sa property, mortgage, pag-upa sa UAE o mga serbisyo ng XOTO.",
@@ -1258,7 +1298,12 @@
    "note_non_resident": "Non-resident: karaniwang 50% LTV; may mga bangkong hanggang 65%.",
    "rate_helpful": "Nakatulong",
    "rate_not_helpful": "Hindi nakatulong",
-   "rated_thanks": "Salamat sa iyong feedback"
+   "rated_thanks": "Salamat sa iyong feedback",
+   "voice_coach_tap": "I-tap ang mic para magsalita",
+   "voice_coach_listening": "Nakikinig ako — magsalita ka lang",
+   "voice_filler_search": "Sandali, titingnan ko.",
+   "voice_filler_calc": "Sandali, kukuwentahin ko.",
+   "voice_filler_check": "Sandali, iche-check ko."
   },
   "fa": {
    "welcome": "سلام، من XO هستم. درباره املاک، وام مسکن، اجاره در امارات یا خدمات XOTO بپرسید.",
@@ -1386,7 +1431,12 @@
    "note_non_resident": "غیرمقیم: نسبت استاندارد 50%؛ برخی بانک‌ها تا 65%.",
    "rate_helpful": "مفید بود",
    "rate_not_helpful": "مفید نبود",
-   "rated_thanks": "از بازخورد شما سپاسگزاریم"
+   "rated_thanks": "از بازخورد شما سپاسگزاریم",
+   "voice_coach_tap": "برای صحبت روی میکروفون بزنید",
+   "voice_coach_listening": "گوش می‌دهم — فقط صحبت کنید",
+   "voice_filler_search": "اجازه بدهید نگاه کنم.",
+   "voice_filler_calc": "اجازه بدهید حساب کنم.",
+   "voice_filler_check": "اجازه بدهید بررسی کنم."
   },
   "bn": {
    "welcome": "হ্যালো, আমি XO। সংযুক্ত আরব আমিরাতের প্রপার্টি, মর্টগেজ, ভাড়া বা XOTO সেবা নিয়ে জিজ্ঞাসা করুন।",
@@ -1514,7 +1564,12 @@
    "note_non_resident": "নন-রেসিডেন্ট: সাধারণ 50% LTV; কিছু ব্যাংক 65% পর্যন্ত দেয়।",
    "rate_helpful": "সহায়ক",
    "rate_not_helpful": "সহায়ক নয়",
-   "rated_thanks": "আপনার মতামতের জন্য ধন্যবাদ"
+   "rated_thanks": "আপনার মতামতের জন্য ধন্যবাদ",
+   "voice_coach_tap": "কথা বলতে মাইকে ট্যাপ করুন",
+   "voice_coach_listening": "আমি শুনছি — শুধু বলুন",
+   "voice_filler_search": "এক সেকেন্ড, আমি দেখছি।",
+   "voice_filler_calc": "এক সেকেন্ড, আমি হিসাব করছি।",
+   "voice_filler_check": "এক সেকেন্ড, আমি যাচাই করছি।"
   },
   "ta": {
    "welcome": "வணக்கம், நான் XO. யுஏஇ சொத்துகள், வீட்டுக் கடன், வாடகை அல்லது XOTO சேவைகள் பற்றி கேளுங்கள்.",
@@ -1642,7 +1697,12 @@
    "note_non_resident": "வெளிநாட்டவர்: வழக்கமான 50% LTV; சில வங்கிகள் 65% வரை.",
    "rate_helpful": "பயனுள்ளது",
    "rate_not_helpful": "பயனில்லை",
-   "rated_thanks": "உங்கள் கருத்துக்கு நன்றி"
+   "rated_thanks": "உங்கள் கருத்துக்கு நன்றி",
+   "voice_coach_tap": "பேச மைக்கைத் தட்டவும்",
+   "voice_coach_listening": "நான் கேட்கிறேன் — பேசுங்கள்",
+   "voice_filler_search": "ஒரு நொடி, பார்க்கிறேன்.",
+   "voice_filler_calc": "ஒரு நொடி, கணக்கிடுகிறேன்.",
+   "voice_filler_check": "ஒரு நொடி, சரிபார்க்கிறேன்."
   },
   "pa": {
    "welcome": "ਸਤ ਸ੍ਰੀ ਅਕਾਲ, ਮੈਂ XO ਹਾਂ। UAE ਦੀ ਪ੍ਰਾਪਰਟੀ, ਮੌਰਗੇਜ, ਕਿਰਾਏ ਜਾਂ XOTO ਸੇਵਾਵਾਂ ਬਾਰੇ ਪੁੱਛੋ।",
@@ -1770,7 +1830,12 @@
    "note_non_resident": "ਨਾਨ-ਰੈਜ਼ੀਡੈਂਟ: ਆਮ 50% LTV; ਕੁਝ ਬੈਂਕ 65% ਤੱਕ ਦਿੰਦੇ ਹਨ।",
    "rate_helpful": "ਮਦਦਗਾਰ",
    "rate_not_helpful": "ਮਦਦਗਾਰ ਨਹੀਂ",
-   "rated_thanks": "ਤੁਹਾਡੀ ਰਾਇ ਲਈ ਧੰਨਵਾਦ"
+   "rated_thanks": "ਤੁਹਾਡੀ ਰਾਇ ਲਈ ਧੰਨਵਾਦ",
+   "voice_coach_tap": "ਬੋਲਣ ਲਈ ਮਾਈਕ 'ਤੇ ਟੈਪ ਕਰੋ",
+   "voice_coach_listening": "ਮੈਂ ਸੁਣ ਰਿਹਾ ਹਾਂ — ਬੱਸ ਬੋਲੋ",
+   "voice_filler_search": "ਇੱਕ ਸਕਿੰਟ, ਮੈਂ ਵੇਖਦਾ ਹਾਂ।",
+   "voice_filler_calc": "ਇੱਕ ਸਕਿੰਟ, ਮੈਂ ਹਿਸਾਬ ਲਾਉਂਦਾ ਹਾਂ।",
+   "voice_filler_check": "ਇੱਕ ਸਕਿੰਟ, ਮੈਂ ਚੈੱਕ ਕਰਦਾ ਹਾਂ।"
   },
   "ml": {
    "welcome": "ഹലോ, ഞാൻ XO ആണ്. യുഎഇ പ്രോപ്പർട്ടി, മോർട്ട്ഗേജ്, വാടക അല്ലെങ്കിൽ XOTO സേവനങ്ങളെക്കുറിച്ച് ചോദിക്കൂ.",
@@ -1898,7 +1963,12 @@
    "note_non_resident": "നോൺ-റെസിഡന്റ്: സാധാരണ 50% LTV; ചില ബാങ്കുകൾ 65% വരെ.",
    "rate_helpful": "സഹായകരം",
    "rate_not_helpful": "സഹായകരമല്ല",
-   "rated_thanks": "നിങ്ങളുടെ അഭിപ്രായത്തിന് നന്ദി"
+   "rated_thanks": "നിങ്ങളുടെ അഭിപ്രായത്തിന് നന്ദി",
+   "voice_coach_tap": "സംസാരിക്കാൻ മൈക്കിൽ ടാപ്പ് ചെയ്യുക",
+   "voice_coach_listening": "ഞാൻ കേൾക്കുന്നു — സംസാരിച്ചോളൂ",
+   "voice_filler_search": "ഒരു നിമിഷം, ഞാൻ നോക്കാം.",
+   "voice_filler_calc": "ഒരു നിമിഷം, ഞാൻ കണക്കാക്കാം.",
+   "voice_filler_check": "ഒരു നിമിഷം, ഞാൻ പരിശോധിക്കാം."
   },
   "or": {
    "welcome": "ନମସ୍କାର, ମୁଁ XO। UAE ସମ୍ପତ୍ତି, ମର୍ଟଗେଜ୍, ଭଡ଼ା କିମ୍ବା XOTO ସେବା ବିଷୟରେ ପଚାରନ୍ତୁ।",
@@ -2026,7 +2096,12 @@
    "note_non_resident": "ଅଣ-ବାସିନ୍ଦା: ସାଧାରଣ 50% LTV; କିଛି ବ୍ୟାଙ୍କ 65% ପର୍ଯ୍ୟନ୍ତ।",
    "rate_helpful": "ସହାୟକ",
    "rate_not_helpful": "ସହାୟକ ନୁହେଁ",
-   "rated_thanks": "ଆପଣଙ୍କ ମତାମତ ପାଇଁ ଧନ୍ୟବାଦ"
+   "rated_thanks": "ଆପଣଙ୍କ ମତାମତ ପାଇଁ ଧନ୍ୟବାଦ",
+   "voice_coach_tap": "କହିବା ପାଇଁ ମାଇକ୍ ଟ୍ୟାପ୍ କରନ୍ତୁ",
+   "voice_coach_listening": "ମୁଁ ଶୁଣୁଛି — କେବଳ କୁହନ୍ତୁ",
+   "voice_filler_search": "ଗୋଟିଏ ସେକେଣ୍ଡ, ମୁଁ ଦେଖୁଛି।",
+   "voice_filler_calc": "ଗୋଟିଏ ସେକେଣ୍ଡ, ମୁଁ ହିସାବ କରୁଛି।",
+   "voice_filler_check": "ଗୋଟିଏ ସେକେଣ୍ଡ, ମୁଁ ଯାଞ୍ଚ କରୁଛି।"
   }
  }
 }

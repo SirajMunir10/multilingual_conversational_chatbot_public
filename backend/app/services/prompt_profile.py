@@ -14,8 +14,8 @@ from app.core.config import builtin_config, load_prompt, override
 PROFILE_ITEM = "prompt_profile"
 
 # Values filled in at every turn. Each must stay somewhere in the instructions.
-PLACEHOLDERS = ("language_name", "language_native", "language_mode", "supported_languages", "default_tenure",
-                "benchmark_rate", "today")
+PLACEHOLDERS = ("language_name", "language_native", "language_writing", "language_mode", "supported_languages",
+                "default_tenure", "benchmark_rate", "today")
 
 # Sections whose titles start with these carry PRD rules (FR-6, FR-13, FR-16, FR-23b) and cannot be edited.
 LOCKED_PREFIXES = ("Truthfulness", "Calculations", "Advisor handoff", "Scope and safety")

@@ -16,6 +16,7 @@ from app.db.database import Database
 from app.db.lead_store import LeadDatabaseService
 from app.routers import admin, admin_config, admin_insights, admin_kb, chat, handoff, health, mortgage, properties, voice
 from app.services.vector_store import VectorDatabase
+from app.services import warmup
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("xo.main")
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
         logger.info("Knowledge base: %d entries live.", await KnowledgeStore.rebuild_index())  # FR-24 edits over the built-in KB
     except Exception as exc:  # keep the built-in index loaded above
         logger.error("Knowledge-base edits could not be loaded; using the built-in knowledge base: %s", exc)
+    warmup.warm_in_background()  # the first visitor after a restart does not pay for new provider connections
     refreshers = [asyncio.create_task(ConfigStore.refresh_forever()), asyncio.create_task(KnowledgeStore.refresh_forever())]
     yield
     for task in refreshers:

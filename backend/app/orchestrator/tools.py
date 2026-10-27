@@ -108,7 +108,8 @@ TOOL_SCHEMAS: List[Dict[str, Any]] = [
         "team": {"type": "string", "enum": list(escalation.TEAM_KEYS)},
         "summary": {"type": "string", "description": "One-line summary of what the user needs."},
     }, ["full_name", "phone", "consent_confirmed"]),
-    _fn("set_language", "Switch the conversation language when the user writes in or asks for another supported language.",
+    _fn("set_language", "Switch the conversation language. Only when the user clearly asks to talk in another supported language "
+        "from now on, or says yes after you offered it. Never for a few words, a message written in it, or 'can you speak …?'.",
         {"language": {"type": "string", "description": "ISO code", "enum": None}}, ["language"]),
 ]
 
@@ -271,41 +272,59 @@ async def _handoff(session: SessionContext, args: Dict[str, Any]) -> ToolResult:
     return res, ui
 
 
-async def _confirm_language_switch(text: str, target: str, explicit_only: bool = False) -> bool:
-    """Guards against switching on a single foreign word: the message must be written in the
-    target language or explicitly ask for it. When the user picked the language from the menu,
-    only an explicit request counts (speech transcripts can come back in a related script, e.g. Urdu as Hindi).
-    Uses a tiny LLM classification (no word lists)."""
+def _last_reply(session: SessionContext) -> str:
+    for message in reversed(session.history):
+        if message.get("role") == "assistant" and isinstance(message.get("content"), str) and message["content"].strip():
+            return message["content"]
+    return ""
+
+
+async def _confirm_language_switch(session: SessionContext, target: str) -> bool:
+    """A small, separate check of the visitor's intent before the conversation language changes (PRD FR-1).
+
+    It reads XO's previous message and the visitor's reply, so it understands both a direct request ("let's talk in
+    Punjabi") and a yes to XO's own offer, and it rejects everything else: a few words in that language, a whole
+    message written in it, or the question "can you speak Hindi?". If the check cannot run, nothing changes."""
     from app.core.config import settings
     from app.llm.client import LLMService
+    name = load_config("locales")["locales"][target]["name"]
     try:
         resp = await LLMService.client().chat.completions.create(
-            model=settings.LLM_MODEL, reasoning_effort=settings.LLM_REASONING_EFFORT or None, max_completion_tokens=40,
+            model=settings.LLM_MODEL, reasoning_effort=settings.LLM_REASONING_EFFORT or None, max_completion_tokens=30,
             response_format={"type": "json_object"},
-            messages=[{"role": "system", "content": "Return JSON {\"written_in\": ISO-639-1 code of the language the message is mainly written in, "
-                                                    "\"requests_language\": ISO-639-1 code the user explicitly asks the assistant to use, or null}."},
-                      {"role": "user", "content": text[:500]}])
-        data = json.loads(resp.choices[0].message.content or "{}")
-        aliases = {"fil": "tl"}
-        written = aliases.get(data.get("written_in"), data.get("written_in"))
-        requested = aliases.get(data.get("requests_language"), data.get("requests_language"))
-        return target == requested if explicit_only else target in (written, requested)
+            messages=[{"role": "system", "content": (
+                f"You check one decision for a chat assistant. Should the conversation now continue in {name}? "
+                f"Answer true only if the user's latest message explicitly asks the assistant to talk or reply in {name} from now on, "
+                f"or agrees to the assistant's previous message offering to continue in {name} (a short yes such as \"yes\", "
+                f"\"نعم\", \"haan\" or \"جی ہاں\" right after that offer counts, even if the message also offered something else). "
+                f"Answer false if the user only "
+                f"asks whether the assistant can speak {name}, uses some {name} words, writes in {name}, mentions {name}, or agrees "
+                "to something else. Return JSON {\"switch\": true or false}.")},
+                {"role": "user", "content": f"Assistant's previous message: {_last_reply(session)[-600:]}\n"
+                                            f"User's latest message: {(session.current_user_text or '')[:500]}"}])
+        return json.loads(resp.choices[0].message.content or "{}").get("switch") is True
     except Exception:
-        return True
+        return False
 
 
 async def _set_language(session: SessionContext, args: Dict[str, Any]) -> ToolResult:
+    locales = load_config("locales")["locales"]
     code = args.get("language")
-    if code not in load_config("locales")["locales"]:
+    if code not in locales:
         return {"error": "unsupported_language"}, {}
     if code == session.language:
         return {"language": code, "status": "already_active"}, {}
-    if not await _confirm_language_switch(session.current_user_text, code, explicit_only=session.language_locked):
+    current, target = locales[session.language], locales[code]
+    if not await _confirm_language_switch(session, code):
         return {"status": "not_switched", "language": session.language,
-                "instruction": "Keep replying in the session language; the user did not ask to switch."}, {}
+                "instruction": (f"Do not switch. Reply in {current['name']}. If they asked whether you speak {target['name']} or "
+                                f"used it, say yes in {current['name']} and ask whether they would like to continue in "
+                                f"{target['name']}.")}, {}
     session.language = code
-    session.language_locked = False
-    return {"language": code, "status": "switched"}, {"language": code}
+    session.language_locked = True
+    return {"language": code, "status": "switched",
+            "instruction": f"Switched. From now on reply only in {target['name']} ({target['native']}): {target.get('writing', '')}."}, \
+        {"language": code}
 
 
 HANDLERS: Dict[str, Callable[[SessionContext, Dict[str, Any]], Awaitable[ToolResult]]] = {
