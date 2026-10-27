@@ -69,6 +69,9 @@ export function createVoice(onChange = () => {}) {
   let resolveFn = null
   let rejectFn = null
   let committed = false
+  let commitQueued = false // "send" arrived before the transcription service was ready
+  let ready = false
+  let pending = []
   let finalTimer = null
   let lastDelta = 0
 
@@ -137,13 +140,18 @@ export function createVoice(onChange = () => {}) {
     done && done(new Error(code))
   }
 
+  function sendCommit() {
+    try { ws.send(JSON.stringify({ type: 'commit' })) } catch (e) {}
+  }
+
   function commit() {
     if (committed || !ws) return
     committed = true
     set({ silenceCountdown: false, listening: false })
     frameHandler = null
-    try { ws.send(JSON.stringify({ type: 'commit' })) } catch (e) {}
-    finalTimer = setTimeout(() => finish(state.liveText), 6000)
+    if (ready && ws.readyState === 1) sendCommit()
+    else commitQueued = true // sent with the buffered audio as soon as the service is ready
+    finalTimer = setTimeout(() => finish(state.liveText), ready ? 6000 : 10000)
   }
 
   function cancel() {
@@ -162,9 +170,14 @@ export function createVoice(onChange = () => {}) {
     node = source = stream = ctx = null
   }
 
-  function listen({ language, sessionId, sampleRate = 24000, silenceMs = 2000, maxSec = 120, noSpeechMs = 15000 }) {
+  // End of speech is found from the voice itself (fast), with transcript activity as the fallback for very quiet
+  // microphones. Background sound is tracked all the time, so a visitor who talks straight away is still heard.
+  function listen({ language, sessionId, sampleRate = 24000, silenceMs = 1000, maxSec = 120, noSpeechMs = 15000 }) {
     set({ liveText: '' })
     committed = false
+    commitQueued = false
+    ready = false
+    pending = []
     lastDelta = 0
     return new Promise((resolve, reject) => {
       resolveFn = resolve
@@ -181,13 +194,15 @@ export function createVoice(onChange = () => {}) {
         return fail('voice_unavailable')
       }
 
-      const pending = []
-      let ready = false
+      const started = performance.now()
+      let readyAt = 0
       ws.onmessage = (ev) => {
         const msg = JSON.parse(ev.data)
         if (msg.type === 'ready') {
           ready = true
+          readyAt = performance.now()
           pending.splice(0).forEach(b => ws.send(b))
+          if (commitQueued) sendCommit()
         } else if (msg.type === 'delta') {
           set({ liveText: state.liveText + msg.text })
           lastDelta = performance.now()
@@ -200,10 +215,12 @@ export function createVoice(onChange = () => {}) {
       ws.onerror = () => fail('voice_unavailable')
       ws.onclose = () => { if (resolveFn) (committed ? finish(state.liveText) : fail('voice_unavailable')) }
 
-      const started = performance.now()
-      let noiseFloor = 0.01
-      let calibrated = false
+      let floor = 0.004       // background level: follows quiet moments quickly, loud ones slowly
+      let speech = 0          // the visitor's own speaking level, once they have talked a little
+      let voicedMs = 0
       let lastVoice = 0
+      let openUntil = 0       // the gate stays open briefly after speech so word endings are kept
+      let lastFrame = started
       let batch = []
       let batchLen = 0
       const batchTarget = Math.round(sampleRate / 10) // ~100 ms per frame sent
@@ -215,14 +232,26 @@ export function createVoice(onChange = () => {}) {
         for (let i = 0; i < frame.length; i++) sum += frame[i] * frame[i]
         const rms = Math.sqrt(sum / frame.length)
         const now = performance.now()
-        if (!calibrated) {
-          noiseFloor = Math.max(noiseFloor * 0.9 + rms * 0.1, 0.002)
-          if (now - started > 400) calibrated = true
+        const dt = Math.min(now - lastFrame, 250)
+        lastFrame = now
+
+        const towards = (from, to, tauMs) => from + (to - from) * (1 - Math.exp(-dt / tauMs))
+        floor = Math.max(rms < floor ? towards(floor, rms, 300) : towards(floor, rms, 4000), 0.0015)
+        // Voices clearly quieter than the visitor's own (a TV, people nearby) do not count as speech.
+        const threshold = Math.max(floor * 3, 0.006, voicedMs > 300 ? speech * 0.25 : 0)
+        const voiced = rms > threshold
+        if (voiced) {
+          voicedMs += dt
+          lastVoice = now
+          openUntil = now + 250
+          speech = speech ? towards(speech, rms, 1500) : rms
         }
         state.level = Math.min(rms / 0.06, 1)
-        if (calibrated && rms > Math.max(noiseFloor * 2.5, 0.008)) lastVoice = now
 
-        const pcm = downsample(frame, ctx.sampleRate, sampleRate)
+        let pcm = downsample(frame, ctx.sampleRate, sampleRate)
+        // Outside speech the sound is turned down (not muted), so background talk is not transcribed as the visitor.
+        // Skipped for very quiet microphones, where only the transcript shows that someone is talking.
+        if (now > openUntil && !(lastDelta && !voicedMs)) pcm = pcm.map(v => v * 0.2)
         batch.push(pcm)
         batchLen += pcm.length
         if (batchLen >= batchTarget) {
@@ -236,13 +265,17 @@ export function createVoice(onChange = () => {}) {
           else pending.push(bytes)
         }
 
-        // Speech is detected from transcript activity (works on quiet phone mics) and from loudness.
-        const heardSpeech = lastDelta > 0
-        if (heardSpeech) {
-          const activity = Math.max(lastDelta, lastVoice)
-          set({ silenceCountdown: now - activity > silenceMs * 0.4 })
-          if (now - activity > silenceMs || now - lastDelta > silenceMs + 2500) commit()
-        } else if (now - started > noSpeechMs) {
+        const heard = lastDelta > 0 || voicedMs >= 600
+        if (voicedMs >= 250 && lastVoice) {
+          const quiet = now - lastVoice
+          set({ silenceCountdown: heard && quiet > silenceMs * 0.4 })
+          // A short sound with no words yet waits a little longer for the transcript before sending.
+          if (quiet > (heard ? silenceMs : silenceMs + 1200)) commit()
+        } else if (lastDelta) {
+          const quiet = now - lastDelta
+          set({ silenceCountdown: quiet > silenceMs * 0.6 })
+          if (quiet > silenceMs + 700) commit()
+        } else if ((readyAt && now - readyAt > noSpeechMs) || now - started > noSpeechMs + 10000) {
           finish('')
         }
         if ((now - started) / 1000 > maxSec) commit()

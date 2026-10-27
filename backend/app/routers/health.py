@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from app.core.config import load_config, settings
+from app.services import warmup
 
 router = APIRouter(prefix="/api", tags=["Health & client config"])
 
@@ -21,3 +22,10 @@ def client_config():
         "voice": {"sample_rate": settings.STT_SAMPLE_RATE, "silence_submit_ms": settings.VOICE_SILENCE_SUBMIT_MS,
                   "max_session_sec": settings.STT_MAX_SESSION_SEC},
     }
+
+
+@router.post("/warm", status_code=204, response_class=Response)
+async def warm():
+    """Called by the widget when it opens: prepares the model and voice connections so the first reply is quick."""
+    warmup.warm_in_background()
+    return Response(status_code=204)

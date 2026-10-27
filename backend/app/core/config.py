@@ -56,7 +56,10 @@ class AppSettings(BaseModel):
     STT_DELAY: str = Field(default_factory=lambda: _env("STT_DELAY", "medium"))
     STT_SAMPLE_RATE: int = Field(default_factory=lambda: _env_int("STT_SAMPLE_RATE", 24000))
     STT_MAX_SESSION_SEC: int = Field(default_factory=lambda: _env_int("STT_MAX_SESSION_SEC", 120))
-    VOICE_SILENCE_SUBMIT_MS: int = Field(default_factory=lambda: _env_int("VOICE_SILENCE_SUBMIT_MS", 2000))
+    # Pause after the visitor stops talking before the turn is sent. 1 s feels immediate yet leaves room for a short breath.
+    VOICE_SILENCE_SUBMIT_MS: int = Field(default_factory=lambda: _env_int("VOICE_SILENCE_SUBMIT_MS", 1000))
+    # Turns down background sound before transcription ("near_field" for a phone or laptop mic, "far_field", or "" for off).
+    STT_NOISE_REDUCTION: str = Field(default_factory=lambda: _env("STT_NOISE_REDUCTION", "near_field"))
     TTS_MODEL: str = Field(default_factory=lambda: _env("TTS_MODEL", "eleven_v4_turbo"))
     ELEVENLABS_VOICE_ID: str = Field(default_factory=lambda: _env("ELEVENLABS_VOICE_ID", "qXpMhyvQqiRxWQs4qSSB"))
     ELEVENLABS_VOICE_NAME: str = Field(default_factory=lambda: _env("ELEVENLABS_VOICE_NAME", "Horatius - Energetic Character voice"))

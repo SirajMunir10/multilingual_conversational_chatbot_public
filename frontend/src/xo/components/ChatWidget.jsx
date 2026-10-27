@@ -11,20 +11,22 @@ import XoIcon from './XoIcon'
 import { SubmitHandoffContext } from './HandoffCard'
 import { Transition, SwitchTransition } from './Transition'
 import { languages, languageInfo, t as translate } from '../i18n'
-import { apiUrl, fetchClientConfig } from '../lib/api'
+import { apiUrl, fetchClientConfig, warmBackend } from '../lib/api'
 import { useVoice } from '../hooks/useVoice'
 import { createSpeech } from '../lib/speech'
 import { createWordHighlight } from '../lib/wordHighlight'
 
 const STORE_SESSION = 'xo_session_id'
 const STORE_MESSAGES = 'xo_chat_messages'
-const VOICE_INTRO_KEY = 'xo_voice_intro_seen'
+const VOICE_TURNS_KEY = 'xo_voice_turns' // voice turns completed on this device; the mic hint shows for the first two
 const STATUS_BY_TOOL = {
   search_properties: 'status_search', find_similar: 'status_search', compare_listings: 'status_search', get_listing_details: 'status_search',
   calc_affordability: 'status_calc', calc_emi: 'status_calc', check_eligibility: 'status_calc', calc_purchase_costs: 'status_calc',
   estimate_offers: 'status_calc', get_mortgage_products: 'status_calc', get_lending_rules: 'status_calc',
   retrieve_kb: 'status_kb', request_human_handoff: 'status_handoff'
 }
+
+const VOICE_FILLER = { status_search: 'voice_filler_search', status_calc: 'voice_filler_calc', status_kb: 'voice_filler_check' }
 
 const cx = (...names) => names.filter(Boolean).join(' ')
 
@@ -86,7 +88,7 @@ export default function ChatWidget({
   const scrolledUpRef = useRef(false)
   const setIsUserScrolledUp = (v) => { scrolledUpRef.current = v; setIsUserScrolledUpState(v) }
   const sessionId = useRef(safeStorage('get', STORE_SESSION) || null)
-  const clientConfig = useRef({ voice: { sample_rate: 24000, silence_submit_ms: 2000, max_session_sec: 120 } })
+  const clientConfig = useRef({ voice: { sample_rate: 24000, silence_submit_ms: 1000, max_session_sec: 120 } })
 
   // Language bookkeeping: a manual choice is sent once as `selected_language`;
   // a switch made by the assistant is only reflected in the UI.
@@ -102,10 +104,16 @@ export default function ChatWidget({
   const nextTick = () => new Promise((resolve) => { tickWaiters.current.push(resolve); forceRender() })
   useLayoutEffect(() => {
     if (scrollPending.current) {
-      const { force } = scrollPending.current
+      const { force, anchor } = scrollPending.current
       scrollPending.current = null
       const el = feedRef.current
-      if (el && (force || !scrolledUpRef.current)) el.scrollTop = el.scrollHeight
+      if (el && (force || !scrolledUpRef.current)) {
+        let target = el.scrollHeight
+        // A reply is shown from its first line: the view follows it only until that line reaches the top.
+        const msg = anchor && el.querySelector(`[data-msg-id="${anchor}"]`)
+        if (msg) target = Math.min(target, msg.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 12)
+        el.scrollTop = target
+      }
     }
     if (tickWaiters.current.length) {
       const waiters = tickWaiters.current.splice(0)
@@ -145,9 +153,15 @@ export default function ChatWidget({
     const el = feedRef.current
     if (el) setIsUserScrolledUp(el.scrollHeight - el.scrollTop - el.clientHeight > 60)
   }
-  function scrollToBottom(force = false) {
-    scrollPending.current = { force: force || !!scrollPending.current?.force }
+  function scrollToBottom(force = false, anchor = null) {
+    const prev = scrollPending.current
+    // An explicit "go to the bottom" replaces an earlier reply anchor in the same frame; a gentle request keeps it.
+    scrollPending.current = { force: force || !!prev?.force, anchor: anchor || (force ? null : prev?.anchor || null) }
     forceRender()
+  }
+  // Brings the start of a reply into view (forced when it first appears, gentle while it streams).
+  function scrollToReply(id, force = false) {
+    scrollToBottom(force, id)
   }
   function scrollToLatest() {
     setIsUserScrolledUp(false)
@@ -170,7 +184,10 @@ export default function ChatWidget({
       if (!added) {
         addMessage(reply)
         added = true
-        if (!reply.hidden) setIsTyping(false)
+        if (!reply.hidden) {
+          setIsTyping(false)
+          scrollToReply(reply.id, true) // the visitor is taken to the first words of the answer
+        }
         hooks.onMessage && hooks.onMessage(reply.id)
       }
       return reply.id
@@ -216,11 +233,12 @@ export default function ChatWidget({
             hooks.onLanguage && hooks.onLanguage(ev.language)
           } else if (ev.type === 'status') {
             setStatusKey(STATUS_BY_TOOL[ev.tool] || 'thinking')
+            hooks.onStatus && hooks.onStatus(ev.tool)
           } else if (ev.type === 'token') {
             const id = ensureAdded()
             updateMessage(id, (m) => ({ content: m.content + ev.text }))
             hooks.onToken && hooks.onToken(ev.text)
-            scrollToBottom()
+            scrollToReply(id)
           } else if (ev.type === 'final') {
             finalEvent = ev
           } else if (ev.type === 'error') {
@@ -266,7 +284,7 @@ export default function ChatWidget({
         props.current.onLanguageChanged?.(finalEvent.language)
       }
     }
-    scrollToBottom()
+    if (!getMessage(id)?.hidden) scrollToReply(id)
     return finalEvent
   }
 
@@ -342,25 +360,22 @@ export default function ChatWidget({
   const voicePhaseRef = useRef('idle')
   const setVoicePhase = (v) => { voicePhaseRef.current = v; setVoicePhaseState(v) }
   const [voiceError, setVoiceError] = useState('')
-  const [voiceIntro, setVoiceIntroState] = useState(false)
+  const [voiceEntering, setVoiceEntering] = useState(0) // a short (<1 s) entry ripple each time voice mode opens
   const [orbBeat, setOrbBeat] = useState(0)
-  const [introBeat, setIntroBeat] = useState(0)
   const [listenBeat, setListenBeat] = useState(0)
-  const [introOrbSize, setIntroOrbSize] = useState(180)
+  const [voiceTurnsDone, setVoiceTurnsDone] = useState(2) // read from storage after mount; 2+ hides the mic hint
   const voiceTurn = useRef(0)
   const pendingReveal = useRef(null)
-  const introWait = useRef(null) // { resolve, timer, beats } while the first-time intro is showing
+  const captionRef = useRef(null)
 
-  // Hiding the intro (tap, timer or leaving voice mode) ends its wait, like the Vue watcher on `voiceIntro`.
-  function hideVoiceIntro() {
-    setVoiceIntroState(false)
-    const wait = introWait.current
-    if (wait) {
-      introWait.current = null
-      clearTimeout(wait.timer)
-      clearInterval(wait.beats)
-      wait.resolve()
-    }
+  // Mic hint for people new to voice: a hand pointing at the mic, until they have completed two voice turns.
+  function readVoiceTurns() {
+    try { return Number(window.localStorage.getItem(VOICE_TURNS_KEY)) || 0 } catch (e) { return 2 }
+  }
+  function countVoiceTurn() {
+    const next = readVoiceTurns() + 1
+    try { window.localStorage.setItem(VOICE_TURNS_KEY, String(next)) } catch (e) {}
+    setVoiceTurnsDone(next)
   }
 
   const voiceStatusText = useMemo(() => {
@@ -392,7 +407,7 @@ export default function ChatWidget({
   function revealReply(replyId) {
     if (replyId && getMessage(replyId)?.hidden) updateMessage(replyId, { hidden: false })
     setIsTyping(false)
-    scrollToBottom(true)
+    scrollToReply(replyId, true)
   }
 
   async function listenTurn() {
@@ -429,21 +444,33 @@ export default function ChatWidget({
     scrollToBottom(true)
     setVoicePhase('thinking')
 
-    // The reply text stays hidden until XO starts speaking, so text and voice arrive together.
+    // The reply text is shown when XO starts speaking, or at most 0.9 s after its first words arrive, so the answer
+    // is never kept waiting on the voice. The spoken word is marked once the full text is on screen.
     let replyId = null
     let audioStarted = false
     let textDone = false
     let revealTimer = null
+    let earlyTimer = null
+    let marking = false
+    const show = () => {
+      clearTimeout(earlyTimer)
+      if (replyId && getMessage(replyId)?.hidden) revealReply(replyId)
+    }
     const reveal = async () => {
       clearTimeout(revealTimer)
-      if (!replyId || !getMessage(replyId)?.hidden) return
-      revealReply(replyId)
+      show()
+      if (!replyId || marking || !textDone) return
+      marking = true
       await nextTick()
       if (turn === voiceTurn.current) highlighter.attach(document.querySelector(`[data-msg-id="${replyId}"] .md`))
     }
-    const maybeReveal = () => { if (audioStarted && textDone) reveal() }
+    const maybeReveal = () => { if (audioStarted) (textDone ? reveal() : show()) }
     pendingReveal.current = () => { pendingReveal.current = null; reveal() }
 
+    // While a search, calculation or knowledge check runs, XO says a short "let me check" so the visitor hears him at once.
+    let turnLanguage = props.current.currentLanguage
+    let heardWords = false
+    let saidFiller = false
     const spoken = speech.start({
       language: props.current.currentLanguage,
       sessionId: sessionId.current,
@@ -463,16 +490,33 @@ export default function ChatWidget({
     const final = await streamTurn(transcript, 'voice', {
       hold: true,
       onMessage: (id) => { replyId = id },
-      onToken: (text) => { if (turn === voiceTurn.current) speech.push(text) },
-      onLanguage: (lang) => { if (turn === voiceTurn.current) speech.setLanguage(lang) }
+      onToken: (text) => {
+        if (turn !== voiceTurn.current) return
+        heardWords = true
+        if (!earlyTimer && !audioStarted) earlyTimer = setTimeout(show, 900)
+        speech.push(text)
+      },
+      onStatus: (tool) => {
+        const key = VOICE_FILLER[STATUS_BY_TOOL[tool]]
+        if (turn !== voiceTurn.current || saidFiller || heardWords || !key) return
+        saidFiller = true
+        speech.push(translate(turnLanguage, key) + ' ')
+      },
+      onLanguage: (lang) => {
+        if (turn !== voiceTurn.current) return
+        turnLanguage = lang || turnLanguage
+        speech.setLanguage(lang)
+      }
     })
     textDone = true
+    if (final && transcript) countVoiceTurn()
     if (turn !== voiceTurn.current || !voiceModeRef.current) return reveal()
     speech.end(final && final.text)
     maybeReveal()
     // Never keep the answer hidden for long if the voice is slow or unavailable.
     revealTimer = setTimeout(reveal, 2500)
     await spoken
+    clearTimeout(earlyTimer)
     reveal()
     highlighter.detach()
     pendingReveal.current = null
@@ -489,28 +533,6 @@ export default function ChatWidget({
     listenTurn()
   }
 
-  // First-time voice intro: remembered across visits (localStorage), shown again only if storage is unavailable.
-  function introSeen(mark) {
-    try {
-      if (mark) window.localStorage.setItem(VOICE_INTRO_KEY, '1')
-      return window.localStorage.getItem(VOICE_INTRO_KEY) === '1'
-    } catch (e) {
-      return false
-    }
-  }
-
-  function showVoiceIntro() {
-    if (introSeen()) return Promise.resolve()
-    introSeen(true)
-    setIntroOrbSize(Math.round(Math.min(200, (feedRef.current?.clientWidth || 320) * 0.5)))
-    setVoiceIntroState(true)
-    return new Promise((resolve) => {
-      const beats = setInterval(() => setIntroBeat((n) => n + 1), 280)
-      const timer = setTimeout(hideVoiceIntro, 3000)
-      introWait.current = { resolve, timer, beats }
-    })
-  }
-
   async function enterVoiceMode() {
     if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
       addMessage({ id: newId('ast'), role: 'assistant', content: t('voice_unavailable'), isError: true, timestamp: new Date().toISOString() })
@@ -523,17 +545,17 @@ export default function ChatWidget({
     setVoiceError('')
     setVoiceMode(true)
     setVoicePhase('thinking')
+    setVoiceEntering((n) => n + 1)
+    setVoiceTurnsDone(readVoiceTurns())
+    warmBackend()
     const turn = ++voiceTurn.current
-    const intro = showVoiceIntro()
     try {
       await voice.open()
     } catch (err) {
-      hideVoiceIntro()
       setVoiceError(err.message === 'mic_denied' ? tNow('voice_mic_denied') : tNow('voice_unavailable'))
       setVoicePhase('hold')
       return
     }
-    await intro
     if (turn === voiceTurn.current && voiceModeRef.current) listenTurn()
   }
 
@@ -542,7 +564,6 @@ export default function ChatWidget({
     if (pendingReveal.current) pendingReveal.current()
     highlighter.detach()
     setVoiceMode(false)
-    hideVoiceIntro()
     setVoicePhase('idle')
     speech.stop()
     voice.close()
@@ -554,6 +575,7 @@ export default function ChatWidget({
   useEffect(() => {
     let active = true
     scrollToBottom(true)
+    warmBackend() // the first answer does not wait for new provider connections (or a sleeping server)
     fetchClientConfig().then((cfg) => { if (active && cfg?.voice) clientConfig.current = cfg })
     return () => {
       active = false
@@ -563,12 +585,42 @@ export default function ChatWidget({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // The live caption always shows the latest words of a long question.
+  useLayoutEffect(() => {
+    const el = captionRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [liveText])
+
   // ---- View ----
   const showHero = messages.length <= 1
+  const coach = voiceMode && voiceTurnsDone < 2 && !voiceError &&
+    (voicePhase === 'hold' || (voicePhase === 'listening' && !liveText.trim()))
 
   const voiceDock = (
     <div className={cx('voice-dock', 'phase-' + voicePhase)} role="region" aria-label={t('voice_listening')}>
-      <button type="button" className={cx('voice-orb-btn', 'phase-' + voicePhase)} onClick={micAction} aria-label={micLabel} data-tip={micLabel} data-tip-pos="top-start">
+      {/* Mic hint for first-time voice users: a hand points at the mic with one short line */}
+      <Transition name="coach" show={coach}>
+        <div className={cx('voice-coach', voicePhase === 'hold' && 'is-tap')} aria-hidden="true">
+          <span className="voice-coach-bubble" dir="auto">{voicePhase === 'hold' ? t('voice_coach_tap') : t('voice_coach_listening')}</span>
+          <span className="voice-coach-hand">
+            {/* Pointing hand (Lucide "pointer", ISC licence), turned to point down at the mic */}
+            <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+              <g transform="rotate(180 12 12)" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                {['halo', 'line'].map((layer) => (
+                  <g key={layer} stroke={layer === 'halo' ? 'var(--w-bg)' : 'currentColor'} strokeWidth={layer === 'halo' ? 4.5 : 1.9}>
+                    <path d="M22 14a8 8 0 0 1-8 8" />
+                    <path d="M18 11v-1a2 2 0 0 0-2-2a2 2 0 0 0-2 2" />
+                    <path d="M14 10V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1" />
+                    <path d="M10 9.5V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v10" />
+                    <path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                  </g>
+                ))}
+              </g>
+            </svg>
+          </span>
+        </div>
+      </Transition>
+      <button type="button" className={cx('voice-orb-btn', 'phase-' + voicePhase, coach && voicePhase === 'hold' && 'is-coached')} onClick={micAction} aria-label={micLabel} data-tip={micLabel} data-tip-pos="top-start">
         <VoiceOrb size={68} phase={voicePhase} levelSource={voice.state} beat={orbBeat} dark={currentTheme === 'dark'} />
         {/* "Your turn": a short double heartbeat each time the mic goes live */}
         {voicePhase === 'listening' && <span key={listenBeat} className="orb-heartbeat" aria-hidden="true" />}
@@ -585,7 +637,7 @@ export default function ChatWidget({
       </button>
       <div className="voice-dock-text" aria-live="polite">
         <span className="voice-dock-status">{voiceStatusText}</span>
-        {voicePhase === 'listening' && liveText.trim() && <p className="voice-dock-caption" dir="auto">{liveText}</p>}
+        {voicePhase === 'listening' && liveText.trim() && <p ref={captionRef} className="voice-dock-caption" dir="auto">{liveText}</p>}
         {voiceError && <p className="voice-error-text" role="alert">{voiceError}</p>}
       </div>
       <div className="voice-dock-actions">
@@ -724,13 +776,8 @@ export default function ChatWidget({
           </button>
         </Transition>
 
-        {/* First-time voice intro */}
-        <Transition name="voice-intro" show={voiceIntro}>
-          <div className="voice-intro" role="dialog" aria-label={t('voice_intro')} onClick={hideVoiceIntro}>
-            <VoiceOrb size={introOrbSize} phase="speaking" beat={introBeat} dark assemble />
-            <p className="voice-intro-text" dir="auto">{t('voice_intro')}</p>
-          </div>
-        </Transition>
+        {/* Entering voice mode: one quick ripple in the widget's own colours (under 1 s) */}
+        {voiceMode && voiceEntering > 0 && <span key={voiceEntering} className="voice-enter-ripple" aria-hidden="true" />}
 
         {/* Voice dock: the conversation stays visible while XO listens, thinks and speaks */}
         <SwitchTransition name="dock" activeKey={voiceMode ? 'voice' : 'text'} render={(key) => (key === 'voice' ? voiceDock : footer)} />

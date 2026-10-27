@@ -48,7 +48,7 @@ class FakeCompletions:
             raise RuntimeError("provider down")
         if not kwargs.get("stream"):
             # Non-streaming calls (e.g. language-switch classifier) return a JSON verdict.
-            content = json.dumps({"written_in": "en", "requests_language": None})
+            content = json.dumps({"switch": False})
             return NS(choices=[NS(message=NS(content=content))])
         return _Stream(self.script.pop(0))
 
