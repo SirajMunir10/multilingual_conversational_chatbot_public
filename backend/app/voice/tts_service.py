@@ -8,6 +8,7 @@ import httpx
 
 from app.core.config import load_config, settings
 from app.core.usage_tracker import UsageTracker
+from app.services.brand_terms import spoken_text
 
 logger = logging.getLogger("xo.tts")
 
@@ -51,7 +52,7 @@ class TTSService:
     def _request(cls, text: str, language: str) -> Tuple[str, Dict[str, Any]]:
         if not settings.ELEVENLABS_API_KEY:
             raise TTSUnavailable("ELEVENLABS_API_KEY not configured")
-        spoken = speech_text(text)
+        spoken = spoken_text(speech_text(text), language)  # XOTO is said "X-oto", never "Zoto"
         if not spoken:
             raise TTSUnavailable("Nothing to speak")
         locales = load_config("locales")["locales"]

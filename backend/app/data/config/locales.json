@@ -19,7 +19,8 @@
     "voice_unavailable": "Voice isn't available right now. Please type your message.",
     "button_confirm": "Confirm",
     "button_edit": "Edit"
-   }
+   },
+   "writing": "natural, friendly English"
   },
   "ar": {
    "name": "Arabic",
@@ -32,7 +33,8 @@
     "voice_unavailable": "الصوت غير متاح حالياً. يرجى كتابة رسالتك.",
     "button_confirm": "تأكيد",
     "button_edit": "تعديل"
-   }
+   },
+   "writing": "Modern Standard Arabic in Arabic script, warm and simple (never Urdu or Persian words or letters such as پ چ گ ک ی ے)"
   },
   "hi": {
    "name": "Hindi",
@@ -45,7 +47,8 @@
     "voice_unavailable": "अभी वॉइस उपलब्ध नहीं है। कृपया अपना संदेश टाइप करें।",
     "button_confirm": "पुष्टि करें",
     "button_edit": "बदलें"
-   }
+   },
+   "writing": "natural spoken Hindi (Hindustani) in Devanagari script only, never Urdu script; common English property words like 'mortgage' or 'EMI' are fine"
   },
   "ur": {
    "name": "Urdu",
@@ -58,7 +61,8 @@
     "voice_unavailable": "آواز کی سہولت ابھی دستیاب نہیں۔ براہ کرم اپنا پیغام لکھیں۔",
     "button_confirm": "تصدیق کریں",
     "button_edit": "تبدیل کریں"
-   }
+   },
+   "writing": "natural spoken Urdu in Urdu (Perso-Arabic, Nastaliq) script only, never Devanagari or Hindi spelling"
   },
   "fr": {
    "name": "French",
@@ -71,7 +75,8 @@
     "voice_unavailable": "La voix n'est pas disponible pour le moment. Veuillez écrire votre message.",
     "button_confirm": "Confirmer",
     "button_edit": "Modifier"
-   }
+   },
+   "writing": "natural, friendly French"
   },
   "es": {
    "name": "Spanish",
@@ -84,7 +89,8 @@
     "voice_unavailable": "La voz no está disponible ahora. Por favor, escribe tu mensaje.",
     "button_confirm": "Confirmar",
     "button_edit": "Editar"
-   }
+   },
+   "writing": "natural, friendly Spanish"
   },
   "de": {
    "name": "German",
@@ -97,7 +103,8 @@
     "voice_unavailable": "Sprache ist gerade nicht verfügbar. Bitte tippen Sie Ihre Nachricht.",
     "button_confirm": "Bestätigen",
     "button_edit": "Bearbeiten"
-   }
+   },
+   "writing": "natural, friendly German (use 'Sie')"
   },
   "zh": {
    "name": "Chinese",
@@ -110,7 +117,8 @@
     "voice_unavailable": "语音暂时不可用，请输入文字。",
     "button_confirm": "确认",
     "button_edit": "编辑"
-   }
+   },
+   "writing": "Simplified Chinese characters, natural Mandarin"
   },
   "tl": {
    "name": "Tagalog",
@@ -123,7 +131,8 @@
     "voice_unavailable": "Hindi available ang boses ngayon. Paki-type ang iyong mensahe.",
     "button_confirm": "Kumpirmahin",
     "button_edit": "I-edit"
-   }
+   },
+   "writing": "natural Filipino (Tagalog); everyday Taglish property words are fine"
   },
   "fa": {
    "name": "Persian",
@@ -136,7 +145,8 @@
     "voice_unavailable": "صدا در حال حاضر در دسترس نیست. لطفاً پیام خود را تایپ کنید.",
     "button_confirm": "تأیید",
     "button_edit": "ویرایش"
-   }
+   },
+   "writing": "natural Persian (Farsi) in Persian script, not Arabic or Urdu"
   },
   "bn": {
    "name": "Bengali",
@@ -149,7 +159,8 @@
     "voice_unavailable": "ভয়েস এখন উপলব্ধ নয়। অনুগ্রহ করে আপনার বার্তা টাইপ করুন।",
     "button_confirm": "নিশ্চিত করুন",
     "button_edit": "সম্পাদনা"
-   }
+   },
+   "writing": "natural Bengali in Bengali script only"
   },
   "ta": {
    "name": "Tamil",
@@ -162,7 +173,8 @@
     "voice_unavailable": "குரல் வசதி இப்போது இல்லை. உங்கள் செய்தியைத் தட்டச்சு செய்யவும்.",
     "button_confirm": "உறுதிசெய்",
     "button_edit": "திருத்து"
-   }
+   },
+   "writing": "natural Tamil in Tamil script only"
   },
   "pa": {
    "name": "Punjabi",
@@ -176,7 +188,8 @@
     "button_confirm": "ਪੁਸ਼ਟੀ ਕਰੋ",
     "button_edit": "ਬਦਲੋ"
    },
-   "stt_note": "Not an accepted gpt-live-transcribe language hint (tested 15 Oct 2026); transcription runs without a hint."
+   "stt_note": "Not an accepted gpt-live-transcribe language hint (tested 15 Oct 2026); transcription runs without a hint.",
+   "writing": "natural Punjabi in Gurmukhi script (ਗੁਰਮੁਖੀ) only — every word and punctuation mark in Gurmukhi, even when the user types in Urdu (Shahmukhi) letters; never Shahmukhi/Urdu script, never Hindi or Devanagari"
   },
   "ml": {
    "name": "Malayalam",
@@ -189,7 +202,8 @@
     "voice_unavailable": "ശബ്ദ സൗകര്യം ഇപ്പോൾ ലഭ്യമല്ല. ദയവായി സന്ദേശം ടൈപ്പ് ചെയ്യുക.",
     "button_confirm": "സ്ഥിരീകരിക്കുക",
     "button_edit": "തിരുത്തുക"
-   }
+   },
+   "writing": "natural Malayalam in Malayalam script only"
   },
   "or": {
    "name": "Odia",
@@ -203,7 +217,8 @@
     "button_confirm": "ନିଶ୍ଚିତ କରନ୍ତୁ",
     "button_edit": "ସମ୍ପାଦନ"
    },
-   "stt_note": "Not an accepted gpt-live-transcribe language hint (tested 15 Oct 2026); transcription runs without a hint."
+   "stt_note": "Not an accepted gpt-live-transcribe language hint (tested 15 Oct 2026); transcription runs without a hint.",
+   "writing": "natural Odia in Odia script only"
   }
  }
 }

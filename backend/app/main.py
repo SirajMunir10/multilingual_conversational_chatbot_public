@@ -10,6 +10,7 @@ from app.voice.tts_service import TTSService
 from app.db.lead_store import LeadDatabaseService
 from app.routers import admin, chat, handoff, health, mortgage, properties, voice
 from app.services.vector_store import VectorDatabase
+from app.services import warmup
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("xo.main")
@@ -21,6 +22,7 @@ async def lifespan(app: FastAPI):
                 settings.LLM_MODEL, settings.STT_MODEL, settings.TTS_MODEL)
     VectorDatabase.load()
     await LeadDatabaseService.init_db()
+    warmup.warm_in_background()  # the first visitor after a restart does not pay for new provider connections
     yield
     await LeadDatabaseService.close_db()
     await TTSService.close()
