@@ -10,6 +10,10 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   return defaultLink(tokens, idx, options, env, self)
 }
 
+// Images are never loaded: a reply could be steered into embedding one whose address carries conversation data.
+// Only the image's description is shown, as plain text.
+md.renderer.rules.image = (tokens, idx) => md.utils.escapeHtml(tokens[idx].content)
+
 export function renderMarkdown(text) {
   return md.render(text || '')
 }

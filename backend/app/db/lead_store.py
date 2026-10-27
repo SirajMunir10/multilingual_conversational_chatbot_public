@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from app.core.audit import AuditService
 from app.core.config import settings
+from app.db.database import Database
 
 logger = logging.getLogger("xo.lead_store")
 
@@ -36,15 +37,13 @@ class LeadDatabaseService:
 
     @classmethod
     async def init_db(cls) -> bool:
-        if not settings.DATABASE_URL:
-            logger.warning("DATABASE_URL not set: advisor leads are kept in process memory only (lost on restart).")
+        """Uses the shared pool opened by Database.init(); without it, leads are kept in process memory."""
+        if not Database.pool:
             return False
         try:
-            import asyncpg
-            cls._pool = await asyncpg.create_pool(dsn=settings.DATABASE_URL, min_size=1, max_size=5, timeout=10.0)
-            async with cls._pool.acquire() as conn:
+            async with Database.pool.acquire() as conn:
                 await conn.execute(SCHEMA_SQL)
-            logger.info("Connected to PostgreSQL lead store.")
+            cls._pool = Database.pool
             return True
         except Exception as exc:
             logger.error("PostgreSQL lead store unavailable: %s", exc)
@@ -53,9 +52,8 @@ class LeadDatabaseService:
 
     @classmethod
     async def close_db(cls) -> None:
-        if cls._pool:
-            await cls._pool.close()
-            cls._pool = None
+        # The shared pool is closed by Database.close().
+        cls._pool = None
 
     @classmethod
     def storage_mode(cls) -> str:

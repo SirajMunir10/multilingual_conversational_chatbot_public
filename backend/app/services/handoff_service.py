@@ -12,12 +12,13 @@ import phonenumbers
 
 from app.core.audit import AuditService
 from app.core.config import load_config, settings
+from app.db.conversation_store import ConversationStore
+from app.services.escalation import TEAM_KEYS, queue_names
 from app.db.lead_store import LeadDatabaseService
 from app.gateways.grid_gateway import GridLeadGateway, GridLeadPayload
 from app.gateways.vault_gateway import VaultGateway, VaultMortgageLeadPayload
 from app.orchestrator.session_store import SessionContext, SessionStore
 
-TEAMS = {"mortgage": "Mortgage Advisory", "sales": "Property Advisory", "support": "Client Support"}
 PHONE_EXAMPLE = "+971 50 123 4567"
 MAX_NAME = 120
 
@@ -70,7 +71,7 @@ class HandoffService:
 
     @classmethod
     def _team(cls, session: SessionContext, requested: Optional[str]) -> str:
-        if requested in TEAMS:
+        if requested in TEAM_KEYS:
             return requested
         if session.last_calculation:
             return "mortgage"
@@ -125,7 +126,8 @@ class HandoffService:
             return {"lead_saved": False, "error": "invalid_phone", "field": "phone"}
         locales = load_config("locales")["locales"]
         language = preferred_language if preferred_language in locales else draft["language"]
-        team_key = team if team in TEAMS else draft["team"]
+        team_key = team if team in TEAM_KEYS else draft["team"]
+        queue = queue_names()[team_key]  # the team's queue name, editable in the escalation rules (FR-29)
 
         calc = session.last_calculation or {}
         ticket_id = f"XO-{datetime.now(timezone.utc).strftime('%y%m%d')}-{secrets.token_hex(3).upper()}"
@@ -142,7 +144,7 @@ class HandoffService:
             "transcript": [t.model_dump() for t in session.transcript],
         }
         storage = await LeadDatabaseService.save_advisor_lead(session.session_id, clean_name, e164, language_name(language),
-                                                             TEAMS[team_key], context, ticket_id=ticket_id)
+                                                             queue, context, ticket_id=ticket_id)
         crm: Dict[str, Any] = {}
         if storage["saved"]:
             if team_key == "mortgage":
@@ -156,13 +158,14 @@ class HandoffService:
                     session.session_id)
             session.handoff_draft = None
             session.handoff_ticket = ticket_id
-            cls._queue.append({"ticket_id": ticket_id, "session_id": session.session_id, "team": TEAMS[team_key], "name": clean_name,
+            cls._queue.append({"ticket_id": ticket_id, "session_id": session.session_id, "team": queue, "name": clean_name,
                                "phone": e164, "preferred_language": language_name(language), "storage": storage["storage"],
                                "crm_synced": crm.get("synced", False), "created_at": datetime.now(timezone.utc).isoformat(), "context": context})
             # Lets the assistant know the request went through if the user asks about it later.
-            note = f"[The user confirmed the advisor callback card. Saved: ticket {ticket_id}, {TEAMS[team_key]}, {display_phone(e164)}, {language_name(language)}.]"
+            note = f"[The user confirmed the advisor callback card. Saved: ticket {ticket_id}, {queue}, {display_phone(e164)}, {language_name(language)}.]"
             SessionStore.append_history(session, [{"role": "assistant", "content": note}])
             SessionStore.add_transcript(session, "assistant", note)
+            ConversationStore.save_in_background(ConversationStore.record_handoff(session.session_id, ticket_id))
         AuditService.log_event("business_write", "human_handoff", "handoff_queue", session_id=session.session_id,
                                status="success" if storage["saved"] else "failed",
                                details={"ticket_id": ticket_id, "team": team_key, "name": clean_name, "phone": e164, "storage": storage["storage"]})
@@ -173,4 +176,4 @@ class HandoffService:
 
     @classmethod
     def queue(cls, team: Optional[str] = None) -> List[Dict[str, Any]]:
-        return [t for t in cls._queue if not team or t["team"] == TEAMS.get(team, team)]
+        return [t for t in cls._queue if not team or t["team"] == queue_names().get(team, team)]

@@ -123,6 +123,17 @@ class VectorDatabase:
         return results[:top_k]
 
     @classmethod
+    def replace(cls, docs: List[Dict[str, Any]], vectors: List[List[float]]) -> None:
+        """Swaps in a new index at once (knowledge-base publish); searches in flight keep the old one."""
+        rows = []
+        for vec in vectors:
+            v = np.array(vec, dtype=np.float32)
+            norm = np.linalg.norm(v)
+            rows.append(v / norm if norm > 0 else v)
+        cls._vectors, cls._docs = (np.vstack(rows) if rows else np.zeros((0, 1536), dtype=np.float32)), list(docs)
+        cls._loaded = True
+
+    @classmethod
     def get_document_count(cls) -> int:
         cls.load()
         return len(cls._docs)

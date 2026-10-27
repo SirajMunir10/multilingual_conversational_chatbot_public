@@ -8,3 +8,5 @@ openai>=1.99.0
 websockets>=13.0
 asyncpg>=0.29.0
 phonenumbers>=8.13
+pypdf>=5.0
+python-docx>=1.1

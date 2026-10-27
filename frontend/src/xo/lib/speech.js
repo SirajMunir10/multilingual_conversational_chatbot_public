@@ -94,7 +94,8 @@ export function createSpeech(getAudioElement) {
     return fetch(apiUrl('/api/voice/speak-timed'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, language: options.language, session_id: options.sessionId })
+      // The conversation id may arrive after speech starts (a visitor's first message), so it is read per request.
+      body: JSON.stringify({ text, language: options.language, session_id: typeof options.sessionId === 'function' ? options.sessionId() : options.sessionId })
     }).then(res => (res.ok && res.body && gen === generation ? res : null)).catch(() => null)
   }
 

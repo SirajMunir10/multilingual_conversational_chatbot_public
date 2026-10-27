@@ -4,7 +4,8 @@ from typing import Optional
 
 from openai import AsyncOpenAI
 
-from app.core.config import load_config, load_prompt, settings
+from app.core.config import load_config, settings
+from app.services import prompt_profile
 
 
 class LLMService:
@@ -30,13 +31,14 @@ class LLMService:
         rules = load_config("mortgage_rules")
         mode = ("chosen by the user; keep using it unless they write in or ask for another language"
                 if language_locked else "the default for this conversation")
-        return load_prompt("system_prompt").format(
-            language_name=info["name"],
-            language_native=info["native"],
-            language_writing=info.get("writing") or f"natural {info['name']} in its usual script",
-            language_mode=mode,
-            supported_languages=", ".join(f"{v['name']}" for v in locales.values()),
-            default_tenure=rules["tenure"]["default_years"],
-            benchmark_rate=rules["interest"]["benchmark_rate_pct"],
-            today=datetime.now(timezone.utc).strftime("%d %B %Y"),
-        )
+        # The instructions published in the admin module (FR-25), or the built-in file when none is published.
+        return prompt_profile.fill(prompt_profile.render_template(prompt_profile.current_profile(), language), {
+            "language_name": info["name"],
+            "language_native": info["native"],
+            "language_writing": info.get("writing") or f"natural {info['name']} in its usual script",
+            "language_mode": mode,
+            "supported_languages": ", ".join(f"{v['name']}" for v in locales.values()),
+            "default_tenure": rules["tenure"]["default_years"],
+            "benchmark_rate": rules["interest"]["benchmark_rate_pct"],
+            "today": datetime.now(timezone.utc).strftime("%d %B %Y"),
+        })

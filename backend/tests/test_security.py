@@ -114,3 +114,102 @@ class TestSecurity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestHardening(unittest.TestCase):
+    """Fixes from the October 2026 security review."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(app)
+
+    def setUp(self):
+        rate_limiter._hits.clear()
+        self.addCleanup(rate_limiter._hits.clear)
+        limits_on = mock.patch.object(settings, "RATE_LIMIT_ENABLED", True)
+        limits_on.start()
+        self.addCleanup(limits_on.stop)
+
+    def test_visitor_cannot_choose_their_address(self):
+        from app.core.security import client_ip
+        req = lambda xff: mock.Mock(headers={"x-forwarded-for": xff}, client=mock.Mock(host="10.0.0.1"))
+        with mock.patch.object(settings, "TRUSTED_PROXY_HOPS", 2):
+            # Through the site: [whatever the visitor typed..., visitor (added by Vercel), Vercel (added by Render)]
+            self.assertEqual(client_ip(req("6.6.6.6, 203.0.113.7, 76.76.21.1")), "203.0.113.7")
+            self.assertEqual(client_ip(req("203.0.113.7")), "203.0.113.7")
+            # Straight to the API (live voice): only Render's entry counts.
+            self.assertEqual(client_ip(req("6.6.6.6, 198.51.100.4"), direct=True), "198.51.100.4")
+        self.assertEqual(client_ip(mock.Mock(headers={}, client=mock.Mock(host="10.0.0.1"))), "10.0.0.1")
+
+    def test_changing_the_forwarded_header_does_not_reset_the_limit(self):
+        with mock.patch.object(settings, "RATE_LIMIT_PER_MINUTE", 3):
+            codes = [self.client.get("/api/mortgage/products", headers={"X-Forwarded-For": f"10.9.0.{i}, 203.0.113.7, 76.76.21.1"}).status_code
+                     for i in range(4)]
+        self.assertEqual(codes[-1], 429)
+
+    def test_paid_calls_have_a_ceiling_shared_by_everyone(self):
+        from app.core.security import allow_paid_call
+        with mock.patch.object(settings, "GLOBAL_PAID_CALLS_PER_MINUTE", 5):
+            allowed = [allow_paid_call(f"visitor-{i}") for i in range(7)]
+        self.assertEqual(allowed, [True] * 5 + [False] * 2)
+
+    def test_warm_is_rate_limited(self):
+        codes = [self.client.post("/api/warm").status_code for _ in range(8)]
+        self.assertEqual((codes[0], codes[-1]), (204, 429))
+
+    def _speak(self, session_id, text):
+        async def audio(*a, **k):
+            yield {"audio": "", "chars": [], "start": [], "end": []}
+        with mock.patch("app.voice.tts_service.TTSService.stream_timed", side_effect=audio):
+            return self.client.post("/api/voice/speak-timed", json={"text": text, "session_id": session_id}).status_code
+
+    def test_speech_only_for_what_xo_said(self):
+        self.assertEqual(self._speak(None, "Arbitrary text to read aloud."), 403)
+        self.assertEqual(self._speak("not-a-session", "Arbitrary text."), 403)
+        session = SessionStore.get_or_create(None)
+        self.assertEqual(self._speak(session.session_id, "Nothing was said yet."), 429)
+
+        async def reply(*a, **k):
+            yield {"type": "session", "session_id": session.session_id, "language": "en"}
+            yield {"type": "token", "text": "A three-bedroom villa in Arabian Ranches."}
+            yield {"type": "final", "session_id": session.session_id, "text": "A three-bedroom villa in Arabian Ranches."}
+        from app.orchestrator.orchestrator import ConversationOrchestrator
+        with mock.patch.object(ConversationOrchestrator, "_turn_events", side_effect=reply):
+            asyncio.run(ConversationOrchestrator.process_turn("hi", session_id=session.session_id))
+        self.assertEqual(self._speak(session.session_id, "Let me check. "), 200)
+        self.assertEqual(self._speak(session.session_id, "A three-bedroom villa in Arabian Ranches."), 200)
+        self.assertEqual(self._speak(session.session_id, "x" * (settings.TTS_ALLOWANCE_PER_TURN + 1)), 429)
+
+    def test_security_headers_and_no_public_docs(self):
+        res = self.client.get("/api/health")
+        for header in ("x-content-type-options", "x-frame-options", "referrer-policy", "content-security-policy"):
+            self.assertIn(header, res.headers)
+        self.assertEqual(self.client.get("/docs").status_code, 404)
+        self.assertEqual(self.client.get("/openapi.json").status_code, 404)
+
+    def test_example_admin_key_is_refused(self):
+        for weak in ("generate_a_long_random_value", "short-key"):
+            with mock.patch.object(settings, "ADMIN_API_KEY", weak):
+                self.assertEqual(self.client.get("/api/admin/sessions", headers={"X-Admin-Key": weak}).status_code, 401, weak)
+
+    def test_zip_bomb_word_file_is_refused(self):
+        import io
+        import zipfile
+        from app.admin.knowledge_text import IngestError, extract_file
+        raw = io.BytesIO()
+        with zipfile.ZipFile(raw, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("word/document.xml", " " * (80 * 1024 * 1024))
+        with self.assertRaises(IngestError) as ctx:
+            extract_file("bomb.docx", raw.getvalue())
+        self.assertEqual(ctx.exception.code, "too_large")
+
+    def test_locked_rules_always_come_from_the_built_in_file(self):
+        from app.admin.config_store import ConfigStore
+        from app.services import prompt_profile
+        stored = prompt_profile.builtin_profile()
+        stale = {**stored, "sections": [{**s, "body": "Old wording.\n"} if s["locked"] else s for s in stored["sections"]]}
+        ConfigStore._apply(prompt_profile.PROFILE_ITEM, 7, stale)
+        self.addCleanup(ConfigStore.reset_memory)
+        rendered = prompt_profile.render_template(prompt_profile.current_profile(), "en")
+        self.assertNotIn("Old wording.", rendered)
+        self.assertIn("don't calculate or state a figure with it", rendered)

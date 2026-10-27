@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, Response
 
 from app.core.config import load_config, settings
+from app.core.security import enforce_light_rate_limit
 from app.services import warmup
 
 router = APIRouter(prefix="/api", tags=["Health & client config"])
@@ -24,7 +25,7 @@ def client_config():
     }
 
 
-@router.post("/warm", status_code=204, response_class=Response)
+@router.post("/warm", status_code=204, response_class=Response, dependencies=[Depends(enforce_light_rate_limit)])
 async def warm():
     """Called by the widget when it opens: prepares the model and voice connections so the first reply is quick."""
     warmup.warm_in_background()

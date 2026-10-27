@@ -44,6 +44,15 @@ class SessionContext(BaseModel):
     # Callback details awaiting the user's confirmation on the review card
     handoff_draft: Optional[Dict[str, Any]] = None
     current_user_text: str = ""
+    # Ids of this session's XO replies, so visitor thumbs are only accepted for real replies (FR-26).
+    turn_ids: List[str] = Field(default_factory=list)
+    # Characters of XO's own replies not yet spoken; the voice endpoints spend from it (no free text-to-speech).
+    speech_allowance: int = 0
+    # Escalation rules already offered in this conversation, and knowledge-base questions XO could not answer (FR-29).
+    escalations_offered: List[str] = Field(default_factory=list)
+    kb_misses: int = 0
+    # An admin's test chat (FR-25): runs like a visitor's, but is never saved for review or analytics.
+    preview: bool = False
     created_at: float = Field(default_factory=time.time)
     updated_at: float = Field(default_factory=time.time)
 
