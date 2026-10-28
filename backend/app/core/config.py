@@ -103,6 +103,10 @@ class AppSettings(BaseModel):
     # per turn (the short "let me check" phrases).
     TTS_ALLOWANCE_PER_TURN: int = Field(default_factory=lambda: _env_int("TTS_ALLOWANCE_PER_TURN", 160))
     ENABLE_API_DOCS: bool = Field(default_factory=lambda: _env_bool("ENABLE_API_DOCS", False))
+    # Largest request body accepted, so a flood of huge requests cannot exhaust memory. Knowledge-base file uploads
+    # (an 8 MB file sent as base64) have their own, larger limit.
+    MAX_REQUEST_BYTES: int = Field(default_factory=lambda: _env_int("MAX_REQUEST_BYTES", 1024 * 1024))
+    MAX_UPLOAD_REQUEST_BYTES: int = Field(default_factory=lambda: _env_int("MAX_UPLOAD_REQUEST_BYTES", 13 * 1024 * 1024))
     # Phone numbers typed without a country code are read as numbers from this region (ISO 3166 code).
     PHONE_DEFAULT_REGION: str = Field(default_factory=lambda: _env("PHONE_DEFAULT_REGION", "AE"))
 

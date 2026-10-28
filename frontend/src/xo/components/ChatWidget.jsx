@@ -8,6 +8,7 @@ import OnboardingTooltips from './OnboardingTooltips'
 import VoiceOrb from './VoiceOrb'
 import UaeSkyline from './UaeSkyline'
 import XoIcon from './XoIcon'
+import LanguageMenu from './LanguageMenu'
 import { SubmitHandoffContext } from './HandoffCard'
 import { Transition, SwitchTransition } from './Transition'
 import { languages, languageInfo, t as translate } from '../i18n'
@@ -719,18 +720,7 @@ export default function ChatWidget({
                 <XoIcon name="chevronDown" size={14} stroke={2.4} className={cx('chip-caret', showLangMenu && 'open')} />
               </button>
               <Transition name="pop" show={showLangMenu}>
-                <ul className="lang-menu" role="listbox" aria-label={t('change_language')}>
-                  {languages.map((lang) => (
-                    <li key={lang.code}>
-                      <button type="button" role="option" aria-selected={lang.code === currentLanguage}
-                              className={cx(lang.code === currentLanguage && 'active')} onClick={() => chooseLanguage(lang.code)}>
-                        <span className="lang-native" dir={lang.dir}>{lang.native}</span>
-                        <span className="lang-name">{lang.name}</span>
-                        {lang.code === currentLanguage && <XoIcon name="check" size={16} className="lang-check" />}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                <LanguageMenu current={currentLanguage} onChoose={chooseLanguage} t={t} />
               </Transition>
             </div>
 

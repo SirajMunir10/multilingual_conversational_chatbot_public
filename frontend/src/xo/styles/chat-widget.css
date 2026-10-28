@@ -90,6 +90,22 @@
   background: var(--w-bg); border: 1px solid var(--w-line); border-radius: 16px;
   box-shadow: 0 18px 40px -12px rgba(15, 23, 42, 0.3);
 }
+.lang-menu ul { list-style: none; margin: 0; padding: 0; }
+/* Phones: the button sits too far left for a menu hanging from it, so the menu drops from the header, full width. */
+@media (max-width: 520px) {
+  .lang-switch { position: static; }
+  .lang-menu { top: calc(100% + 6px); inset-inline: 10px; width: auto; max-height: min(420px, 60dvh); }
+}
+.lang-search {
+  position: sticky; top: -6px; z-index: 1; display: flex; align-items: center; gap: 8px; margin: -6px -6px 6px;
+  padding: 10px 12px; background: var(--w-bg); border-bottom: 1px solid var(--w-line); color: var(--w-ink-2);
+}
+.lang-search input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--w-ink); font: inherit; font-size: 0.9rem;
+}
+.lang-search input::-webkit-search-cancel-button { cursor: pointer; }
+.lang-search:focus-within { color: var(--w-brand); }
+.lang-empty { margin: 0; padding: 12px 10px; font-size: 0.85rem; color: var(--w-ink-2); }
 .lang-menu button {
   display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px;
   border: 0; border-radius: 10px; background: transparent; color: var(--w-ink); cursor: pointer; text-align: start;

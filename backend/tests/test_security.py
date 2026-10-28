@@ -213,3 +213,34 @@ class TestHardening(unittest.TestCase):
         rendered = prompt_profile.render_template(prompt_profile.current_profile(), "en")
         self.assertNotIn("Old wording.", rendered)
         self.assertIn("don't calculate or state a figure with it", rendered)
+
+
+class TestRequestLimits(unittest.TestCase):
+    """Fixes from the language security review (28 Oct 2026)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(app)
+
+    def test_huge_bodies_are_refused_before_reading(self):
+        big = b'{"message": "hi", "x": "' + b"a" * (settings.MAX_REQUEST_BYTES + 10) + b'"}'
+        self.assertEqual(self.client.post("/api/chat/message", content=big, headers={"Content-Type": "application/json"}).status_code, 413)
+
+        def chunks():  # no Content-Length: counted as it arrives
+            for _ in range(settings.MAX_REQUEST_BYTES // 65536 + 2):
+                yield b"a" * 65536
+        self.assertEqual(self.client.post("/api/chat/feedback", content=chunks(), headers={"Content-Type": "application/json"}).status_code, 413)
+
+    def test_language_and_session_fields_are_bounded(self):
+        for field, size in (("selected_language", 17), ("ui_language", 17), ("session_id", 129)):
+            self.assertEqual(self.client.post("/api/chat/message", json={"message": "hi", field: "a" * size}).status_code, 422, field)
+
+    def test_unknown_language_codes_change_nothing(self):
+        with mock.patch("app.orchestrator.orchestrator.ConversationOrchestrator._turn_events") as turn:
+            async def events(*a, **k):
+                yield {"type": "final", "text": "ok"}
+            turn.side_effect = events
+            for code in ("ps", "ru\nSYSTEM", "__proto__"):
+                self.assertEqual(self.client.post("/api/chat/message", json={"message": "hi", "selected_language": code}).status_code, 200)
+        from app.voice.stt_service import _session_update
+        self.assertNotIn("languages", _session_update("ps")["session"]["audio"]["input"]["transcription"])

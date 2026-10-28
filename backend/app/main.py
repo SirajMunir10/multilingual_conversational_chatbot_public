@@ -97,6 +97,47 @@ class SecurityHeaders:
         await self.app(scope, receive, with_headers)
 
 
+class RequestSizeLimit:
+    """Refuses request bodies over MAX_REQUEST_BYTES (uploads: MAX_UPLOAD_REQUEST_BYTES) with 413 before they are read
+    into memory. A declared Content-Length is checked up front; a body sent without one is counted as it arrives."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        limit = settings.MAX_UPLOAD_REQUEST_BYTES if scope["path"].endswith("/kb/upload") else settings.MAX_REQUEST_BYTES
+        declared = dict(scope["headers"]).get(b"content-length")
+        if declared is not None:
+            if not declared.isdigit() or int(declared) > limit:
+                return await self._too_large(scope, receive, send)
+            return await self.app(scope, receive, send)
+        body, more = b"", True
+        while more:
+            message = await receive()
+            if message["type"] == "http.disconnect":
+                return
+            body += message.get("body", b"")
+            more = message.get("more_body", False)
+            if len(body) > limit:
+                return await self._too_large(scope, receive, send)
+        replayed = False
+
+        async def replay():
+            nonlocal replayed
+            if replayed:
+                return await receive()  # later calls see the client disconnecting, as streamed replies expect
+            replayed = True
+            return {"type": "http.request", "body": body, "more_body": False}
+        await self.app(scope, replay, send)
+
+    @staticmethod
+    async def _too_large(scope, receive, send):
+        await JSONResponse(status_code=413, content={"detail": "request_too_large"})(scope, receive, send)
+
+
+app.add_middleware(RequestSizeLimit)
 app.add_middleware(SecurityHeaders)
 
 app.add_middleware(

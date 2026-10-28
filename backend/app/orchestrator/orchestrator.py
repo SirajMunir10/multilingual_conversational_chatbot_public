@@ -5,6 +5,7 @@ listing and fact comes from a tool. Replies are streamed token by token (PRD §7
 import difflib
 import json
 import logging
+import re
 import secrets
 import time
 from typing import Any, AsyncGenerator, Dict, List, Optional
@@ -90,6 +91,28 @@ def dedupe(text: str) -> str:
     if len(first) >= 20 and _similar(_squash(first), _squash(second), 0.85):
         return first
     return result
+
+
+# Text written after a tool call is held for this long (in characters) when a lead-in was already shown, to see whether
+# it only says the lead-in again (the model sometimes asks "Shall I arrange a call?", looks something up, then asks again).
+_OPENING_CHARS = 80
+_SENTENCE = re.compile(r"(?<=[.!?।۔؟。])\s+")
+
+
+def _restates(lead_in: str, opening: str) -> bool:
+    """True when the start of an answer says again, in other words, what the lead-in before it already said."""
+    return _similar(_squash(opening), _squash(lead_in)[: len(_squash(opening)) + 20], 0.55)
+
+
+def _without_restated(text: str, lead_in: str) -> str:
+    """The answer without the sentences that repeat the lead-in; whatever is new (e.g. the search results) stays."""
+    said = [_squash(s) for s in _SENTENCE.split(lead_in) if s.strip()]
+    paragraphs = []
+    for paragraph in text.split("\n"):
+        kept = [s for s in _SENTENCE.split(paragraph) if s.strip() and not any(_similar(_squash(s), p, 0.6) for p in said)]
+        if kept or not paragraph.strip():
+            paragraphs.append(" ".join(kept))
+    return "\n".join(paragraphs).strip()
 
 
 VOICE_NOTE = ("This turn is a VOICE conversation: reply in at most two short spoken sentences, no lists, no markdown, "
@@ -218,6 +241,9 @@ class ConversationOrchestrator:
                 content_parts: List[str] = []
                 guard = RepeatGuard()
                 calls: Dict[int, Dict[str, str]] = {}
+                # After a lead-in, the opening of this step's text is held until it shows it is not the lead-in again.
+                held: List[str] = []
+                opening_checked, restated = not preambles, False
                 async for chunk in stream:
                     if getattr(chunk, "usage", None):
                         u = chunk.usage
@@ -232,7 +258,15 @@ class ConversationOrchestrator:
                         content_parts.append(delta.content)
                         visible = guard.feed(delta.content)
                         if visible and not check_script:
-                            yield {"type": "token", "text": tidy_punctuation(visible, session.language)}
+                            if opening_checked:
+                                if not restated:
+                                    yield {"type": "token", "text": tidy_punctuation(visible, session.language)}
+                            else:
+                                held.append(visible)
+                                if len("".join(held)) >= _OPENING_CHARS:
+                                    opening_checked, restated = True, _restates(preambles[-1], "".join(held))
+                                    if not restated:
+                                        yield {"type": "token", "text": tidy_punctuation("".join(held), session.language)}
                     for tc in delta.tool_calls or []:
                         slot = calls.setdefault(tc.index, {"id": "", "name": "", "arguments": ""})
                         if tc.id:
@@ -244,11 +278,20 @@ class ConversationOrchestrator:
                             slot["arguments"] += tc.function.arguments
 
                 content = "".join(content_parts)
+                if held and not opening_checked:  # a short text: check it now
+                    restated = _restates(preambles[-1], "".join(held))
+                    if not restated and not check_script:
+                        yield {"type": "token", "text": tidy_punctuation("".join(held), session.language)}
+                if restated:
+                    # Only what is new is shown (and spoken); the sentences that repeat the lead-in are dropped.
+                    content = _without_restated(guard.final() if not calls else content, preambles[-1])
+                    if content and not check_script:
+                        yield {"type": "token", "text": tidy_punctuation(content, session.language)}
                 if not calls:
-                    final_text = answer = guard.final()
+                    final_text = answer = content if restated else guard.final()
                     if preambles and not rewritten:
                         # A spoken lead-in ("Let me check that.") stays part of the reply, so text and voice match.
-                        final_text = "\n\n".join(preambles + [final_text])
+                        final_text = "\n\n".join(preambles + ([final_text] if final_text else []))
                     if check_script and not rewritten and not script_matches(answer, session.language) \
                             and step < settings.LLM_MAX_TOOL_STEPS:
                         # Wrong script right after the visitor chose a language (e.g. Punjabi in Urdu letters): rewrite once.
@@ -286,7 +329,7 @@ class ConversationOrchestrator:
                         affordable_price = result["max_property_price_aed"]
                     tools_used.append(c["name"])
                     ui.update(payload)
-                    if c["name"] != "set_language" or result.get("status") != "not_switched":
+                    if c["name"] != "set_language" or result.get("status") == "switched":
                         refused_switch_only = False
                     if c["name"] == "set_language" and result.get("status") == "switched":
                         # Lets voice clients speak the rest of this reply in the new language.
@@ -296,8 +339,8 @@ class ConversationOrchestrator:
                     messages.append(tool_msg)
                     turn_messages.append(tool_msg)
                 if refused_switch_only and content.strip():
-                    # The model answered and also asked to switch language, which the visitor did not ask for: its answer
-                    # stands (a second pass would only repeat it).
+                    # The model answered and also asked for a language switch that changed nothing (refused, or the
+                    # language was already active): its answer stands, as a second pass would only say it again.
                     answer = guard.final()
                     final_text = answer if not check_script or script_matches(answer, session.language) else ""
                     if final_text:
