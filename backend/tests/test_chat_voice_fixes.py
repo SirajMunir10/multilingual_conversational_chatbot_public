@@ -149,6 +149,42 @@ class TestLanguageSwitchInConversation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[-1]["text"], answer)
         self.assertEqual(len([c for c in client.chat.completions.calls if c.get("stream")]), 1)
 
+    async def test_answer_with_a_switch_to_the_current_language_is_not_repeated(self):
+        # Seen live (Gujarati, Russian): the language is already active, the model answers and also "switches" to it.
+        # The answer stands; before, a second pass said it again and the visitor saw it twice.
+        answer = "Конечно, могу организовать звонок консультанта XOTO. Вам это подходит?"
+        chunks = text_turn(answer)[:-1] + tool_turn([{"name": "set_language", "args": {"language": "ru"}}])
+        client = FakeClient([chunks, text_turn("Конечно, могу организовать звонок консультанта XOTO. Это удобно?")])
+        self.use(client)
+        events = await collect(O.stream_turn("Да, хочу поговорить с консультантом.", selected_language="ru"))
+        self.assertEqual(events[-1]["text"], answer)
+        self.assertEqual(len([c for c in client.chat.completions.calls if c.get("stream")]), 1)
+
+    async def _lead_in_then(self, lead_in, answer, tool="retrieve_kb"):
+        chunks = text_turn(lead_in)[:-1] + tool_turn([{"name": tool, "args": {"query": "advisor"}}])
+        self.use(FakeClient([chunks, text_turn(answer)]))
+        events = await collect(O.stream_turn("Evet, bir danışmanla konuşmak istiyorum."))
+        return "".join(e["text"] for e in events if e["type"] == "token").strip(), events[-1]["text"]
+
+    async def test_a_question_asked_again_after_a_lookup_is_shown_once(self):
+        # Seen live (Turkish, Russian, Gujarati): the consent question, a needless lookup, then the question reworded.
+        shown, final = await self._lead_in_then(
+            "Elbette, mortgage danışmanımızın sizi aramasını ayarlayabilirim. Uygun mudur?",
+            "Elbette, mortgage danışmanımızın sizi aramasını sağlayabilirim. Uygun mudur?")
+        self.assertEqual(shown, "Elbette, mortgage danışmanımızın sizi aramasını ayarlayabilirim. Uygun mudur?")
+        self.assertEqual(final, shown)
+
+    async def test_new_content_after_a_repeated_lead_in_is_kept(self):
+        shown, final = await self._lead_in_then(
+            "Let me check the latest listings in Dubai Marina for you.",
+            "Let me check the latest listings in Dubai Marina for you. I found 3 homes in Dubai Marina, from AED 703,000.")
+        self.assertEqual(final, "Let me check the latest listings in Dubai Marina for you.\n\nI found 3 homes in Dubai Marina, from AED 703,000.")
+        self.assertEqual(shown.count("Let me check"), 1)
+
+    async def test_a_different_answer_after_a_lead_in_streams_as_usual(self):
+        shown, final = await self._lead_in_then("Let me look that up.", "Dubai transfer fees are 4% of the price, plus AED 580 in admin fees.")
+        self.assertEqual(final, "Let me look that up.\n\nDubai transfer fees are 4% of the price, plus AED 580 in admin fees.")
+
     async def test_reply_in_another_language_without_a_switch_is_rewritten(self):
         # English conversation, the visitor writes in Arabic, the model answers in Arabic: the visitor never sees that.
         client = FakeClient([text_turn("بالتأكيد، وجدت شقة في دبي مارينا."),

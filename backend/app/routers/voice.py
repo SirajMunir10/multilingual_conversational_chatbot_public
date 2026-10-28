@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
-from app.core.config import settings
+from app.core.config import load_config, settings
 from app.core.security import allow_paid_call, client_ip, enforce_paid_limit
 from app.core.usage_tracker import UsageTracker
 from app.db.conversation_store import ConversationStore
@@ -88,6 +88,9 @@ async def speech_to_text(websocket: WebSocket, language: Optional[str] = None, s
         await websocket.close(code=1008)
         return
     # Every session spends transcription credit, so it shares the per-visitor limit with the other paid endpoints.
+    # Only a known language and a well-formed conversation id are passed on; anything else is dropped.
+    language = language if language in load_config("locales")["locales"] else None
+    session_id = session_id if is_valid_session_id(session_id) else None
     if not allow_paid_call(f"stt:{client_ip(websocket, direct=True)}"):
         await websocket.close(code=1013)
         return

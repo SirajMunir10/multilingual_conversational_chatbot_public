@@ -1,12 +1,13 @@
 // Language switching (menu, server-driven, header select), right-to-left, theme, tips and tooltips.
 const { test, expect } = require('@playwright/test')
 const { openApp, send } = require('./support/mock')
+const ui = require('../../frontend/src/xo/i18n/ui.json')
 
 test.describe('language', () => {
-  test('menu lists 15 languages; Arabic switches the widget to right-to-left and is sent once', async ({ page }) => {
+  test('menu lists every language; Arabic switches the widget to right-to-left and is sent once', async ({ page }) => {
     const log = await openApp(page)
     await page.locator('.lang-switch-btn').click()
-    await expect(page.locator('.lang-menu li')).toHaveCount(15)
+    await expect(page.locator('.lang-menu li')).toHaveCount(ui.languages.length)
     await page.locator('.lang-menu li button', { hasText: 'العربية' }).click()
     await expect(page.locator('.lang-menu')).toHaveCount(0)
     await expect(page.locator('.xo-widget')).toHaveAttribute('dir', 'rtl')
@@ -15,6 +16,33 @@ test.describe('language', () => {
     expect(log.chat.at(-1)).toMatchObject({ selected_language: 'ar', ui_language: 'ar' })
     await send(page, 'hello again')
     expect(log.chat.at(-1).selected_language).toBeUndefined()
+  })
+
+  test('the language search finds a language by its native or English name, without accents; Enter picks it', async ({ page }) => {
+    await openApp(page)
+    await page.locator('.lang-switch-btn').click()
+    const search = page.locator('.lang-search input')
+    await search.fill('turkce')
+    await expect(page.locator('.lang-menu li')).toHaveCount(1)
+    await expect(page.locator('.lang-menu li')).toContainText('Türkçe')
+    await search.fill('Gujarati')
+    await expect(page.locator('.lang-menu li')).toContainText('ગુજરાતી')
+    await search.fill('zzz')
+    await expect(page.locator('.lang-empty')).toHaveText('No language matches')
+    await search.fill('русс')
+    await search.press('Enter')
+    await expect(page.locator('.lang-menu')).toHaveCount(0)
+    await expect(page.locator('#chat-text-input')).toHaveAttribute('placeholder', ui.strings.ru.placeholder)
+  })
+
+  test('every language has every phrase, with the same placeholders as English', () => {
+    const placeholders = (s) => (s.match(/\{[a-z_]+\}/g) || []).sort().join()
+    for (const { code } of ui.languages) {
+      for (const [key, english] of Object.entries(ui.strings.en)) {
+        expect(ui.strings[code]?.[key], `${code}.${key}`).toBeTruthy()
+        expect(placeholders(ui.strings[code][key]), `${code}.${key}`).toBe(placeholders(english))
+      }
+    }
   })
 
   test('switching mid-conversation keeps history and adds a divider', async ({ page }) => {

@@ -51,7 +51,7 @@
   },
   {
    "code": "tl",
-   "name": "Tagalog",
+   "name": "Filipino",
    "native": "Filipino",
    "dir": "ltr"
   },
@@ -89,6 +89,42 @@
    "code": "or",
    "name": "Odia",
    "native": "ଓଡ଼ିଆ",
+   "dir": "ltr"
+  },
+  {
+   "code": "ru",
+   "name": "Russian",
+   "native": "Русский",
+   "dir": "ltr"
+  },
+  {
+   "code": "tr",
+   "name": "Turkish",
+   "native": "Türkçe",
+   "dir": "ltr"
+  },
+  {
+   "code": "gu",
+   "name": "Gujarati",
+   "native": "ગુજરાતી",
+   "dir": "ltr"
+  },
+  {
+   "code": "ne",
+   "name": "Nepali",
+   "native": "नेपाली",
+   "dir": "ltr"
+  },
+  {
+   "code": "it",
+   "name": "Italian",
+   "native": "Italiano",
+   "dir": "ltr"
+  },
+  {
+   "code": "te",
+   "name": "Telugu",
+   "native": "తెలుగు",
    "dir": "ltr"
   }
  ],

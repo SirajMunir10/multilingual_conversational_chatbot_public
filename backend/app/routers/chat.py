@@ -15,9 +15,9 @@ router = APIRouter(prefix="/api/chat", tags=["Conversation"])
 
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=settings.MAX_MESSAGE_CHARS)
-    session_id: Optional[str] = None
-    selected_language: Optional[str] = Field(None, description="Set only when the user picked a language in the menu (manual override, FR-1).")
-    ui_language: Optional[str] = Field(None, description="Current UI language; used to start a new session.")
+    session_id: Optional[str] = Field(None, max_length=128)
+    selected_language: Optional[str] = Field(None, max_length=16, description="Set only when the user picked a language in the menu (manual override, FR-1).")
+    ui_language: Optional[str] = Field(None, max_length=16, description="Current UI language; used to start a new session.")
     channel: str = Field("text", pattern="^(text|voice)$")
 
 

@@ -89,8 +89,10 @@ async def relay(client_ws: WebSocket, language: Optional[str], session_id: Optio
                         if data.get("type") == "commit":
                             await upstream.send(json.dumps({"type": "input_audio_buffer.commit"}))
                         elif data.get("type") == "language":
-                            current_language = data.get("language")
-                            await upstream.send(json.dumps(_session_update(current_language, noise_reduction)))
+                            requested = data.get("language")
+                            if isinstance(requested, str) and requested in load_config("locales")["locales"]:
+                                current_language = requested
+                                await upstream.send(json.dumps(_session_update(current_language, noise_reduction)))
 
             async def from_upstream() -> None:
                 nonlocal noise_reduction, ready

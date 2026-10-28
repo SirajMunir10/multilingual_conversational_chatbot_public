@@ -1,5 +1,5 @@
 {
- "version": "2026.10.15",
+ "version": "2026.10.28",
  "default": "en",
  "prd_launch_languages": [
   "en",
@@ -12,6 +12,11 @@
    "name": "English",
    "native": "English",
    "dir": "ltr",
+   "script": "LATIN",
+   "brand": {
+    "xoto": "Ex-oto",
+    "xo": "Ex-O"
+   },
    "stt_language": "en",
    "tts_language_code": "en",
    "messages": {
@@ -26,6 +31,19 @@
    "name": "Arabic",
    "native": "العربية",
    "dir": "rtl",
+   "script": "ARABIC",
+   "brand": {
+    "xoto": "إكس-أوتو",
+    "xo": "إكس-أو",
+    "heard_xoto": [
+     "زوتو",
+     "اكسوتو",
+     "إكسوتو",
+     "اکسوتو",
+     "إكس أوتو",
+     "اكس اوتو"
+    ]
+   },
    "stt_language": "ar",
    "tts_language_code": "ar",
    "messages": {
@@ -40,6 +58,19 @@
    "name": "Hindi",
    "native": "हिन्दी",
    "dir": "ltr",
+   "script": "DEVANAGARI",
+   "full_stop": "।",
+   "brand": {
+    "xoto": "एक्स-ओटो",
+    "xo": "एक्स-ओ",
+    "heard_xoto": [
+     "ज़ोटो",
+     "जोटो",
+     "एक्सोटो",
+     "एक्स ओटो",
+     "एक्स ऑटो"
+    ]
+   },
    "stt_language": "hi",
    "tts_language_code": "hi",
    "messages": {
@@ -54,6 +85,16 @@
    "name": "Urdu",
    "native": "اردو",
    "dir": "rtl",
+   "script": "ARABIC",
+   "brand": {
+    "xoto": "ایکس-اوٹو",
+    "xo": "ایکس-او",
+    "heard_xoto": [
+     "ایکسوٹو",
+     "ایکس اوٹو",
+     "زوٹو"
+    ]
+   },
    "stt_language": "ur",
    "tts_language_code": "ur",
    "messages": {
@@ -68,6 +109,11 @@
    "name": "French",
    "native": "Français",
    "dir": "ltr",
+   "script": "LATIN",
+   "brand": {
+    "xoto": "Ex-oto",
+    "xo": "Ex-O"
+   },
    "stt_language": "fr",
    "tts_language_code": "fr",
    "messages": {
@@ -82,6 +128,11 @@
    "name": "Spanish",
    "native": "Español",
    "dir": "ltr",
+   "script": "LATIN",
+   "brand": {
+    "xoto": "Ex-oto",
+    "xo": "Ex-O"
+   },
    "stt_language": "es",
    "tts_language_code": "es",
    "messages": {
@@ -96,6 +147,11 @@
    "name": "German",
    "native": "Deutsch",
    "dir": "ltr",
+   "script": "LATIN",
+   "brand": {
+    "xoto": "Ex-oto",
+    "xo": "Ex-O"
+   },
    "stt_language": "de",
    "tts_language_code": "de",
    "messages": {
@@ -110,6 +166,11 @@
    "name": "Chinese",
    "native": "简体中文",
    "dir": "ltr",
+   "script": "CJK",
+   "brand": {
+    "xoto": "Ex-oto",
+    "xo": "Ex-O"
+   },
    "stt_language": "zh",
    "tts_language_code": "zh",
    "messages": {
@@ -121,9 +182,14 @@
    "writing": "Simplified Chinese characters, natural Mandarin"
   },
   "tl": {
-   "name": "Tagalog",
+   "name": "Filipino",
    "native": "Filipino",
    "dir": "ltr",
+   "script": "LATIN",
+   "brand": {
+    "xoto": "Ex-oto",
+    "xo": "Ex-O"
+   },
    "stt_language": "tl",
    "tts_language_code": "fil",
    "messages": {
@@ -138,6 +204,11 @@
    "name": "Persian",
    "native": "فارسی",
    "dir": "rtl",
+   "script": "ARABIC",
+   "brand": {
+    "xoto": "ایکس-اوتو",
+    "xo": "ایکس-او"
+   },
    "stt_language": "fa",
    "tts_language_code": "fa",
    "messages": {
@@ -152,6 +223,12 @@
    "name": "Bengali",
    "native": "বাংলা",
    "dir": "ltr",
+   "script": "BENGALI",
+   "full_stop": "।",
+   "brand": {
+    "xoto": "এক্স-ওটো",
+    "xo": "এক্স-ও"
+   },
    "stt_language": "bn",
    "tts_language_code": "bn",
    "messages": {
@@ -166,6 +243,11 @@
    "name": "Tamil",
    "native": "தமிழ்",
    "dir": "ltr",
+   "script": "TAMIL",
+   "brand": {
+    "xoto": "எக்ஸ்-ஓட்டோ",
+    "xo": "எக்ஸ்-ஓ"
+   },
    "stt_language": "ta",
    "tts_language_code": "ta",
    "messages": {
@@ -180,6 +262,12 @@
    "name": "Punjabi",
    "native": "ਪੰਜਾਬੀ",
    "dir": "ltr",
+   "script": "GURMUKHI",
+   "full_stop": "।",
+   "brand": {
+    "xoto": "ਐਕਸ-ਓਟੋ",
+    "xo": "ਐਕਸ-ਓ"
+   },
    "stt_language": null,
    "tts_language_code": "pa",
    "messages": {
@@ -195,6 +283,11 @@
    "name": "Malayalam",
    "native": "മലയാളം",
    "dir": "ltr",
+   "script": "MALAYALAM",
+   "brand": {
+    "xoto": "എക്സ്-ഓട്ടോ",
+    "xo": "എക്സ്-ഓ"
+   },
    "stt_language": "ml",
    "tts_language_code": "ml",
    "messages": {
@@ -209,6 +302,12 @@
    "name": "Odia",
    "native": "ଓଡ଼ିଆ",
    "dir": "ltr",
+   "script": "ORIYA",
+   "full_stop": "।",
+   "brand": {
+    "xoto": "ଏକ୍ସ-ଓଟୋ",
+    "xo": "ଏକ୍ସ-ଓ"
+   },
    "stt_language": null,
    "tts_language_code": "or",
    "messages": {
@@ -219,6 +318,145 @@
    },
    "stt_note": "Not an accepted gpt-live-transcribe language hint (tested 15 Oct 2026); transcription runs without a hint.",
    "writing": "natural Odia in Odia script only"
+  },
+  "ru": {
+   "name": "Russian",
+   "native": "Русский",
+   "dir": "ltr",
+   "script": "CYRILLIC",
+   "brand": {
+    "xoto": "Экс-ото",
+    "xo": "Экс-О",
+    "heard_xoto": [
+     "Ксото",
+     "Зото",
+     "Эксото",
+     "Экс ото",
+     "Иксото"
+    ]
+   },
+   "stt_language": "ru",
+   "tts_language_code": "ru",
+   "messages": {
+    "error_generic": "Извините, что-то пошло не так. Попробуйте ещё раз.",
+    "voice_unavailable": "Голосовой ввод сейчас недоступен. Напишите сообщение.",
+    "button_confirm": "Подтвердить",
+    "button_edit": "Изменить"
+   },
+   "writing": "natural, friendly Russian in Cyrillic (use 'вы')"
+  },
+  "tr": {
+   "name": "Turkish",
+   "native": "Türkçe",
+   "dir": "ltr",
+   "script": "LATIN",
+   "brand": {
+    "xoto": "Ex-oto",
+    "xo": "Ex-O"
+   },
+   "stt_language": "tr",
+   "tts_language_code": "tr",
+   "messages": {
+    "error_generic": "Üzgünüm, bir sorun oluştu. Lütfen tekrar deneyin.",
+    "voice_unavailable": "Sesli kullanım şu an mümkün değil. Lütfen mesajınızı yazın.",
+    "button_confirm": "Onayla",
+    "button_edit": "Düzenle"
+   },
+   "writing": "natural, friendly Turkish (use 'siz')"
+  },
+  "gu": {
+   "name": "Gujarati",
+   "native": "ગુજરાતી",
+   "dir": "ltr",
+   "script": "GUJARATI",
+   "brand": {
+    "xoto": "એક્સ-ઓટો",
+    "xo": "એક્સ-ઓ",
+    "heard_xoto": [
+     "ઝોટો",
+     "એક્સોટો",
+     "એક્સ ઓટો",
+     "X ઓટો"
+    ]
+   },
+   "stt_language": "gu",
+   "tts_language_code": "gu",
+   "messages": {
+    "error_generic": "મારી તરફથી કંઈક ગડબડ થઈ. ફરી પ્રયાસ કરો.",
+    "voice_unavailable": "હમણાં વૉઇસ ઉપલબ્ધ નથી. તમારો મેસેજ ટાઇપ કરો.",
+    "button_confirm": "પાક્કું કરો",
+    "button_edit": "ફેરફાર કરો"
+   },
+   "writing": "natural, everyday Gujarati in Gujarati script only; use Gujarati words rather than Hindi or Urdu borrowings (for example હપ્તો for an instalment, not કિશ્ત); English words people really use, such as mortgage, loan or credit card, are fine but written in Gujarati letters (મોર્ગેજ, લોન, ક્રેડિટ કાર્ડ)"
+  },
+  "ne": {
+   "name": "Nepali",
+   "native": "नेपाली",
+   "dir": "ltr",
+   "script": "DEVANAGARI",
+   "full_stop": "।",
+   "brand": {
+    "xoto": "एक्स-ओटो",
+    "xo": "एक्स-ओ",
+    "heard_xoto": [
+     "एक्स ऑटो"
+    ]
+   },
+   "stt_language": "ne",
+   "tts_language_code": "ne",
+   "messages": {
+    "error_generic": "माफ गर्नुहोस्, मबाट केही गडबड भयो। फेरि प्रयास गर्नुहोस्।",
+    "voice_unavailable": "अहिले आवाजको सुविधा उपलब्ध छैन। कृपया आफ्नो सन्देश टाइप गर्नुहोस्।",
+    "button_confirm": "पक्का गर्नुहोस्",
+    "button_edit": "बदल्नुहोस्"
+   },
+   "writing": "natural Nepali (not Hindi) in Devanagari script only"
+  },
+  "it": {
+   "name": "Italian",
+   "native": "Italiano",
+   "dir": "ltr",
+   "script": "LATIN",
+   "brand": {
+    "xoto": "Ex-oto",
+    "xo": "Ex-O"
+   },
+   "stt_language": "it",
+   "tts_language_code": "it",
+   "messages": {
+    "error_generic": "Mi dispiace, c’è stato un problema. Riprova.",
+    "voice_unavailable": "La funzione vocale non è disponibile al momento. Scrivi il tuo messaggio.",
+    "button_confirm": "Conferma",
+    "button_edit": "Modifica"
+   },
+   "writing": "natural, friendly Italian (use 'tu')"
+  },
+  "te": {
+   "name": "Telugu",
+   "native": "తెలుగు",
+   "dir": "ltr",
+   "script": "TELUGU",
+   "brand": {
+    "xoto": "ఎక్స్-ఓటో",
+    "xo": "ఎక్స్-ఓ",
+    "heard_xoto": [
+     "జోటో",
+     "ఎక్సోటో",
+     "ఎక్స్ ఓటో",
+     "X ఆటో",
+     "ఎక్స్ ఆటో",
+     "X ఓటో"
+    ]
+   },
+   "stt_language": "te",
+   "tts_language_code": "te",
+   "messages": {
+    "error_generic": "క్షమించండి, నా వైపు ఏదో సమస్య వచ్చింది. మళ్లీ ప్రయత్నించండి.",
+    "voice_unavailable": "ఇప్పుడే వాయిస్ అందుబాటులో లేదు. మీ సందేశాన్ని టైప్ చేయండి.",
+    "button_confirm": "ఖరారు చేయండి",
+    "button_edit": "మార్చండి"
+   },
+   "writing": "natural Telugu in Telugu script only"
   }
  }
 }
