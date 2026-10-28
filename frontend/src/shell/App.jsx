@@ -2,7 +2,6 @@
 import { useEffect, useState } from 'react'
 import HeaderNav from './HeaderNav'
 import WidgetView from './WidgetView'
-import AdminView from './AdminView'
 
 // Theme management: Light Mode is strictly the default.
 // Storage can throw (private browsing, blocked cookies), so every access is guarded.
@@ -17,7 +16,6 @@ const applyTheme = (theme) => {
 }
 
 export default function App() {
-  const [currentView, setCurrentView] = useState('widget')
   const [currentLanguage, setCurrentLanguage] = useState('en')
   const [currentTheme, setCurrentTheme] = useState(() => (readTheme() === 'dark' ? 'dark' : 'light'))
 
@@ -27,26 +25,19 @@ export default function App() {
     <div className="app-root" data-theme={currentTheme}>
       {/* Master Header Navigation */}
       <HeaderNav
-        currentView={currentView}
         currentLanguage={currentLanguage}
         currentTheme={currentTheme}
-        onViewChange={setCurrentView}
         onLanguageChange={setCurrentLanguage}
         onThemeChange={setCurrentTheme}
       />
 
-      {/* Main Content Area based on Selected View */}
       <main className="main-viewport">
-        {currentView === 'widget' ? (
-          <WidgetView
-            currentLanguage={currentLanguage}
-            currentTheme={currentTheme}
-            onLanguageChanged={setCurrentLanguage}
-            onThemeChange={setCurrentTheme}
-          />
-        ) : currentView === 'admin' ? (
-          <AdminView />
-        ) : null}
+        <WidgetView
+          currentLanguage={currentLanguage}
+          currentTheme={currentTheme}
+          onLanguageChanged={setCurrentLanguage}
+          onThemeChange={setCurrentTheme}
+        />
       </main>
 
       {/* Footer with Authoritative Compliance Reference */}

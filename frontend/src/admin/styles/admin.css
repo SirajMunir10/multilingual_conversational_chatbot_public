@@ -134,6 +134,8 @@
 .xa-login-card h1 { font-family: var(--font-heading); font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
 .xa-login-card .xa-login-sub { color: var(--xa-ink-3); margin-block-start: -12px; }
 .xa-login-foot { color: var(--xa-ink-3); font-size: 12.5px; }
+.xa-login-back { align-self: flex-start; font-size: 13px; font-weight: 500; color: var(--xa-brand-ink); text-decoration: none; }
+.xa-login-back:hover { text-decoration: underline; }
 
 /* =============================== Shell =============================== */
 /* The site stylesheet sets overflow-x: hidden on html and body, which turns body into a scroll container that never

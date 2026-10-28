@@ -106,13 +106,6 @@ test.describe('visual parity', () => {
     await shot(page, 'voice-coach')
   })
 
-  test('admin preview', async ({ page, isMobile }) => {
-    test.skip(isMobile, 'desktop shell')
-    await openApp(page)
-    await page.locator('.app-header .nav-tab').nth(1).click()
-    await shot(page, 'admin')
-  })
-
   test('widget closed shows the launcher', async ({ page, isMobile }) => {
     test.skip(isMobile, 'desktop shell')
     await openApp(page)

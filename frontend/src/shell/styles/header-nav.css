@@ -95,43 +95,6 @@
   margin: 0;
 }
 
-.nav-tabs {
-  display: flex;
-  align-items: center;
-  background: var(--bg-surface-elevated);
-  padding: 3px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-subtle);
-  gap: 4px;
-}
-
-.nav-tab {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 16px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 0.84rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.nav-tab:hover {
-  color: var(--text-primary);
-  background: var(--bg-surface-hover);
-}
-
-.nav-tab.active {
-  background: linear-gradient(135deg, var(--brand-purple-light), var(--brand-purple));
-  color: #FFFFFF;
-  border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: var(--shadow-sm);
-}
-
 .header-right {
   display: flex;
   align-items: center;
@@ -185,25 +148,34 @@
   line-height: 1;
 }
 
-.btn-advisor-top {
-  display: flex;
+/* Admin entry for the XOTO team: quiet, so visitors' attention stays on the chat */
+.header-admin-link {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: linear-gradient(135deg, var(--brand-purple-light), var(--brand-purple));
-  color: #FFFFFF;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 6px 12px;
   border-radius: var(--radius-full);
-  padding: 6px 14px;
-  font-size: 0.80rem;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: all var(--transition-fast);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
 }
 
-.btn-advisor-top:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md), 0 0 14px var(--brand-purple-glow);
+.header-admin-link:hover {
+  color: var(--brand-purple);
+  border-color: var(--border-purple);
+}
+
+[data-theme="dark"] .header-admin-link:hover {
+  color: var(--text-primary);
+}
+
+.header-admin-link:focus-visible {
+  outline: 2px solid var(--brand-purple);
+  outline-offset: 2px;
 }
 
 .lang-dropdown {
@@ -243,7 +215,7 @@
     margin: 8px 10px 16px;
   }
 
-  .app-header .header-left, .header-center, .header-right {
+  .app-header .header-left, .header-right {
     justify-content: center;
   }
 }
@@ -275,19 +247,6 @@
     text-align: center;
   }
 
-  .nav-tabs {
-    width: 100%;
-    display: flex;
-  }
-
-  .nav-tab {
-    flex: 1;
-    justify-content: center;
-    padding: 6px 8px;
-    font-size: 0.75rem;
-    gap: 4px;
-    white-space: nowrap;
-  }
 
   .header-right {
     display: flex;
@@ -306,7 +265,7 @@
     padding: 5px 8px;
   }
 
-  .btn-advisor-top {
+  .header-admin-link {
     padding: 5px 10px;
     font-size: 0.75rem;
   }

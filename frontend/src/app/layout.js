@@ -11,7 +11,6 @@ import '@/xo/styles/voice-orb.css'
 import '@/xo/styles/uae-skyline.css'
 import '@/xo/styles/chat-widget.css'
 import '@/shell/styles/widget-view.css'
-import '@/shell/styles/admin-view.css'
 import '@/shell/styles/app.css'
 
 export const metadata = {

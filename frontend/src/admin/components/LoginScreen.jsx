@@ -54,6 +54,7 @@ export default function LoginScreen({ onSignedIn, notice }) {
           </Field>
           <Button type="submit" busy={busy} disabled={!email || !password} className="xa-btn-block">Sign in</Button>
           <p className="xa-login-foot">Forgot your password? An admin can reset it under Users &amp; roles.</p>
+          <a className="xa-login-back" href="/">Back to XO chat</a>
         </form>
       </section>
     </main>
