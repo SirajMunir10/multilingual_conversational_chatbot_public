@@ -37,7 +37,7 @@ test.describe('chat', () => {
     await expect(page.locator('.message-wrapper.user')).toHaveCount(1)
     await expect(page.locator('.xo-hero')).toHaveCount(0)
     await page.locator('.clear-chat-btn').click()
-    await expect(page.locator('.message-wrapper')).toHaveCount(1)
+    await expect(page.locator('.message-wrapper')).toHaveCount(0)
     await expect(page.locator('.xo-hero')).toBeVisible()
     await send(page, 'again')
     expect(log.chat.at(-1).session_id).toBeNull()

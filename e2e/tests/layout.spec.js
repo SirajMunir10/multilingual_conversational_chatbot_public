@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test')
 const { openApp, send } = require('./support/mock')
 
 test.describe('layout', () => {
-  test('widget shows header, welcome, hero, input and disclaimer', async ({ page }) => {
+  test('widget shows header, hero, input and disclaimer, without a welcome bubble', async ({ page }) => {
     await openApp(page)
     const w = page.locator('.xo-widget')
     await expect(w.locator('.xo-brand-text strong')).toHaveText('XO')
@@ -12,10 +12,10 @@ test.describe('layout', () => {
     await expect(w.locator('.advisor-btn')).toBeVisible()
     for (const sel of ['.theme-toggle-btn', '.clear-chat-btn', '.close-widget-btn']) await expect(w.locator(sel)).toBeVisible()
     await expect(w.locator('.xo-hero h3')).toHaveText('How can I help with your property plans today?')
-    await expect(w.locator('.message-wrapper.assistant .md')).toHaveText("Hi, I'm XO. Ask me about UAE properties, mortgages, renting or XOTO services.")
+    await expect(w.locator('.message-wrapper')).toHaveCount(0)
     await expect(page.locator('#chat-text-input')).toHaveAttribute('placeholder', 'Ask about properties, mortgages, fees…')
     await expect(page.locator('.send-btn')).toBeDisabled()
-    await expect(w.locator('.input-disclaimer')).toHaveText('XO gives estimates, not offers. Figures are subject to lender approval.')
+    await expect(w.locator('.input-disclaimer')).toHaveText('Please verify important details independently.')
     await expect(w.locator('.feed-backdrop svg')).toHaveCount(1)
   })
 

@@ -763,9 +763,10 @@ export default function ChatWidget({
               </div>
             )}
 
+            {/* The welcome message stays in the conversation state but is not shown: the hero above greets the visitor */}
             {messages.map((msg) => (msg.kind === 'divider'
               ? <div key={msg.id} className="lang-divider" role="separator"><span dir="auto">{msg.content}</span></div>
-              : !msg.hidden && <MessageItem key={msg.id} message={msg} language={currentLanguage} onAsk={sendQuickPrompt} onHandoffUpdate={handoffUpdate} onRate={rateReply} />
+              : !msg.hidden && msg.id !== 'welcome' && <MessageItem key={msg.id} message={msg} language={currentLanguage} onAsk={sendQuickPrompt} onHandoffUpdate={handoffUpdate} onRate={rateReply} />
             ))}
 
             {isTyping && (

@@ -182,13 +182,14 @@
 .chat-feed::-webkit-scrollbar { width: 6px; }
 .chat-feed::-webkit-scrollbar-thumb { background: var(--w-line); border-radius: 6px; }
 
-.xo-hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 14px 12px 4px; }
+/* The empty-state greeting sits in the middle of the conversation area (lifted slightly above the skyline) */
+.xo-hero { display: flex; flex-direction: column; align-items: center; text-align: center; margin-block: auto; padding: 16px 16px 48px; }
 .xo-hero-mascot {
-  width: 96px; height: 96px; margin-bottom: 14px; border-radius: 50%; display: grid; place-items: center;
+  width: 112px; height: 112px; margin-bottom: 18px; border-radius: 50%; display: grid; place-items: center;
   background: radial-gradient(circle at 50% 40%, rgba(3, 164, 244, 0.18), rgba(124, 44, 240, 0.12) 60%, transparent 72%);
 }
-.xo-hero-mascot img { width: 84px; height: 84px; object-fit: contain; animation: cw-floatMascot 4s ease-in-out infinite; }
-.xo-hero h3 { margin: 0 0 6px; font-family: var(--font-heading); font-size: 1.22rem; font-weight: 700; line-height: 1.3; color: var(--w-ink); max-width: 320px; }
+.xo-hero-mascot img { width: 96px; height: 96px; object-fit: contain; animation: cw-floatMascot 4s ease-in-out infinite; }
+.xo-hero h3 { margin: 0 0 8px; font-family: var(--font-heading); font-size: 1.22rem; font-weight: 700; line-height: 1.3; color: var(--w-ink); max-width: 320px; }
 .xo-hero p { margin: 0; font-size: 0.9rem; color: var(--w-ink-2); }
 @keyframes cw-floatMascot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 
@@ -243,6 +244,7 @@
 .send-btn:hover:not(:disabled) { transform: translateY(-1px); }
 .send-btn:disabled { background: var(--w-line); color: var(--w-ink-2); box-shadow: none; cursor: default; }
 .mic-btn:active, .send-btn:active:not(:disabled) { transform: scale(0.94); }
+/* One quiet line under the input, in text and voice mode; it also keeps clear of the phone's home bar */
 .input-disclaimer {
   padding: 6px 16px calc(8px + env(safe-area-inset-bottom, 0px));
   background: var(--w-bg); color: var(--w-ink-2); font-size: 0.68rem; line-height: 1.35; text-align: center;
