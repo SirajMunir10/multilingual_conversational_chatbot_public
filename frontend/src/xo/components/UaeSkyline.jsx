@@ -1,6 +1,54 @@
-// Decorative Dubai skyline (Burj Al Arab, Museum of the Future, Burj Khalifa, Emirates Towers, Dubai Frame)
+// Decorative Dubai skyline (Burj Al Arab, Museum of the Future, Burj Khalifa, Emirates Towers, Dubai Frame),
+// with a living sky: sparkles, stars and lit windows. All motion is CSS (styles/uae-skyline.css), animating only
+// opacity and transform, so it costs almost nothing and stops while the chat is closed.
+
+// Same positions on every render (no layout jumps); a tiny seeded generator spreads them naturally.
+function seeded(seed) {
+  let s = seed
+  return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646 }
+}
+const rand = seeded(11)
+// Stars and sparkles stay in the upper sky, clear of the greeting text and the towers.
+// Few animated elements keep the cost near zero: the stars are drawn as gradients on three layers and the windows sit
+// in three groups, and each layer or group twinkles on its own rhythm.
+const GROUPS = [{ delay: 0, duration: 3.4 }, { delay: 1.3, duration: 4.6 }, { delay: 2.6, duration: 5.8 }]
+const STAR_LAYERS = GROUPS.map((timing) => ({
+  ...timing,
+  image: Array.from({ length: 8 }, () => {
+    const radius = (1.6 + rand() * 1.6).toFixed(1)
+    return `radial-gradient(circle ${radius}px at ${(rand() * 100).toFixed(1)}% ${(rand() * 34).toFixed(1)}%, #fff 0 35%, rgba(255, 255, 255, 0) 100%)`
+  }).join(', ')
+}))
+const SPARKLES = Array.from({ length: 7 }, () => ({ x: 6 + rand() * 88, y: 4 + rand() * 28, size: 7 + rand() * 6, delay: rand() * 9, duration: 6 + rand() * 4 }))
+// Windows on the towers, in the skyline's own coordinates (viewBox 480 x 200), one list per group
+const WINDOW_GROUPS = [
+  [[270, 170], [276, 104], [305, 166], [380, 130], [408, 176]],
+  [[274, 142], [284, 122], [357, 142], [402, 142]],
+  [[278, 72], [287, 160], [360, 176], [386, 162]]
+]
+
+const timing = (item) => ({ animationDelay: `-${item.delay.toFixed(2)}s`, animationDuration: `${item.duration.toFixed(2)}s` })
+
+// Day (light mode): a softly breathing sun and two drifting clouds. Night (dark mode): stars, sparkles and a rare
+// shooting star. Both cover the whole conversation background; CSS shows the set that matches the theme.
+export function SkySparkles() {
+  return (
+    <div className="feed-sky" aria-hidden="true">
+      <span className="sky-sun" />
+      <span className="sky-cloud" />
+      <span className="sky-cloud sky-cloud-far" />
+      {STAR_LAYERS.map((layer, i) => <span key={`stars-${i}`} className="sky-stars" style={{ backgroundImage: layer.image, ...timing(layer) }} />)}
+      {SPARKLES.map((s, i) => (
+        <span key={`sparkle-${i}`} className="sky-sparkle" style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.size, height: s.size, ...timing(s) }} />
+      ))}
+      <span className="sky-shooting-star" />
+    </div>
+  )
+}
+
 export default function UaeSkyline() {
   return (
+    <>
       <svg className="uae-skyline" viewBox="0 0 480 200" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
         <defs>
           <linearGradient id="xo-sky-fill" x1="0" y1="0" x2="1" y2="1">
@@ -58,5 +106,13 @@ export default function UaeSkyline() {
           <path d="M0 196 Q 60 192 120 196 T 240 196 T 360 196 T 480 196 L480 200 L0 200 Z" />
         </g>
       </svg>
+      <svg className="uae-skyline-lights" viewBox="0 0 480 200" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
+        {WINDOW_GROUPS.map((group, i) => (
+          <g key={i} className="sky-windows" style={timing(GROUPS[i])}>
+            {group.map(([x, y]) => <rect key={`${x}-${y}`} x={x} y={y} width="2.2" height="3" rx="0.4" />)}
+          </g>
+        ))}
+      </svg>
+    </>
   )
 }

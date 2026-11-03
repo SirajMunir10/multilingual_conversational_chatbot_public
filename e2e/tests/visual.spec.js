@@ -80,13 +80,6 @@ test.describe('visual parity', () => {
     await shot(page, 'language-menu')
   })
 
-  test('tips panel', async ({ page, isMobile }) => {
-    await openApp(page)
-    test.skip(isMobile && !(await page.locator('.tips-toggle-btn').isVisible()), 'tips button hidden on narrow phones')
-    await page.locator('.tips-toggle-btn').click()
-    await shot(page, 'tips')
-  })
-
   test('voice dock in hold', async ({ page }) => {
     test.setTimeout(90_000)
     await openApp(page)

@@ -80,7 +80,9 @@
   transition: background 150ms ease, color 150ms ease;
 }
 .xo-icon-btn:hover { background: var(--w-chip); color: var(--w-ink); }
-.close-widget-btn:hover { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+/* Red is kept for the one destructive action; closing only hides the chat and keeps the conversation */
+.clear-chat-btn:hover { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+[data-theme="dark"] .clear-chat-btn:hover { background: rgba(248, 113, 113, 0.14); color: #f87171; }
 
 /* Language menu */
 .lang-switch { position: relative; }
@@ -149,9 +151,6 @@
   .lang-switch-btn { gap: 4px; padding: 0 8px 0 9px; }
   .lang-switch-btn .chip-code { display: inline; font-size: 0.74rem; letter-spacing: 0.02em; }
 }
-@container (max-width: 420px) {
-  .tips-toggle-btn { display: none; }
-}
 @container (max-width: 340px) {
   .theme-toggle-btn, .xo-divider, .xo-brand-text small { display: none; }
 }
@@ -167,11 +166,12 @@
 /* UAE skyline behind the conversation: fixed while messages scroll, very faint so text stays crisp */
 .feed-backdrop {
   position: absolute; left: 0; right: 0; bottom: 0; height: min(46%, 300px); pointer-events: none;
-  opacity: 0.075;
   -webkit-mask-image: linear-gradient(to top, #000 55%, transparent);
   mask-image: linear-gradient(to top, #000 55%, transparent);
 }
-[data-theme="dark"] .feed-backdrop { opacity: 0.16; }
+/* The faintness applies to the buildings only, so their lit windows can glow above it */
+.feed-backdrop .uae-skyline { opacity: 0.075; }
+[data-theme="dark"] .feed-backdrop .uae-skyline { opacity: 0.16; }
 .chat-feed {
   position: relative; z-index: 1;
   flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
@@ -182,13 +182,14 @@
 .chat-feed::-webkit-scrollbar { width: 6px; }
 .chat-feed::-webkit-scrollbar-thumb { background: var(--w-line); border-radius: 6px; }
 
-.xo-hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 14px 12px 4px; }
+/* The empty-state greeting sits in the middle of the conversation area (lifted slightly above the skyline) */
+.xo-hero { display: flex; flex-direction: column; align-items: center; text-align: center; margin-block: auto; padding: 16px 16px 48px; }
 .xo-hero-mascot {
-  width: 96px; height: 96px; margin-bottom: 14px; border-radius: 50%; display: grid; place-items: center;
+  width: 112px; height: 112px; margin-bottom: 18px; border-radius: 50%; display: grid; place-items: center;
   background: radial-gradient(circle at 50% 40%, rgba(3, 164, 244, 0.18), rgba(124, 44, 240, 0.12) 60%, transparent 72%);
 }
-.xo-hero-mascot img { width: 84px; height: 84px; object-fit: contain; animation: cw-floatMascot 4s ease-in-out infinite; }
-.xo-hero h3 { margin: 0 0 6px; font-family: var(--font-heading); font-size: 1.22rem; font-weight: 700; line-height: 1.3; color: var(--w-ink); max-width: 320px; }
+.xo-hero-mascot img { width: 96px; height: 96px; object-fit: contain; animation: cw-floatMascot 4s ease-in-out infinite; }
+.xo-hero h3 { margin: 0 0 8px; font-family: var(--font-heading); font-size: 1.22rem; font-weight: 700; line-height: 1.3; color: var(--w-ink); max-width: 320px; }
 .xo-hero p { margin: 0; font-size: 0.9rem; color: var(--w-ink-2); }
 @keyframes cw-floatMascot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 
@@ -243,6 +244,7 @@
 .send-btn:hover:not(:disabled) { transform: translateY(-1px); }
 .send-btn:disabled { background: var(--w-line); color: var(--w-ink-2); box-shadow: none; cursor: default; }
 .mic-btn:active, .send-btn:active:not(:disabled) { transform: scale(0.94); }
+/* One quiet line under the input, in text and voice mode; it also keeps clear of the phone's home bar */
 .input-disclaimer {
   padding: 6px 16px calc(8px + env(safe-area-inset-bottom, 0px));
   background: var(--w-bg); color: var(--w-ink-2); font-size: 0.68rem; line-height: 1.35; text-align: center;

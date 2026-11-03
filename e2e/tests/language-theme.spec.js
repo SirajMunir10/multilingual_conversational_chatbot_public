@@ -90,12 +90,9 @@ test.describe('theme, tips and tooltips', () => {
     await expect(page.locator('.theme-btn').nth(1)).toHaveClass(/active/)
   })
 
-  test('tips panel opens and closes', async ({ page, isMobile }) => {
+  test('the header has no tips button', async ({ page }) => {
     await openApp(page)
-    test.skip(isMobile && !(await page.locator('.tips-toggle-btn').isVisible()), 'tips button hidden on narrow phones')
-    await page.locator('.tips-toggle-btn').click()
-    await expect(page.locator('.onboarding-tips-container')).toBeVisible()
-    await page.locator('.tips-close-btn').click()
+    await expect(page.locator('.tips-toggle-btn')).toHaveCount(0)
     await expect(page.locator('.onboarding-tips-container')).toHaveCount(0)
   })
 
