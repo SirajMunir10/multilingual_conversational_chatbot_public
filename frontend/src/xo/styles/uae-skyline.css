@@ -1,2 +1,86 @@
 /* Converted from components/chat/UaeSkyline.vue (Vue scoped styles). Class names unchanged. */
-.uae-skyline { display: block; width: 100%; height: 100%; }
+.uae-skyline, .uae-skyline-lights { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+
+/* ===== Living sky =====
+   Day: a warm sun glow and two soft clouds. Night: stars, sparkles, a rare shooting star and warm window lights.
+   Everything stays faint and slow so it never competes with the conversation, and only opacity and transform are
+   animated (handled by the GPU, no page repaint). Nothing runs while the chat is closed (it is display: none). */
+.feed-sky { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+
+/* ----- Day (light mode) ----- */
+.sky-sun {
+  position: absolute; top: -90px; inset-inline-end: -70px; width: 260px; height: 260px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 196, 102, 0.22), rgba(255, 196, 102, 0.08) 45%, rgba(255, 196, 102, 0) 70%);
+  animation: xo-sun 10s ease-in-out infinite;
+}
+@keyframes xo-sun {
+  0%, 100% { opacity: 0.7; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+/* Each cloud layer is as wide as the chat and slides across it; the cloud itself is drawn in its middle */
+.sky-cloud {
+  position: absolute; top: 9%; left: 0; width: 100%; height: 64px;
+  background:
+    radial-gradient(closest-side, rgba(124, 44, 240, 0.07), rgba(124, 44, 240, 0)) 44% 60% / 90px 40px no-repeat,
+    radial-gradient(closest-side, rgba(3, 164, 244, 0.07), rgba(3, 164, 244, 0)) 52% 35% / 80px 46px no-repeat,
+    radial-gradient(closest-side, rgba(124, 44, 240, 0.06), rgba(124, 44, 240, 0)) 59% 62% / 84px 36px no-repeat;
+  animation: xo-cloud 80s linear -30s infinite;
+}
+.sky-cloud-far { top: 27%; height: 48px; opacity: 0.7; transform: scale(0.8); animation-duration: 120s; animation-delay: -85s; }
+@keyframes xo-cloud {
+  from { transform: translateX(-75%); }
+  to { transform: translateX(75%); }
+}
+
+/* ----- Night (dark mode) ----- */
+.sky-stars, .sky-sparkle, .sky-shooting-star { display: none; }
+[data-theme="dark"] .sky-sun, [data-theme="dark"] .sky-cloud { display: none; }
+[data-theme="dark"] .sky-stars, [data-theme="dark"] .sky-sparkle, [data-theme="dark"] .sky-shooting-star { display: block; }
+
+/* Stars: three layers that twinkle in turn, never fully bright */
+.sky-stars { position: absolute; inset: 0; background-repeat: no-repeat; animation: xo-twinkle ease-in-out infinite; }
+@keyframes xo-twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.8; }
+}
+
+/* Four-point sparkles in soft starlight */
+.sky-sparkle {
+  position: absolute; opacity: 0;
+  background: linear-gradient(135deg, #f3eaff, #a8dcff);
+  clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%);
+  animation: xo-sparkle ease-in-out infinite;
+}
+@keyframes xo-sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  50% { opacity: 0.5; transform: scale(1) rotate(45deg); }
+}
+
+/* A shooting star now and then, so it stays a small surprise */
+.sky-shooting-star {
+  position: absolute; top: 9%; left: 82%; width: 80px; height: 1.5px; border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85));
+  opacity: 0; transform-origin: 0 50%;
+  animation: xo-shooting-star 24s ease-out 6s infinite;
+}
+@keyframes xo-shooting-star {
+  0% { opacity: 0; transform: rotate(155deg) translateX(0); }
+  1.2% { opacity: 1; }
+  4%, 100% { opacity: 0; transform: rotate(155deg) translateX(240px); }
+}
+
+/* Windows on the towers: faint glass glints by day, warm lights at night */
+.sky-windows { fill: #03a4f4; opacity: 0.1; animation: xo-window-day ease-in-out infinite; }
+[data-theme="dark"] .sky-windows { fill: #ffd98a; animation-name: xo-window-night; }
+@keyframes xo-window-day { 0%, 100% { opacity: 0.08; } 50% { opacity: 0.35; } }
+@keyframes xo-window-night { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.75; } }
+
+/* Visitors who ask for less motion get a calm, still sky */
+@media (prefers-reduced-motion: reduce) {
+  .sky-sun, .sky-cloud, .sky-stars, .sky-sparkle, .sky-windows { animation: none; }
+  .sky-stars { opacity: 0.5; }
+  .sky-sparkle { opacity: 0.3; }
+  .sky-windows { opacity: 0.2; }
+  [data-theme="dark"] .sky-windows { opacity: 0.5; }
+  [data-theme="dark"] .sky-shooting-star { display: none; }
+}

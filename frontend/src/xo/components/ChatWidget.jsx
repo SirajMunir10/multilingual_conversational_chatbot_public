@@ -4,9 +4,8 @@
 // synchronous mirrors (refs) that the streaming and voice flows read between renders.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 import MessageItem from './MessageItem'
-import OnboardingTooltips from './OnboardingTooltips'
 import VoiceOrb from './VoiceOrb'
-import UaeSkyline from './UaeSkyline'
+import UaeSkyline, { SkySparkles } from './UaeSkyline'
 import XoIcon from './XoIcon'
 import LanguageMenu from './LanguageMenu'
 import { SubmitHandoffContext } from './HandoffCard'
@@ -81,7 +80,6 @@ export default function ChatWidget({
   const isTypingRef = useRef(false)
   const setIsTyping = (v) => { isTypingRef.current = v; setIsTypingState(v) }
   const [statusKey, setStatusKey] = useState('thinking')
-  const [showTips, setShowTips] = useState(false)
   const [showLangMenu, setShowLangMenu] = useState(false)
   const feedRef = useRef(null)
   const audioPlayerRef = useRef(null)
@@ -736,9 +734,6 @@ export default function ChatWidget({
                     aria-label={currentTheme === 'light' ? t('tip_dark') : t('tip_light')} data-tip={currentTheme === 'light' ? t('tip_dark') : t('tip_light')}>
               <XoIcon name={currentTheme === 'light' ? 'moon' : 'sun'} />
             </button>
-            <button type="button" className="xo-icon-btn tips-toggle-btn" onClick={() => setShowTips(!showTips)} aria-label={t('tip_tips')} data-tip={t('tip_tips')}>
-              <XoIcon name="bulb" />
-            </button>
             <button type="button" className="xo-icon-btn clear-chat-btn" onClick={clearChat} aria-label={t('clear_chat')} data-tip={t('clear_chat')} data-tip-pos="end">
               <XoIcon name="trash" />
             </button>
@@ -748,9 +743,8 @@ export default function ChatWidget({
           </div>
         </header>
 
-        <OnboardingTooltips isOpen={showTips} onClose={() => setShowTips(false)} />
-
         <div className="feed-wrap">
+          <SkySparkles />
           <div className="feed-backdrop" aria-hidden="true"><UaeSkyline /></div>
           <div className="chat-feed" ref={feedRef} role="log" aria-live="polite" onScroll={handleFeedScroll}>
             {showHero && (

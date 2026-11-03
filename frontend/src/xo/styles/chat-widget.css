@@ -80,7 +80,9 @@
   transition: background 150ms ease, color 150ms ease;
 }
 .xo-icon-btn:hover { background: var(--w-chip); color: var(--w-ink); }
-.close-widget-btn:hover { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+/* Red is kept for the one destructive action; closing only hides the chat and keeps the conversation */
+.clear-chat-btn:hover { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
+[data-theme="dark"] .clear-chat-btn:hover { background: rgba(248, 113, 113, 0.14); color: #f87171; }
 
 /* Language menu */
 .lang-switch { position: relative; }
@@ -149,9 +151,6 @@
   .lang-switch-btn { gap: 4px; padding: 0 8px 0 9px; }
   .lang-switch-btn .chip-code { display: inline; font-size: 0.74rem; letter-spacing: 0.02em; }
 }
-@container (max-width: 420px) {
-  .tips-toggle-btn { display: none; }
-}
 @container (max-width: 340px) {
   .theme-toggle-btn, .xo-divider, .xo-brand-text small { display: none; }
 }
@@ -167,11 +166,12 @@
 /* UAE skyline behind the conversation: fixed while messages scroll, very faint so text stays crisp */
 .feed-backdrop {
   position: absolute; left: 0; right: 0; bottom: 0; height: min(46%, 300px); pointer-events: none;
-  opacity: 0.075;
   -webkit-mask-image: linear-gradient(to top, #000 55%, transparent);
   mask-image: linear-gradient(to top, #000 55%, transparent);
 }
-[data-theme="dark"] .feed-backdrop { opacity: 0.16; }
+/* The faintness applies to the buildings only, so their lit windows can glow above it */
+.feed-backdrop .uae-skyline { opacity: 0.075; }
+[data-theme="dark"] .feed-backdrop .uae-skyline { opacity: 0.16; }
 .chat-feed {
   position: relative; z-index: 1;
   flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;

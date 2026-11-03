@@ -16,7 +16,9 @@ test.describe('layout', () => {
     await expect(page.locator('#chat-text-input')).toHaveAttribute('placeholder', 'Ask about properties, mortgages, fees…')
     await expect(page.locator('.send-btn')).toBeDisabled()
     await expect(w.locator('.input-disclaimer')).toHaveText('Please verify important details independently.')
-    await expect(w.locator('.feed-backdrop svg')).toHaveCount(1)
+    await expect(w.locator('.feed-backdrop .uae-skyline')).toHaveCount(1)
+    await expect(w.locator('.feed-backdrop .uae-skyline-lights .sky-windows')).toHaveCount(3)
+    await expect(w.locator('.feed-sky .sky-sparkle')).toHaveCount(7)
   })
 
   test('closing hides the widget, the launcher reopens it with the conversation intact', async ({ page, isMobile }) => {
