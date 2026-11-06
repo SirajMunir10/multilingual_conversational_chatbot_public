@@ -14,7 +14,7 @@ import { languages, languageInfo, t as translate } from '../i18n'
 import { apiUrl, fetchClientConfig, warmBackend } from '../lib/api'
 import { useVoice } from '../hooks/useVoice'
 import { createSpeech } from '../lib/speech'
-import { createWordHighlight } from '../lib/wordHighlight'
+import { createWordHighlight, CJK } from '../lib/wordHighlight'
 
 const STORE_SESSION = 'xo_session_id'
 const STORE_MESSAGES = 'xo_chat_messages'
@@ -40,6 +40,9 @@ function safeStorage(op, key, value) {
   }
   return null
 }
+
+// Words added to a spoken question join it with a space, except between two Chinese/Japanese characters.
+const joinSpeech = (before, after) => (before && after ? before + (CJK.test(before.slice(-1)) && CJK.test(after[0]) ? '' : ' ') + after : before || after)
 
 const newId = (prefix) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 
@@ -459,10 +462,36 @@ export default function ChatWidget({
       return
     }
 
-    addMessage({ id: newId('usr'), role: 'user', content: transcript, viaVoice: true, timestamp: new Date().toISOString() })
+    const questionId = newId('usr')
+    addMessage({ id: questionId, role: 'user', content: transcript, viaVoice: true, timestamp: new Date().toISOString() })
     setIsUserScrolledUp(false)
     scrollToBottom(true)
+    let question = transcript
+    // While XO is still thinking the mic keeps listening: words the visitor adds join their question on screen,
+    // the unfinished answer is dropped, and XO answers the whole question once they stop.
+    let byVoice = true
+    while (question) {
+      const asked = question
+      question = await answerTurn(turn, questionId, question, byVoice)
+      // A sound that was not words is not heard as talking again, so noise can never keep XO from answering.
+      byVoice = question !== asked
+    }
+  }
+
+  // One answer to a spoken question. Resolves with the longer question when the visitor kept talking, otherwise ''.
+  // byVoice: the visitor's voice alone (before their words are transcribed) stops the answer.
+  async function answerTurn(turn, questionId, question, byVoice) {
     setVoicePhase('thinking')
+    let added = ''
+    let talking = false
+    let resolveAdded = null
+    const addition = new Promise((resolve) => { resolveAdded = resolve })
+    let hearing = true
+    const stopHearing = () => {
+      if (!hearing) return
+      hearing = false
+      if (!talking && turn === voiceTurn.current) voice.cancel()
+    }
 
     // The reply text is shown when XO starts speaking, or at most 0.9 s after its first words arrive, so the answer
     // is never kept waiting on the voice. The spoken word is marked once the full text is on screen.
@@ -474,12 +503,14 @@ export default function ChatWidget({
     let marking = false
     const show = () => {
       clearTimeout(earlyTimer)
+      if (talking) return
+      if (replyId) stopHearing() // once the answer is on screen, later speech is a new question
       if (replyId && getMessage(replyId)?.hidden) revealReply(replyId)
     }
     const reveal = async () => {
       clearTimeout(revealTimer)
       show()
-      if (!replyId || marking || !textDone) return
+      if (talking || !replyId || marking || !textDone) return
       marking = true
       await nextTick()
       if (turn === voiceTurn.current) highlighter.attach(document.querySelector(`[data-msg-id="${replyId}"] .md`))
@@ -495,7 +526,8 @@ export default function ChatWidget({
       language: props.current.currentLanguage,
       sessionId: () => sessionId.current,
       onStart: () => {
-        if (turn !== voiceTurn.current || !voiceModeRef.current) return
+        if (turn !== voiceTurn.current || !voiceModeRef.current || talking) return
+        stopHearing() // the mic must not take XO's own voice for the visitor's
         audioStarted = true
         setVoicePhase('speaking')
         maybeReveal()
@@ -507,7 +539,7 @@ export default function ChatWidget({
       },
       onError: () => { if (turn === voiceTurn.current) setVoiceError(tNow('voice_unavailable')) }
     })
-    const final = await streamTurn(transcript, 'voice', {
+    const answering = streamTurn(question, 'voice', {
       hold: true,
       onMessage: (id) => { replyId = id },
       onToken: (text) => {
@@ -528,9 +560,49 @@ export default function ChatWidget({
         speech.setLanguage(lang)
       }
     })
+
+    // The visitor is still talking: the unfinished answer is dropped and the mic shows it is listening.
+    const keepListening = () => {
+      if (turn !== voiceTurn.current || !hearing) return false
+      if (talking) return true
+      talking = true
+      if (abortController.current) abortController.current.abort()
+      speech.stop()
+      clearTimeout(earlyTimer)
+      if (replyId) commitMessages((list) => list.filter((m) => m.id !== replyId))
+      setIsTyping(false)
+      setVoicePhase('listening')
+      return true
+    }
+    voice.listen({
+      language: props.current.currentLanguage,
+      sessionId: sessionId.current,
+      sampleRate: clientConfig.current.voice.sample_rate,
+      silenceMs: clientConfig.current.voice.silence_submit_ms,
+      maxSec: clientConfig.current.voice.max_session_sec,
+      resume: true,
+      onSpeech: () => { if (byVoice) keepListening() },
+      onText: (text) => {
+        if (!text.trim() || !keepListening()) return
+        added = text.trim()
+        updateMessage(questionId, { content: joinSpeech(question, added) })
+        scrollToBottom()
+      }
+    }).then((text) => resolveAdded(text), () => resolveAdded(''))
+    const final = await answering
+    if (talking) {
+      // Answer the whole question once they have finished (the final transcript, or the words already shown).
+      const whole = joinSpeech(question, (await addition).trim() || added)
+      if (!getMessage(questionId)) return '' // the chat was cleared
+      updateMessage(questionId, { content: whole })
+      if (turn === voiceTurn.current && voiceModeRef.current) return whole
+      if (!voiceModeRef.current) streamTurn(whole, 'text') // voice mode was closed while they spoke: answered in text
+      return ''
+    }
+    stopHearing()
     textDone = true
-    if (final && transcript) countVoiceTurn()
-    if (turn !== voiceTurn.current || !voiceModeRef.current) return reveal()
+    if (final) countVoiceTurn()
+    if (turn !== voiceTurn.current || !voiceModeRef.current) { reveal(); return '' }
     speech.end(final && final.text)
     maybeReveal()
     // Never keep the answer hidden for long if the voice is slow or unavailable.
@@ -541,6 +613,7 @@ export default function ChatWidget({
     highlighter.detach()
     pendingReveal.current = null
     if (turn === voiceTurn.current && voiceModeRef.current) setVoicePhase('hold')
+    return ''
   }
 
   function micAction() {

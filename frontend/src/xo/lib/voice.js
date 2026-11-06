@@ -12,6 +12,9 @@ class Capture extends AudioWorkletProcessor {
 registerProcessor('xo-capture', Capture)
 `
 
+// The longest stretch of audio kept between a sent question and the listening that follows it.
+const CARRY_MAX_MS = 15000
+
 function downsample(float32, fromRate, toRate) {
   if (fromRate === toRate) return float32
   const ratio = fromRate / toRate
@@ -43,6 +46,8 @@ function toPcm16(float32) {
  *    AudioContext (Android/iOS keep contexts created outside a gesture suspended).
  *  - open() asks for the microphone once and keeps it for the whole voice session.
  *  - listen() runs one turn and resolves with the final transcript after silence (or commit()).
+ *    The audio heard after a turn is sent is kept, so listen({ resume: true }) straight afterwards loses no words
+ *    (used to hear the visitor add to a question while XO is still thinking).
  *  - close() releases the microphone and audio engine.
  *
  * `onChange(state)` receives { liveText, listening, silenceCountdown } whenever one of them changes.
@@ -74,6 +79,17 @@ export function createVoice(onChange = () => {}) {
   let pending = []
   let finalTimer = null
   let lastDelta = 0
+  const gate = { floor: 0, speech: 0 } // the latest listening levels
+  // Audio heard after commit(), with the listening levels reached so far, for a listen({ resume: true }) that follows.
+  let carry = []
+  let carryMs = 0
+  let calibration = null
+  const keep = (frame) => {
+    if (carryMs > CARRY_MAX_MS) return
+    carry.push({ frame, at: performance.now() })
+    carryMs += (frame.length / ctx.sampleRate) * 1000
+  }
+  const dropCarry = () => { carry = []; carryMs = 0; calibration = null }
 
   function prepare() {
     if (!ctx) {
@@ -120,7 +136,7 @@ export function createVoice(onChange = () => {}) {
 
   function endTurn() {
     set({ listening: false, silenceCountdown: false, level: 0 })
-    frameHandler = null
+    if (frameHandler !== keep) frameHandler = null
     clearTimeout(finalTimer)
     try { ws && ws.readyState <= 1 && ws.close() } catch (e) {}
     ws = null
@@ -136,6 +152,7 @@ export function createVoice(onChange = () => {}) {
   function fail(code) {
     const done = rejectFn
     resolveFn = rejectFn = null
+    dropCarry()
     endTurn()
     done && done(new Error(code))
   }
@@ -148,7 +165,9 @@ export function createVoice(onChange = () => {}) {
     if (committed || !ws) return
     committed = true
     set({ silenceCountdown: false, listening: false })
-    frameHandler = null
+    dropCarry()
+    calibration = { ...gate }
+    frameHandler = keep
     if (ready && ws.readyState === 1) sendCommit()
     else commitQueued = true // sent with the buffered audio as soon as the service is ready
     finalTimer = setTimeout(() => finish(state.liveText), ready ? 6000 : 10000)
@@ -157,6 +176,8 @@ export function createVoice(onChange = () => {}) {
   function cancel() {
     const done = resolveFn
     resolveFn = rejectFn = null
+    dropCarry()
+    frameHandler = null
     endTurn()
     done && done('')
   }
@@ -172,7 +193,15 @@ export function createVoice(onChange = () => {}) {
 
   // End of speech is found from the voice itself (fast), with transcript activity as the fallback for very quiet
   // microphones. Background sound is tracked all the time, so a visitor who talks straight away is still heard.
-  function listen({ language, sessionId, sampleRate = 24000, silenceMs = 1000, maxSec = 120, noSpeechMs = 15000 }) {
+  // onText(text) receives the transcript so far each time it grows; onSpeech() is called once the visitor has clearly
+  // been talking for speechMs, which comes well before their words are transcribed.
+  function listen({ language, sessionId, sampleRate = 24000, silenceMs = 1000, maxSec = 120, noSpeechMs = 15000,
+                    resume = false, onText, onSpeech, speechMs = 500 }) {
+    if (resolveFn) cancel()
+    const replay = resume ? carry : []
+    const levels = resume ? calibration : null
+    dropCarry()
+    if (frameHandler === keep) frameHandler = null
     set({ liveText: '' })
     committed = false
     commitQueued = false
@@ -193,10 +222,13 @@ export function createVoice(onChange = () => {}) {
       } catch (e) {
         return fail('voice_unavailable')
       }
+      // A socket that has just closed can still report events; only this turn's own socket counts.
+      const sock = ws
 
-      const started = performance.now()
+      const started = replay.length ? replay[0].at : performance.now()
       let readyAt = 0
-      ws.onmessage = (ev) => {
+      sock.onmessage = (ev) => {
+        if (sock !== ws) return
         const msg = JSON.parse(ev.data)
         if (msg.type === 'ready') {
           ready = true
@@ -206,18 +238,20 @@ export function createVoice(onChange = () => {}) {
         } else if (msg.type === 'delta') {
           set({ liveText: state.liveText + msg.text })
           lastDelta = performance.now()
+          onText && onText(state.liveText)
         } else if (msg.type === 'final') {
           finish(msg.text || state.liveText)
         } else if (msg.type === 'error') {
           fail(msg.code === 'session_too_long' ? 'too_long' : 'voice_unavailable')
         }
       }
-      ws.onerror = () => fail('voice_unavailable')
-      ws.onclose = () => { if (resolveFn) (committed ? finish(state.liveText) : fail('voice_unavailable')) }
+      sock.onerror = () => { if (sock === ws) fail('voice_unavailable') }
+      sock.onclose = () => { if (sock === ws && resolveFn) (committed ? finish(state.liveText) : fail('voice_unavailable')) }
 
-      let floor = 0.004       // background level: follows quiet moments quickly, loud ones slowly
-      let speech = 0          // the visitor's own speaking level, once they have talked a little
+      let floor = levels ? levels.floor : 0.004 // background level: follows quiet moments quickly, loud ones slowly
+      let speech = levels ? levels.speech : 0   // the visitor's own speaking level, once they have talked a little
       let voicedMs = 0
+      let saidSpeech = false
       let lastVoice = 0
       let openUntil = 0       // the gate stays open briefly after speech so word endings are kept
       let lastFrame = started
@@ -226,26 +260,32 @@ export function createVoice(onChange = () => {}) {
       const batchTarget = Math.round(sampleRate / 10) // ~100 ms per frame sent
 
       set({ listening: true })
-      frameHandler = (frame) => {
+      frameHandler = (frame, at) => {
         if (committed) return
         let sum = 0
         for (let i = 0; i < frame.length; i++) sum += frame[i] * frame[i]
         const rms = Math.sqrt(sum / frame.length)
-        const now = performance.now()
+        const now = at || performance.now()
         const dt = Math.min(now - lastFrame, 250)
         lastFrame = now
 
         const towards = (from, to, tauMs) => from + (to - from) * (1 - Math.exp(-dt / tauMs))
         floor = Math.max(rms < floor ? towards(floor, rms, 300) : towards(floor, rms, 4000), 0.0015)
         // Voices clearly quieter than the visitor's own (a TV, people nearby) do not count as speech.
-        const threshold = Math.max(floor * 3, 0.006, voicedMs > 300 ? speech * 0.25 : 0)
+        const threshold = Math.max(floor * 3, 0.006, voicedMs > 300 || (levels && levels.speech) ? speech * 0.25 : 0)
         const voiced = rms > threshold
         if (voiced) {
           voicedMs += dt
           lastVoice = now
           openUntil = now + 250
           speech = speech ? towards(speech, rms, 1500) : rms
+          if (!saidSpeech && voicedMs >= speechMs) {
+            saidSpeech = true
+            onSpeech && onSpeech()
+          }
         }
+        gate.floor = floor
+        gate.speech = speech
         state.level = Math.min(rms / 0.06, 1)
 
         let pcm = downsample(frame, ctx.sampleRate, sampleRate)
@@ -280,6 +320,7 @@ export function createVoice(onChange = () => {}) {
         }
         if ((now - started) / 1000 > maxSec) commit()
       }
+      replay.forEach(({ frame, at }) => frameHandler && frameHandler(frame, at))
     })
   }
 
