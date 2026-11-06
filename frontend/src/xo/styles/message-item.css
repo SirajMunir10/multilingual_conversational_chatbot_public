@@ -4,10 +4,8 @@
 .message-wrapper.user { justify-content: flex-end; }
 @keyframes mi-msgIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-.message-avatar {
-  flex: none; width: 28px; height: 28px; margin-top: 2px; border-radius: 50%; object-fit: cover;
-  background: #f4efff; box-shadow: 0 0 0 1.5px rgba(124, 44, 240, 0.35);
-}
+/* The mascot on its own beside XO's replies, no circle */
+.message-avatar { flex: none; width: 30px; height: 32px; object-fit: contain; object-position: 50% 100%; }
 
 .message-bubble-container { display: flex; flex-direction: column; min-width: 0; max-width: 84%; }
 .message-wrapper.user .message-bubble-container { align-items: flex-end; max-width: 82%; }
@@ -19,12 +17,13 @@
   background: var(--w-bg, #fff); color: var(--w-ink, #0f172a);
   border: 1px solid var(--w-line, rgba(15, 23, 42, 0.08));
   border-radius: 6px 18px 18px 18px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 6px 18px -12px rgba(38, 10, 74, 0.28);
 }
+/* The visitor's messages are brand violet, like the language button in the header */
 .message-wrapper.user .message-bubble {
-  background: linear-gradient(135deg, #6d14b8, #5c039b);
+  background: var(--w-violet, linear-gradient(135deg, #8b3dff, #6a11c9));
   color: #fff; border-radius: 18px 18px 6px 18px;
-  box-shadow: 0 6px 16px -8px rgba(92, 3, 155, 0.7);
+  box-shadow: 0 10px 22px -12px rgba(106, 17, 201, 0.75);
 }
 [dir="rtl"] .message-wrapper.assistant .message-bubble { border-radius: 18px 6px 18px 18px; }
 [dir="rtl"] .message-wrapper.user .message-bubble { border-radius: 18px 18px 18px 6px; }
