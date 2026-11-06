@@ -1,11 +1,12 @@
 /* Converted from components/chat/ChatWidget.vue (Vue scoped styles). Class names unchanged. */
 /* ===== XO widget — design tokens (light / dark) ===== */
+/* Look: the whole window is a softly drifting aurora; text sits on white cards and a dark ink command bar with a lime accent. */
 .xo-widget {
   --w-bg: #ffffff;
-  --w-feed: #f7f6fb;
+  --w-feed: #f5f2ff;
   --w-line: rgba(15, 23, 42, 0.08);
   --w-ink: #0f172a;
-  --w-ink-2: #64748b;
+  --w-ink-2: #5b6478;
   --w-brand: #5c039b;
   --w-brand-2: #7c2cf0;
   --w-accent: #03a4f4;
@@ -14,72 +15,124 @@
   --w-chip: rgba(92, 3, 155, 0.06);
   --w-chip-hover: rgba(92, 3, 155, 0.12);
   --w-ring: rgba(124, 44, 240, 0.14);
-  --w-shadow: 0 28px 70px -18px rgba(38, 10, 74, 0.32), 0 10px 24px -12px rgba(38, 10, 74, 0.22);
+  --w-shadow: 0 28px 70px -18px rgba(38, 10, 74, 0.35), 0 10px 24px -12px rgba(38, 10, 74, 0.2);
+  /* Aurora light: violet, cyan and lime glows (pre-softened gradients, no blur filter) */
+  --w-aurora-1: rgba(139, 61, 255, 0.3);
+  --w-aurora-2: rgba(3, 164, 244, 0.22);
+  --w-aurora-3: rgba(100, 239, 10, 0.16);
+  /* Floating controls on the aurora */
+  --w-float: rgba(255, 255, 255, 0.72);
+  --w-float-line: rgba(255, 255, 255, 0.9);
+  /* The command bar (input and voice): a bright capsule with a brand-colour edge */
+  --w-cmd: #ffffff;
+  --w-cmd-edge: linear-gradient(115deg, rgba(139, 61, 255, 0.6), rgba(3, 164, 244, 0.5) 50%, rgba(100, 239, 10, 0.55));
+  --w-cmd-shadow: 0 12px 28px -14px rgba(92, 3, 155, 0.45);
+  /* Brand violet for the visitor's messages and the language button */
+  --w-violet: linear-gradient(135deg, #8b3dff, #6a11c9);
+  /* The colours that travel around the window while XO is in voice mode */
+  --w-palette: #8b3dff, #03a4f4, #64ef0a, #03a4f4, #8b3dff;
 
   position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   width: 100%;
   height: var(--xo-widget-h, 620px);
-  background: var(--w-bg);
+  background: var(--w-feed);
   color: var(--w-ink);
-  border: 1px solid var(--w-line);
-  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 30px;
   box-shadow: var(--w-shadow);
+  /* clip, not hidden: the oversized aurora must never turn the window itself into something that can scroll */
   overflow: hidden;
+  overflow: clip;
   container-type: inline-size;
   font-family: var(--font-body);
   -webkit-tap-highlight-color: transparent;
+  transform-origin: 100% 100%;
+  animation: cw-open 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
+[dir="rtl"].xo-widget { transform-origin: 0 100%; }
+/* Opening: the window grows out of the launcher corner */
+@keyframes cw-open { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: none; } }
 [data-theme="dark"] .xo-widget {
-  --w-bg: #110e1f;
+  --w-bg: #15112a;
   --w-feed: #0b0916;
-  --w-line: rgba(255, 255, 255, 0.08);
+  --w-line: rgba(255, 255, 255, 0.09);
   --w-ink: #f1f0f7;
-  --w-ink-2: #9a97ad;
+  --w-ink-2: #a3a0b8;
   --w-brand: #c59bff;
   --w-chip: rgba(168, 85, 247, 0.12);
   --w-chip-hover: rgba(168, 85, 247, 0.22);
   --w-ring: rgba(168, 85, 247, 0.22);
-  --w-shadow: 0 28px 70px -18px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(168, 85, 247, 0.12);
+  --w-shadow: 0 28px 70px -18px rgba(0, 0, 0, 0.75);
+  --w-aurora-1: rgba(124, 44, 240, 0.34);
+  --w-aurora-2: rgba(3, 164, 244, 0.16);
+  --w-aurora-3: rgba(100, 239, 10, 0.07);
+  --w-float: rgba(255, 255, 255, 0.07);
+  --w-float-line: rgba(255, 255, 255, 0.1);
+  --w-cmd: #241c4a;
+  --w-cmd-edge: linear-gradient(115deg, rgba(168, 85, 247, 0.7), rgba(3, 164, 244, 0.5) 50%, rgba(100, 239, 10, 0.5));
+  --w-cmd-shadow: 0 12px 28px -14px rgba(0, 0, 0, 0.75);
+  border-color: rgba(168, 85, 247, 0.22);
+}
+/* The aurora: one oversized layer of glows that drifts slowly (transform only, cheap to animate) */
+.xo-widget::before {
+  content: ""; position: absolute; z-index: -1; inset: -30%; pointer-events: none;
+  background:
+    radial-gradient(32% 28% at 28% 22%, var(--w-aurora-1), transparent 70%),
+    radial-gradient(30% 26% at 76% 34%, var(--w-aurora-2), transparent 70%),
+    radial-gradient(34% 26% at 34% 74%, var(--w-aurora-3), transparent 70%);
+  animation: cw-aurora 26s ease-in-out infinite alternate;
+}
+@keyframes cw-aurora {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(4%, 3%, 0) rotate(8deg); }
+  100% { transform: translate3d(-3%, 5%, 0) rotate(-6deg); }
 }
 .xo-widget button:not(.message-wrapper *, .onboarding-tips-container *) { font-family: inherit; -webkit-tap-highlight-color: transparent; }
-.xo-widget :focus-visible:not(.message-wrapper *, .onboarding-tips-container *) { outline: 2px solid var(--w-accent); outline-offset: 2px; }
+/* Text boxes are left out: the input capsule and the language search show focus themselves */
+.xo-widget :focus-visible:not(.message-wrapper *, .onboarding-tips-container *, input) { outline: 2px solid var(--w-accent); outline-offset: 2px; }
 
-/* ===== Header ===== */
+/* ===== Header: no bar; the name floats on the aurora and the controls sit together in one floating capsule ===== */
 .xo-header {
   position: relative; z-index: 6;
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 12px 10px 12px 14px;
-  background: var(--w-bg);
-  border-bottom: 1px solid var(--w-line);
+  padding: 12px 12px 6px 14px;
 }
-.xo-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.xo-avatar { position: relative; flex: none; width: 38px; height: 38px; padding: 2px; border-radius: 50%; background: var(--w-grad); }
-.xo-avatar img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: #f4efff; }
-.xo-online { position: absolute; right: 0; bottom: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--w-lime); box-shadow: 0 0 0 2px var(--w-bg); }
-.xo-brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.xo-brand-text strong { font-family: var(--font-heading); font-size: 1.05rem; font-weight: 700; letter-spacing: 0.01em; }
-.xo-brand-text small { font-size: 0.72rem; color: var(--w-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xo-brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+/* The mascot on its own, no circle */
+.xo-avatar { position: relative; flex: none; width: 36px; height: 40px; }
+.xo-avatar img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; filter: drop-shadow(0 3px 4px rgba(92, 3, 155, 0.25)); }
+.xo-online { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: var(--w-lime); box-shadow: 0 0 0 2px var(--w-feed); }
+.xo-brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.xo-brand-text strong { font-family: var(--font-heading); font-size: 1.1rem; font-weight: 800; letter-spacing: 0.02em; }
+.xo-brand-text small { font-size: 0.7rem; color: var(--w-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.xo-header-actions { display: flex; align-items: center; gap: 2px; flex: none; }
+.xo-header-actions {
+  display: flex; align-items: center; gap: 1px; flex: none; padding: 3px;
+  background: var(--w-float); border: 1px solid var(--w-float-line); border-radius: 999px;
+  box-shadow: 0 8px 22px -14px rgba(38, 10, 74, 0.45);
+}
 .xo-chip {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-  height: 32px; padding: 0 11px; margin-inline-end: 4px;
+  height: 30px; padding: 0 10px; margin-inline-end: 2px;
   border: 0; border-radius: 999px; cursor: pointer;
-  background: var(--w-chip); color: var(--w-brand);
-  font-size: 0.78rem; font-weight: 600; white-space: nowrap;
+  background: var(--w-violet); color: #fff;
+  font-size: 0.76rem; font-weight: 600; white-space: nowrap;
   transition: background 150ms ease, transform 150ms ease;
 }
-.xo-chip:hover { background: var(--w-chip-hover); }
+.xo-chip:hover { filter: brightness(1.08); }
 .xo-chip:active { transform: scale(0.96); }
-.xo-divider { width: 1px; height: 20px; margin: 0 4px; background: var(--w-line); }
+.advisor-btn { background: transparent; color: var(--w-ink); }
+.advisor-btn:hover { background: var(--w-chip-hover); filter: none; }
+.xo-divider { width: 1px; height: 16px; margin: 0 2px; background: var(--w-line); }
 .xo-icon-btn {
-  display: grid; place-items: center; width: 32px; height: 32px;
-  border: 0; border-radius: 10px; background: transparent; color: var(--w-ink-2); cursor: pointer;
+  display: grid; place-items: center; width: 30px; height: 30px;
+  border: 0; border-radius: 50%; background: transparent; color: var(--w-ink-2); cursor: pointer;
   transition: background 150ms ease, color 150ms ease;
 }
-.xo-icon-btn:hover { background: var(--w-chip); color: var(--w-ink); }
+.xo-icon-btn:hover { background: var(--w-chip-hover); color: var(--w-ink); }
 /* Red is kept for the one destructive action; closing only hides the chat and keeps the conversation */
 .clear-chat-btn:hover { background: rgba(220, 38, 38, 0.1); color: #dc2626; }
 [data-theme="dark"] .clear-chat-btn:hover { background: rgba(248, 113, 113, 0.14); color: #f87171; }
@@ -156,18 +209,13 @@
 }
 
 /* ===== Conversation ===== */
-.feed-wrap {
-  position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column;
-  background:
-    radial-gradient(120% 50% at 0% 0%, rgba(124, 44, 240, 0.06), transparent 60%),
-    radial-gradient(100% 45% at 100% 0%, rgba(3, 164, 244, 0.05), transparent 60%),
-    var(--w-feed);
-}
+/* No panel of its own: the conversation floats on the window's aurora */
+.feed-wrap { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 /* UAE skyline behind the conversation: fixed while messages scroll, very faint so text stays crisp */
 .feed-backdrop {
   position: absolute; left: 0; right: 0; bottom: 0; height: min(46%, 300px); pointer-events: none;
-  -webkit-mask-image: linear-gradient(to top, #000 55%, transparent);
-  mask-image: linear-gradient(to top, #000 55%, transparent);
+  -webkit-mask-image: linear-gradient(to top, transparent 0, #000 28px, #000 55%, transparent);
+  mask-image: linear-gradient(to top, transparent 0, #000 28px, #000 55%, transparent);
 }
 /* The faintness applies to the buildings only, so their lit windows can glow above it */
 .feed-backdrop .uae-skyline { opacity: 0.075; }
@@ -176,28 +224,58 @@
   position: relative; z-index: 1;
   flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   display: flex; flex-direction: column; gap: 14px;
-  padding: 18px 14px 22px;
+  padding: 10px 14px 18px;
+  /* Messages fade in and out softly at the top and bottom edges instead of being cut off */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 16px), transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 16px), transparent 100%);
   scrollbar-width: thin; scrollbar-color: var(--w-line) transparent;
 }
 .chat-feed::-webkit-scrollbar { width: 6px; }
 .chat-feed::-webkit-scrollbar-thumb { background: var(--w-line); border-radius: 6px; }
 
-/* The empty-state greeting sits in the middle of the conversation area (lifted slightly above the skyline) */
-.xo-hero { display: flex; flex-direction: column; align-items: center; text-align: center; margin-block: auto; padding: 16px 16px 48px; }
+/* The empty-state greeting: XO inside a glowing, breathing orb (lifted slightly above the skyline) */
+.xo-hero { display: flex; flex-direction: column; align-items: center; text-align: center; margin-block: auto; padding: 4px 12px 40px; }
 .xo-hero-mascot {
-  width: 112px; height: 112px; margin-bottom: 18px; border-radius: 50%; display: grid; place-items: center;
-  background: radial-gradient(circle at 50% 40%, rgba(3, 164, 244, 0.18), rgba(124, 44, 240, 0.12) 60%, transparent 72%);
+  position: relative; width: 128px; height: 128px; margin-bottom: 18px; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 38%, #ffffff 0%, #efe6ff 55%, #dcc8ff 100%);
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.5), 0 18px 40px -14px rgba(92, 3, 155, 0.55), inset 0 -10px 24px rgba(124, 44, 240, 0.18);
 }
-.xo-hero-mascot img { width: 96px; height: 96px; object-fit: contain; animation: cw-floatMascot 4s ease-in-out infinite; }
-.xo-hero h3 { margin: 0 0 8px; font-family: var(--font-heading); font-size: 1.22rem; font-weight: 700; line-height: 1.3; color: var(--w-ink); max-width: 320px; }
-.xo-hero p { margin: 0; font-size: 0.9rem; color: var(--w-ink-2); }
+[data-theme="dark"] .xo-hero-mascot {
+  background: radial-gradient(circle at 50% 38%, #3b2470 0%, #22154a 60%, #160d33 100%);
+  box-shadow: 0 0 0 6px rgba(168, 85, 247, 0.1), 0 18px 44px -12px rgba(124, 44, 240, 0.6), inset 0 -10px 24px rgba(3, 164, 244, 0.15);
+}
+/* A turning ring of brand colours and a soft halo that breathes (both animate transform and opacity only) */
+.xo-hero-mascot::before {
+  content: ""; position: absolute; inset: -9px; border-radius: 50%;
+  background: conic-gradient(from 0deg, #7c2cf0, #03a4f4, #64ef0a, #7c2cf0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+  animation: cw-ringSpin 10s linear infinite;
+}
+.xo-hero-mascot::after {
+  content: ""; position: absolute; inset: -22px; z-index: -1; border-radius: 50%;
+  background: radial-gradient(circle, rgba(124, 44, 240, 0.28), rgba(3, 164, 244, 0.12) 50%, transparent 70%);
+  animation: cw-breathe 4s ease-in-out infinite;
+}
+.xo-hero-mascot img { position: relative; width: 104px; height: 104px; object-fit: contain; animation: cw-floatMascot 4s ease-in-out infinite; }
+.xo-hero h3 {
+  margin: 0 0 6px; font-family: var(--font-heading); font-size: 1.28rem; font-weight: 800; line-height: 1.25; letter-spacing: -0.01em;
+  color: var(--w-ink); max-width: 290px;
+}
+.xo-hero p {
+  display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 0; padding: 5px 12px; border-radius: 999px;
+  background: var(--w-float); border: 1px solid var(--w-float-line); font-size: 0.8rem; color: var(--w-ink-2);
+}
+.xo-hero p::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--w-lime); box-shadow: 0 0 0 3px rgba(100, 239, 10, 0.22); }
 @keyframes cw-floatMascot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes cw-ringSpin { to { transform: rotate(1turn); } }
+@keyframes cw-breathe { 0%, 100% { transform: scale(0.92); opacity: 0.7; } 50% { transform: scale(1.06); opacity: 1; } }
 
 .lang-divider { display: flex; align-items: center; gap: 10px; margin: 2px 0; color: var(--w-ink-2); font-size: 0.72rem; }
 .lang-divider::before, .lang-divider::after { content: ""; flex: 1; height: 1px; background: var(--w-line); }
 
 .typing-indicator { display: flex; align-items: center; gap: 8px; animation: cw-rise 220ms ease both; }
-.typing-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #f4efff; flex: none; }
+.typing-avatar { width: 30px; height: 32px; object-fit: contain; object-position: 50% 100%; flex: none; }
 .typing-pill {
   display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px;
   background: var(--w-bg); border: 1px solid var(--w-line); border-radius: 16px 16px 16px 6px;
@@ -219,15 +297,17 @@
   box-shadow: 0 8px 20px -8px rgba(15, 23, 42, 0.3);
 }
 
-/* ===== Text input ===== */
-.chat-footer { padding: 10px 12px 2px; background: var(--w-bg); border-top: 1px solid var(--w-line); }
+/* ===== Command bar: the text input and the voice bar are one bright capsule with a brand-colour edge and a lime send button ===== */
+.chat-footer { padding: 4px 12px 2px; }
 .input-form {
-  display: flex; align-items: center; gap: 4px; padding: 5px 5px 5px 16px;
-  border: 1px solid var(--w-line); border-radius: 999px; background: var(--w-feed);
-  transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+  display: flex; align-items: center; gap: 4px; padding: 5px 5px 5px 18px;
+  border: 1.5px solid transparent; border-radius: 999px;
+  background: linear-gradient(var(--w-cmd), var(--w-cmd)) padding-box, var(--w-cmd-edge) border-box;
+  box-shadow: var(--w-cmd-shadow);
+  transition: box-shadow 150ms ease;
 }
-[dir="rtl"] .input-form { padding: 5px 16px 5px 5px; }
-.input-form:focus-within { border-color: rgba(124, 44, 240, 0.45); box-shadow: 0 0 0 4px var(--w-ring); background: var(--w-bg); }
+[dir="rtl"] .input-form { padding: 5px 18px 5px 5px; }
+.input-form:focus-within { box-shadow: 0 0 0 4px var(--w-ring), var(--w-cmd-shadow); }
 .chat-input-field {
   flex: 1 1 auto; min-width: 0; padding: 10px 0; border: 0; outline: none; background: transparent;
   color: var(--w-ink); font-size: 0.95rem; font-family: inherit;
@@ -238,26 +318,29 @@
   flex: none; display: grid; place-items: center; width: 40px; height: 40px;
   border: 0; border-radius: 50%; cursor: pointer; transition: transform 150ms ease, background 150ms ease, opacity 150ms ease;
 }
-.mic-btn { background: transparent; color: var(--w-brand); }
+.mic-btn { background: var(--w-chip); color: var(--w-brand-2); }
+[data-theme="dark"] .mic-btn { color: #d9c2ff; }
 .mic-btn:hover { background: var(--w-chip-hover); }
-.send-btn { background: var(--w-grad); color: #fff; box-shadow: 0 6px 14px -6px rgba(92, 3, 155, 0.6); }
+.send-btn { background: var(--w-lime); color: #170b2e; box-shadow: 0 0 18px -4px rgba(100, 239, 10, 0.7); }
 .send-btn:hover:not(:disabled) { transform: translateY(-1px); }
-.send-btn:disabled { background: var(--w-line); color: var(--w-ink-2); box-shadow: none; cursor: default; }
+.send-btn:disabled { background: var(--w-chip); color: var(--w-ink-2); box-shadow: none; cursor: default; }
 .mic-btn:active, .send-btn:active:not(:disabled) { transform: scale(0.94); }
 /* One quiet line under the input, in text and voice mode; it also keeps clear of the phone's home bar */
 .input-disclaimer {
   padding: 6px 16px calc(8px + env(safe-area-inset-bottom, 0px));
-  background: var(--w-bg); color: var(--w-ink-2); font-size: 0.68rem; line-height: 1.35; text-align: center;
+  color: var(--w-ink-2); font-size: 0.68rem; line-height: 1.35; text-align: center;
 }
 
-/* ===== Voice dock ===== */
+/* ===== Voice dock: the same command bar, holding the orb; its edge colours travel while XO is in voice mode ===== */
 .voice-dock {
   position: relative; display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px 2px 8px; background: var(--w-bg); border-top: 1px solid var(--w-line);
+  margin: 4px 12px 2px; padding: 4px 8px 4px 4px;
+  border: 2px solid transparent; border-radius: 44px;
+  background: linear-gradient(var(--w-cmd), var(--w-cmd)) padding-box, conic-gradient(from var(--w-spin), var(--w-palette)) border-box;
+  box-shadow: 0 0 22px -6px rgba(139, 61, 255, 0.55), var(--w-cmd-shadow);
+  animation: cw-spin 6s steps(144) infinite;
 }
-.voice-dock::before {
-  content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: var(--w-grad); opacity: 0.55;
-}
+[dir="rtl"] .voice-dock { padding: 4px 4px 4px 8px; }
 .voice-orb-btn {
   position: relative; flex: none; display: grid; place-items: center; width: 68px; height: 68px; padding: 0;
   border: 0; border-radius: 50%; background: transparent; cursor: pointer; transition: transform 150ms ease;
@@ -296,6 +379,7 @@
   mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em);
 }
 .voice-error-text { margin: 4px 0 0; color: #dc2626; font-size: 0.8rem; }
+[data-theme="dark"] .voice-error-text { color: #fca5a5; }
 .voice-dock-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .xo-round-btn {
   display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
@@ -304,7 +388,8 @@
 }
 .xo-round-btn:active { transform: scale(0.94); }
 .xo-round-btn.cancel:hover { background: rgba(220, 38, 38, 0.08); color: #dc2626; }
-.xo-round-btn.confirm { border: 0; background: var(--w-grad); color: #fff; box-shadow: 0 6px 14px -6px rgba(92, 3, 155, 0.6); }
+[data-theme="dark"] .xo-round-btn.cancel:hover { background: rgba(248, 113, 113, 0.16); color: #fca5a5; }
+.xo-round-btn.confirm { border: 0; background: var(--w-lime); color: #170b2e; box-shadow: 0 0 18px -4px rgba(100, 239, 10, 0.7); }
 
 /* Mic hint for first-time voice users: a hand points at the mic and taps gently */
 .voice-coach {
@@ -335,6 +420,28 @@
 }
 @keyframes cw-voiceEnter { from { transform: scale(0.4); opacity: 1; } to { transform: scale(26); opacity: 0; } }
 
+/* ===== Voice mode: brand colours travel around the window's edge and it glows softly ===== */
+/* A registered angle, so the gradient can turn; browsers without it show the same ring standing still.
+   The turn runs at 24 steps a second (6 s / 144): smooth to the eye at half the drawing work of every frame. */
+@property --w-spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+@keyframes cw-spin { to { --w-spin: 360deg; } }
+.xo-widget.in-voice::after {
+  content: ""; position: absolute; inset: 0; z-index: 30; pointer-events: none;
+  padding: 2px; border-radius: inherit;
+  background: conic-gradient(from var(--w-spin), var(--w-palette));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: cw-spin 6s steps(144) infinite, cw-ringIn 400ms ease both;
+}
+/* The opening animation stays first in the list, so leaving voice mode does not replay it */
+.xo-widget.in-voice { animation: cw-open 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both, cw-voiceGlow 3s ease-in-out infinite alternate; }
+@keyframes cw-ringIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cw-voiceGlow {
+  from { box-shadow: 0 0 34px -8px rgba(139, 61, 255, 0.55), var(--w-shadow); }
+  to { box-shadow: 0 0 34px -8px rgba(3, 164, 244, 0.5), var(--w-shadow); }
+}
+
 /* ===== Transitions ===== */
 .dock-enter-active, .dock-leave-active { transition: opacity 160ms ease, transform 160ms ease; }
 .dock-enter-from, .dock-leave-to { opacity: 0; transform: translateY(10px); }
@@ -352,6 +459,6 @@
   .chat-input-field { font-size: 16px; } /* prevents iOS zoom on focus */
 }
 @media (prefers-reduced-motion: reduce) {
-  .xo-hero-mascot img, .typing-dots i, .typing-indicator, .orb-heartbeat, .voice-coach-hand, .voice-orb-btn.is-coached::after { animation: none !important; }
+  .xo-widget, .xo-widget::before, .xo-widget.in-voice::after, .voice-dock, .xo-hero-mascot::before, .xo-hero-mascot::after, .xo-hero-mascot img, .typing-dots i, .typing-indicator, .orb-heartbeat, .voice-coach-hand, .voice-orb-btn.is-coached::after { animation: none !important; }
   .voice-enter-ripple { display: none; }
 }

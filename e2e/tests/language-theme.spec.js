@@ -66,7 +66,7 @@ test.describe('language', () => {
     await openApp(page)
     await page.locator('#lang-select').selectOption('fr')
     await expect(page.locator('.xo-widget')).toHaveAttribute('lang', 'fr')
-    await expect(page.locator('.xo-brand-text small')).toHaveText('Assistant immobilier et prêts')
+    await expect(page.locator('.xo-brand-text small')).toHaveText('Assistant IA')
   })
 })
 

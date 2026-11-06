@@ -43,7 +43,9 @@ test('full voice conversation', async ({ page }) => {
   expect(log.chat.at(-1)).toMatchObject({ message: 'Show me homes in Dubai Marina', channel: 'voice' })
   await page.waitForTimeout(2500)
   expect(await phase(page)).toBe('hold')
-  expect(log.sttSockets).toBe(1)
+  // One listening for the question, and one while XO thought (closed once he spoke) in case the visitor added words.
+  expect(log.sttSockets).toBe(2)
+  expect(log.chat).toHaveLength(1)
 
   // Tap in hold -> listening; while XO speaks, tap interrupts and listens again
   await page.locator('.voice-orb-btn').click({ force: true })
@@ -85,5 +87,27 @@ test('a long spoken question keeps its newest words in view; entering voice mode
   // The caption is three lines high and scrolled to its end, so the last words are the ones on screen.
   const view = await caption.evaluate((el) => ({ hidden: el.scrollHeight > el.clientHeight + 2, atEnd: el.scrollHeight - el.scrollTop - el.clientHeight < 2 }))
   expect(view).toEqual({ hidden: true, atEnd: true })
+  await page.locator('.xo-round-btn.cancel').click()
+})
+
+test('words added while XO is still thinking join the question on screen, and XO answers the whole question', async ({ page }) => {
+  test.setTimeout(60_000)
+  const log = await openApp(page, { followUp: 'under two million dirhams', thinkMs: 4000 })
+  await page.evaluate(() => localStorage.setItem('xo_voice_turns', '2'))
+  await page.locator('.mic-btn').click()
+  const question = page.locator('.message-wrapper.user')
+  await expect(question).toContainText('Show me homes in Dubai Marina', { timeout: 15_000 })
+
+  // The visitor keeps talking: XO stops thinking, listens, and their words appear in the same question as they speak
+  await expect(page.locator('.voice-dock.phase-listening')).toBeVisible({ timeout: 5_000 })
+  await expect(question.locator('.message-content')).toContainText('Show me homes in Dubai Marina under two', { timeout: 5_000 })
+  await expect(question.locator('.message-content')).toHaveText('Show me homes in Dubai Marina under two million dirhams', { timeout: 5_000 })
+
+  // XO answers the whole question once, and nothing of the dropped answer is left behind
+  await expect(page.locator('.voice-dock.phase-speaking')).toBeVisible({ timeout: 20_000 })
+  await expect(page.locator('.message-wrapper.assistant').last().locator('.md')).toHaveText('I found three homes in Dubai Marina for you.')
+  await expect(question).toHaveCount(1)
+  await expect(page.locator('.message-wrapper.assistant')).toHaveCount(1)
+  expect(log.chat.map((c) => c.message)).toEqual(['Show me homes in Dubai Marina', 'Show me homes in Dubai Marina under two million dirhams'])
   await page.locator('.xo-round-btn.cancel').click()
 })

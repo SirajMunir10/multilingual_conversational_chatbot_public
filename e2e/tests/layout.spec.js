@@ -7,7 +7,7 @@ test.describe('layout', () => {
     await openApp(page)
     const w = page.locator('.xo-widget')
     await expect(w.locator('.xo-brand-text strong')).toHaveText('XO')
-    await expect(w.locator('.xo-brand-text small')).toHaveText('Property & mortgage assistant')
+    await expect(w.locator('.xo-brand-text small')).toHaveText('AI assistant')
     await expect(w.locator('.lang-switch-btn')).toHaveAttribute('aria-label', /English/)
     await expect(w.locator('.advisor-btn')).toBeVisible()
     for (const sel of ['.theme-toggle-btn', '.clear-chat-btn', '.close-widget-btn']) await expect(w.locator(sel)).toBeVisible()

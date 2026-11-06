@@ -57,8 +57,12 @@ function tokens(text) {
  * Installs the simulated backend and a scripted (silent) microphone on a page.
  * Returns a log of what the widget sent, for assertions.
  */
-async function installMocks(page, { transcript = 'Show me homes in Dubai Marina' } = {}) {
+// followUp: words the visitor adds while XO is still thinking (heard by the listening that starts as a question is sent).
+// thinkMs: how long XO takes before its reply starts.
+async function installMocks(page, { transcript = 'Show me homes in Dubai Marina', followUp = '', thinkMs = 0 } = {}) {
   const log = { chat: [], speak: [], confirm: [], feedback: [], sttSockets: 0, sttCommits: 0 }
+  let lastFinalAt = 0
+  let followUpLeft = !!followUp
   let advisorCount = 0
 
   await page.clock.setFixedTime(FIXED_TIME)
@@ -111,7 +115,9 @@ async function installMocks(page, { transcript = 'Show me homes in Dubai Marina'
       const text = REPLIES[kind]
       const events = [{ type: 'session', session_id: 'sess_test', language: lang }, ...status, ...tokens(text),
         { type: 'final', session_id: 'sess_test', language: lang, text, tools: status.map((s) => s.tool), ...extra }]
-      return route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body: sse(events) })
+      if (thinkMs) await new Promise((resolve) => setTimeout(resolve, thinkMs))
+      // A reply the widget dropped (the visitor kept talking) can no longer be delivered.
+      return route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body: sse(events) }).catch(() => {})
     }
 
     if (p.endsWith('/api/handoff/confirm')) {
@@ -151,6 +157,10 @@ async function installMocks(page, { transcript = 'Show me homes in Dubai Marina'
   // Live transcription: "ready", then transcript deltas while audio frames arrive, "final" on commit.
   await page.routeWebSocket(/\/api\/voice\/stt/, (ws) => {
     log.sttSockets += 1
+    // Opened straight after a question was sent: the visitor says the follow-up words once, otherwise nothing.
+    const continuing = Date.now() - lastFinalAt < 300
+    const said = continuing ? (followUpLeft ? followUp : '') : transcript
+    if (continuing) followUpLeft = false
     let frames = 0
     let sent = false
     setTimeout(() => ws.send(JSON.stringify({ type: 'ready' })), 100)
@@ -159,14 +169,17 @@ async function installMocks(page, { transcript = 'Show me homes in Dubai Marina'
         const msg = JSON.parse(message)
         if (msg.type === 'commit') {
           log.sttCommits += 1
-          setTimeout(() => ws.send(JSON.stringify({ type: 'final', text: transcript })), 150)
+          setTimeout(() => {
+            lastFinalAt = Date.now()
+            ws.send(JSON.stringify({ type: 'final', text: said }))
+          }, 150)
         }
         return
       }
       frames += 1
-      if (!sent && frames >= 3) {
+      if (!sent && said && frames >= 3) {
         sent = true
-        const words = transcript.split(' ')
+        const words = said.split(' ')
         words.forEach((w, i) => setTimeout(() => ws.send(JSON.stringify({ type: 'delta', text: (i ? ' ' : '') + w })), 150 * (i + 1)))
       }
     })
