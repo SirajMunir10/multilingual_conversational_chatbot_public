@@ -1,5 +1,7 @@
 # XO — XOTO Conversational Assistant
 
+> **Note:** Company documents and the knowledge base are private and not included.
+
 XO is XOTO's chat and voice assistant for UAE real estate and mortgages. It helps buyers, investors, agents, brokers, bankers and mortgage advisors find properties, estimate affordability and payments, understand fees and regulations from XOTO's knowledge base, and request an advisor callback, in 15 languages. The authoritative requirements are in [`prd.md`](prd.md) and [`Xobia_KB_v2_FINAL.md`](Xobia_KB_v2_FINAL.md); mortgage eligibility and calculations follow the approved [`Mortgage Eligibility Calculations.pdf`](Mortgage%20Eligibility%20Calculations.pdf).
 
 ## Models (confirmed, override PRD §6.2)
